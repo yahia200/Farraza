@@ -1,0 +1,54 @@
+// use prisma-8
+
+enum MemberRole {
+  Owner       = "owner"
+  Admin       = "admin"
+  Recruiter   = "recruiter"
+  Interviewer = "interviewer"
+}
+
+model User {
+  id           Uuid                       @id @default(sql`gen_random_uuid()`)
+  email        String                     @unique
+  emailVerified Boolean                    @default(false) @map("email_verified")
+  passwordHash String?                     @map("password_hash")
+  name         String
+  createdAt    TimestamptzJsDate          @default(now()) @map("created_at")
+  updatedAt    temporal.updatedAtJsDate() @map("updated_at")
+
+  memberships Membership[]
+
+  @@check(expression: "email = lower(email)", name: "users_email_lowercase")
+  @@map("users")
+}
+
+model Company {
+  id         Uuid                       @id @default(sql`gen_random_uuid()`)
+  name       String
+  slug       String                     @unique
+  logoUrl    String?                    @map("logo_url")
+  brandColor Char(7)?                   @map("brand_color")
+  createdAt  TimestamptzJsDate          @default(now()) @map("created_at")
+  updatedAt  temporal.updatedAtJsDate() @map("updated_at")
+
+  memberships Membership[]
+
+  @@check(expression: "slug ~ '^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$'", name: "companies_slug_format")
+  @@check(expression: "brand_color ~ '^#[0-9a-fA-F]{6}$'", name: "companies_brand_color_format")
+  @@map("companies")
+}
+
+model Membership {
+  id        Uuid              @id @default(sql`gen_random_uuid()`)
+  userId    Uuid              @map("user_id")
+  companyId Uuid              @map("company_id")
+  role      MemberRole
+  createdAt TimestamptzJsDate @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, companyId])
+  @@index([companyId])
+  @@map("memberships")
+}
