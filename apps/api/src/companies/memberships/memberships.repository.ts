@@ -16,7 +16,7 @@ export class MembershipsRepository {
       userId: row.userId,
       name: row.user.name,
       email: row.user.email,
-      role: row.role as MemberRole,
+      role: row.role,
       joinedAt: row.createdAt,
     }));
   }
@@ -45,7 +45,7 @@ export class MembershipsRepository {
         userId: row.userId,
         name: row.user.name,
         email: row.user.email,
-        role: row.role as MemberRole,
+        role: row.role,
         joinedAt: row.createdAt,
       }
       : null;

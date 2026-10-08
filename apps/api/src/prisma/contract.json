@@ -8,8 +8,16 @@
       "model": "Company",
       "namespace": "public"
     },
+    "jobs": {
+      "model": "Job",
+      "namespace": "public"
+    },
     "memberships": {
       "model": "Membership",
+      "namespace": "public"
+    },
+    "stages": {
+      "model": "Stage",
       "namespace": "public"
     },
     "users": {
@@ -21,6 +29,23 @@
     "namespaces": {
       "public": {
         "enum": {
+          "JobStatus": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "Draft",
+                "value": "draft"
+              },
+              {
+                "name": "Open",
+                "value": "open"
+              },
+              {
+                "name": "Closed",
+                "value": "closed"
+              }
+            ]
+          },
           "MemberRole": {
             "codecId": "pg/text@1",
             "members": [
@@ -39,6 +64,48 @@
               {
                 "name": "Interviewer",
                 "value": "interviewer"
+              }
+            ]
+          },
+          "PublicLabel": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "Received",
+                "value": "received"
+              },
+              {
+                "name": "InReview",
+                "value": "in_review"
+              },
+              {
+                "name": "Interview",
+                "value": "interview"
+              },
+              {
+                "name": "Offer",
+                "value": "offer"
+              },
+              {
+                "name": "Closed",
+                "value": "closed"
+              }
+            ]
+          },
+          "StageKind": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "Normal",
+                "value": "normal"
+              },
+              {
+                "name": "Hired",
+                "value": "hired"
+              },
+              {
+                "name": "Rejected",
+                "value": "rejected"
               }
             ]
           }
@@ -141,6 +208,181 @@
               "table": "companies"
             }
           },
+          "Job": {
+            "fields": {
+              "closedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              },
+              "companyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdById": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "description": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "openedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              },
+              "slug": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "status": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "JobStatus",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "title": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "company": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "companyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Company",
+                  "namespace": "public"
+                }
+              },
+              "createdBy": {
+                "cardinality": "N:1",
+                "nullable": true,
+                "on": {
+                  "localFields": [
+                    "createdById"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              },
+              "stages": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "jobId"
+                  ]
+                },
+                "to": {
+                  "model": "Stage",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "closedAt": {
+                  "column": "closed_at"
+                },
+                "companyId": {
+                  "column": "company_id"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "createdById": {
+                  "column": "created_by"
+                },
+                "description": {
+                  "column": "description"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "openedAt": {
+                  "column": "opened_at"
+                },
+                "slug": {
+                  "column": "slug"
+                },
+                "status": {
+                  "column": "status"
+                },
+                "title": {
+                  "column": "title"
+                },
+                "updatedAt": {
+                  "column": "updated_at"
+                }
+              },
+              "namespaceId": "public",
+              "table": "jobs"
+            }
+          },
           "Membership": {
             "fields": {
               "companyId": {
@@ -239,6 +481,152 @@
               },
               "namespaceId": "public",
               "table": "memberships"
+            }
+          },
+          "Stage": {
+            "fields": {
+              "companyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "jobId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "kind": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "StageKind",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "name": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "position": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "publicLabel": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "PublicLabel",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "company": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "companyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Company",
+                  "namespace": "public"
+                }
+              },
+              "job": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "jobId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Job",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "companyId": {
+                  "column": "company_id"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "jobId": {
+                  "column": "job_id"
+                },
+                "kind": {
+                  "column": "kind"
+                },
+                "name": {
+                  "column": "name"
+                },
+                "position": {
+                  "column": "position"
+                },
+                "publicLabel": {
+                  "column": "public_label"
+                },
+                "updatedAt": {
+                  "column": "updated_at"
+                }
+              },
+              "namespaceId": "public",
+              "table": "stages"
             }
           },
           "User": {
@@ -420,6 +808,171 @@
                 }
               ]
             },
+            "jobs": {
+              "checks": [
+                {
+                  "expression": "slug ~ '^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$'",
+                  "name": "jobs_slug_format_8c6602b9",
+                  "prefix": "jobs_slug_format"
+                },
+                {
+                  "expression": "\"status\" IN ('draft', 'open', 'closed')",
+                  "name": "jobs_status_check_b2eb4764",
+                  "prefix": "jobs_status_check"
+                }
+              ],
+              "columns": {
+                "closed_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "company_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "created_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "created_by": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": true
+                },
+                "description": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "default": {
+                    "expression": "gen_random_uuid()",
+                    "kind": "function"
+                  },
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "opened_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "slug": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "status": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "draft"
+                  },
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "JobStatus",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "title": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "updated_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "company_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "jobs"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "companies"
+                  }
+                },
+                {
+                  "onDelete": "setNull",
+                  "source": {
+                    "columns": [
+                      "created_by"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "jobs"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "users"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "company_id"
+                  ],
+                  "name": "jobs_company_id_idx_1303a718",
+                  "prefix": "jobs_company_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "company_id",
+                    "status"
+                  ],
+                  "name": "jobs_company_id_status_idx_e3e50399",
+                  "prefix": "jobs_company_id_status_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "created_by"
+                  ],
+                  "name": "jobs_created_by_idx_e13bb8bf",
+                  "prefix": "jobs_created_by_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "company_id",
+                    "slug"
+                  ]
+                }
+              ]
+            },
             "memberships": {
               "checks": [
                 {
@@ -537,6 +1090,168 @@
                 }
               ]
             },
+            "stages": {
+              "checks": [
+                {
+                  "expression": "\"kind\" IN ('normal', 'hired', 'rejected')",
+                  "name": "stages_kind_check_b99316cc",
+                  "prefix": "stages_kind_check"
+                },
+                {
+                  "expression": "\"public_label\" IN ('received', 'in_review', 'interview', 'offer', 'closed')",
+                  "name": "stages_public_label_check_d229e22f",
+                  "prefix": "stages_public_label_check"
+                }
+              ],
+              "columns": {
+                "company_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "created_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "default": {
+                    "expression": "gen_random_uuid()",
+                    "kind": "function"
+                  },
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "job_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "kind": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "normal"
+                  },
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "StageKind",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "name": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "position": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "public_label": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "in_review"
+                  },
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "PublicLabel",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "updated_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "company_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "stages"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "companies"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "job_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "stages"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "jobs"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "company_id"
+                  ],
+                  "name": "stages_company_id_idx_1303a718",
+                  "prefix": "stages_company_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "job_id"
+                  ],
+                  "name": "stages_job_id_idx_58a5bbdd",
+                  "prefix": "stages_job_id_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "job_id",
+                    "position"
+                  ]
+                },
+                {
+                  "columns": [
+                    "job_id",
+                    "name"
+                  ]
+                }
+              ]
+            },
             "users": {
               "checks": [
                 {
@@ -611,6 +1326,14 @@
             }
           },
           "valueSet": {
+            "JobStatus": {
+              "kind": "valueSet",
+              "values": [
+                "draft",
+                "open",
+                "closed"
+              ]
+            },
             "MemberRole": {
               "kind": "valueSet",
               "values": [
@@ -619,6 +1342,24 @@
                 "recruiter",
                 "interviewer"
               ]
+            },
+            "PublicLabel": {
+              "kind": "valueSet",
+              "values": [
+                "received",
+                "in_review",
+                "interview",
+                "offer",
+                "closed"
+              ]
+            },
+            "StageKind": {
+              "kind": "valueSet",
+              "values": [
+                "normal",
+                "hired",
+                "rejected"
+              ]
             }
           }
         },
@@ -626,10 +1367,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "46924e3c808e126c2777b0d85df6530ba1b7e7b4d4801167c65d8870e90d4adb"
+    "storageHash": "67197dbdc2ec832465433e1c0e52902d34d6b784fa4197856d15791b49315711"
   },
   "execution": {
-    "executionHash": "687690a5c0afa2af7a0b318732c4b417898d1e7c0b514ce1331a971378728bdd",
+    "executionHash": "0fe7ded28ef1920f9f974e0b41f33efd21c981b0f81cba77a75841adbc36fc8b",
     "mutations": {
       "defaults": [
         {
@@ -643,6 +1384,36 @@
           },
           "ref": {
             "entry": "companies",
+            "field": "updated_at",
+            "namespace": "public"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "timestampNow",
+            "kind": "generator"
+          },
+          "onUpdate": {
+            "id": "timestampNow",
+            "kind": "generator"
+          },
+          "ref": {
+            "entry": "jobs",
+            "field": "updated_at",
+            "namespace": "public"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "timestampNow",
+            "kind": "generator"
+          },
+          "onUpdate": {
+            "id": "timestampNow",
+            "kind": "generator"
+          },
+          "ref": {
+            "entry": "stages",
             "field": "updated_at",
             "namespace": "public"
           }

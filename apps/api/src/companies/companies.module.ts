@@ -16,5 +16,6 @@ import { UsersModule } from '../users/users.module.js';
   imports: [UsersModule],
   controllers: [CompaniesController, CompanyController, MembersController],
   providers: [CompaniesService, CompaniesRepository, CompanyPolicy, CompanyMemberGuard, MembersService, MembershipsRepository, MemberPolicy],
+  exports: [CompaniesRepository]
 })
 export class CompaniesModule {}

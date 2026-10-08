@@ -7,6 +7,26 @@ enum MemberRole {
   Interviewer = "interviewer"
 }
 
+enum JobStatus {
+  Draft  = "draft"
+  Open   = "open"
+  Closed = "closed"
+}
+
+enum StageKind {
+  Normal   = "normal"
+  Hired    = "hired"
+  Rejected = "rejected"
+}
+
+enum PublicLabel {
+  Received  = "received"
+  InReview  = "in_review"
+  Interview = "interview"
+  Offer     = "offer"
+  Closed    = "closed"
+}
+
 model User {
   id           Uuid                       @id @default(sql`gen_random_uuid()`)
   email        String                     @unique
@@ -51,4 +71,46 @@ model Membership {
   @@unique([userId, companyId])
   @@index([companyId])
   @@map("memberships")
+}
+
+model Job {
+  id          Uuid                       @id @default(sql`gen_random_uuid()`)
+  companyId   Uuid                       @map("company_id")
+  title       String
+  slug        String
+  description String?
+  status      JobStatus                  @default(Draft)
+  createdById Uuid?                      @map("created_by")
+  openedAt    TimestamptzJsDate?         @map("opened_at")
+  closedAt    TimestamptzJsDate?         @map("closed_at")
+  createdAt   TimestamptzJsDate          @default(now()) @map("created_at")
+  updatedAt   temporal.updatedAtJsDate() @map("updated_at")
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  stages    Stage[]
+
+  @@unique([companyId, slug])
+  @@index([companyId, status])
+  @@check(expression: "slug ~ '^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$'", name: "jobs_slug_format")
+  @@map("jobs")
+}
+
+model Stage {
+  id          Uuid                       @id @default(sql`gen_random_uuid()`)
+  companyId   Uuid                       @map("company_id")
+  jobId       Uuid                       @map("job_id")
+  name        String
+  position    Int
+  kind        StageKind                  @default(Normal)
+  publicLabel PublicLabel                @default(InReview) @map("public_label")
+  createdAt   TimestamptzJsDate          @default(now()) @map("created_at")
+  updatedAt   temporal.updatedAtJsDate() @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  job     Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, position])
+  @@unique([jobId, name])
+  @@map("stages")
 }

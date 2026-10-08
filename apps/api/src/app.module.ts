@@ -7,11 +7,12 @@ import { AuthModule } from './auth/auth.module.js';
 import { AuthenticationModule } from '@nestjs/authentication';
 import { AuthorizationModule } from '@nestjs/authorization';
 import { CompaniesModule } from './companies/companies.module.js';
+import { JobsModule } from './jobs/jobs.module.js';
 
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true }),
   AuthenticationModule.forRoot({ session: { absoluteTtl: '14d', idleTtl: '3d', trustedOrigins: ['http://localhost:3000'] } }),
   AuthorizationModule.forRoot(),
-    HealthModule, PrismaModule, UsersModule, AuthModule, CompaniesModule],
+    HealthModule, PrismaModule, UsersModule, AuthModule, CompaniesModule, JobsModule],
 })
 export class AppModule { }
