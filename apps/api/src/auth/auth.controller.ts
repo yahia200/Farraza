@@ -9,7 +9,7 @@ export class AuthController {
   constructor(
     private readonly credentialsService: CredentialsService,
     private readonly signInService: SignInService,
-  ) {}
+  ) { }
 
   @Post('sign-up')
   async signUp(@Body() body: SignUpDto) {
@@ -27,5 +27,13 @@ export class AuthController {
     }
     await this.signInService.signIn(user.id, { method: 'password' });
     return user;
+  }
+
+  @Post('sign-out')
+  @HttpCode(204)
+  async signOut() {
+    if (!(await this.signInService.signOut())) {
+      throw new UnauthorizedException();
+    }
   }
 }

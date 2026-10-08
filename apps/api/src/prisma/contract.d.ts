@@ -34,7 +34,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'67197dbdc2ec832465433e1c0e52902d34d6b784fa4197856d15791b49315711'>;
+  StorageHashBase<'68dcbaac1fc44af174a38b0a7cc8374463ef8428c3aea33a8d5b46ab5e264ea6'>;
 export type ExecutionHash =
   ExecutionHashBase<'0fe7ded28ef1920f9f974e0b41f33efd21c981b0f81cba77a75841adbc36fc8b'>;
 export type ProfileHash =
@@ -279,6 +279,15 @@ export type FieldOutputTypes = {
       readonly role: 'owner' | 'admin' | 'recruiter' | 'interviewer';
       readonly userId: CodecTypes['pg/uuid@1']['output'];
     };
+    readonly Session: {
+      readonly createdAt: CodecTypes['pg/timestamptz-date@1']['output'];
+      readonly expiresAt: CodecTypes['pg/timestamptz-date@1']['output'];
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly lastActiveAt: CodecTypes['pg/timestamptz-date@1']['output'];
+      readonly metadata: CodecTypes['pg/jsonb@1']['output'] | null;
+      readonly mfa: 'pending' | 'verified' | null;
+      readonly userId: CodecTypes['pg/uuid@1']['output'];
+    };
     readonly Stage: {
       readonly companyId: CodecTypes['pg/uuid@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz-date@1']['output'];
@@ -330,6 +339,15 @@ export type FieldInputTypes = {
       readonly createdAt: CodecTypes['pg/timestamptz-date@1']['input'];
       readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly role: 'owner' | 'admin' | 'recruiter' | 'interviewer';
+      readonly userId: CodecTypes['pg/uuid@1']['input'];
+    };
+    readonly Session: {
+      readonly createdAt: CodecTypes['pg/timestamptz-date@1']['input'];
+      readonly expiresAt: CodecTypes['pg/timestamptz-date@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly lastActiveAt: CodecTypes['pg/timestamptz-date@1']['input'];
+      readonly metadata: CodecTypes['pg/jsonb@1']['input'] | null;
+      readonly mfa: 'pending' | 'verified' | null;
       readonly userId: CodecTypes['pg/uuid@1']['input'];
     };
     readonly Stage: {
@@ -385,6 +403,15 @@ export type StorageColumnTypes = {
       readonly role: 'owner' | 'admin' | 'recruiter' | 'interviewer';
       readonly user_id: CodecTypes['pg/uuid@1']['output'];
     };
+    readonly sessions: {
+      readonly created_at: CodecTypes['pg/timestamptz-date@1']['output'];
+      readonly expires_at: CodecTypes['pg/timestamptz-date@1']['output'];
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly last_active_at: CodecTypes['pg/timestamptz-date@1']['output'];
+      readonly metadata: CodecTypes['pg/jsonb@1']['output'] | null;
+      readonly mfa: 'pending' | 'verified' | null;
+      readonly user_id: CodecTypes['pg/uuid@1']['output'];
+    };
     readonly stages: {
       readonly company_id: CodecTypes['pg/uuid@1']['output'];
       readonly created_at: CodecTypes['pg/timestamptz-date@1']['output'];
@@ -436,6 +463,15 @@ export type StorageColumnInputTypes = {
       readonly created_at: CodecTypes['pg/timestamptz-date@1']['input'];
       readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly role: 'owner' | 'admin' | 'recruiter' | 'interviewer';
+      readonly user_id: CodecTypes['pg/uuid@1']['input'];
+    };
+    readonly sessions: {
+      readonly created_at: CodecTypes['pg/timestamptz-date@1']['input'];
+      readonly expires_at: CodecTypes['pg/timestamptz-date@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly last_active_at: CodecTypes['pg/timestamptz-date@1']['input'];
+      readonly metadata: CodecTypes['pg/jsonb@1']['input'] | null;
+      readonly mfa: 'pending' | 'verified' | null;
       readonly user_id: CodecTypes['pg/uuid@1']['input'];
     };
     readonly stages: {
@@ -500,6 +536,17 @@ export namespace Models {
     user: public_User;
     readonly [RelationKeys]?: 'company' | 'user';
   };
+  export type public_Session = {
+    createdAt: CodecTypes['pg/timestamptz-date@1']['output'];
+    expiresAt: CodecTypes['pg/timestamptz-date@1']['output'];
+    id: CodecTypes['pg/text@1']['output'];
+    lastActiveAt: CodecTypes['pg/timestamptz-date@1']['output'];
+    metadata: CodecTypes['pg/jsonb@1']['output'] | null;
+    mfa: 'pending' | 'verified' | null;
+    userId: CodecTypes['pg/uuid@1']['output'];
+    user: public_User;
+    readonly [RelationKeys]?: 'user';
+  };
   export type public_Stage = {
     companyId: CodecTypes['pg/uuid@1']['output'];
     createdAt: CodecTypes['pg/timestamptz-date@1']['output'];
@@ -532,6 +579,7 @@ export declare const models: {
     Company: Models.public_Company;
     Job: Models.public_Job;
     Membership: Models.public_Membership;
+    Session: Models.public_Session;
     Stage: Models.public_Stage;
     User: Models.public_User;
   };
@@ -795,6 +843,75 @@ type ContractBase = Omit<
                 },
               ];
             };
+            readonly sessions: {
+              columns: {
+                readonly created_at: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly nullable: false;
+                };
+                readonly expires_at: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly nullable: false;
+                };
+                readonly id: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly last_active_at: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly nullable: false;
+                };
+                readonly metadata: {
+                  readonly nativeType: 'jsonb';
+                  readonly codecId: 'pg/jsonb@1';
+                  readonly nullable: true;
+                };
+                readonly mfa: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly user_id: {
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
+                  readonly nullable: false;
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [];
+              indexes: readonly [
+                {
+                  readonly name: 'sessions_expires_at_idx_35365ada';
+                  readonly prefix: 'sessions_expires_at_idx';
+                  readonly columns: readonly ['expires_at'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'sessions_user_id_idx_6c952402';
+                  readonly prefix: 'sessions_user_id_idx';
+                  readonly columns: readonly ['user_id'];
+                  readonly unique: false;
+                },
+              ];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'sessions';
+                    readonly columns: readonly ['user_id'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'users';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
+            };
             readonly stages: {
               columns: {
                 readonly company_id: {
@@ -968,6 +1085,10 @@ type ContractBase = Omit<
               readonly kind: 'valueSet';
               readonly values: readonly ['received', 'in_review', 'interview', 'offer', 'closed'];
             };
+            readonly SessionMfa: {
+              readonly kind: 'valueSet';
+              readonly values: readonly ['pending', 'verified'];
+            };
             readonly StageKind: {
               readonly kind: 'valueSet';
               readonly values: readonly ['normal', 'hired', 'rejected'];
@@ -989,6 +1110,7 @@ type ContractBase = Omit<
       readonly namespace: 'public' & NamespaceId;
       readonly model: 'Membership';
     };
+    readonly sessions: { readonly namespace: 'public' & NamespaceId; readonly model: 'Session' };
     readonly stages: { readonly namespace: 'public' & NamespaceId; readonly model: 'Stage' };
     readonly users: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
   };
@@ -1232,6 +1354,71 @@ type ContractBase = Omit<
               };
             };
           };
+          readonly Session: {
+            readonly fields: {
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                };
+              };
+              readonly expiresAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                };
+              };
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly lastActiveAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                };
+              };
+              readonly metadata: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
+              };
+              readonly mfa: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly userId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
+              };
+            };
+            readonly relations: {
+              readonly user: {
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
+                readonly cardinality: 'N:1';
+                readonly nullable: false;
+                readonly on: {
+                  readonly localFields: readonly ['userId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'sessions';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly createdAt: { readonly column: 'created_at' };
+                readonly expiresAt: { readonly column: 'expires_at' };
+                readonly id: { readonly column: 'id' };
+                readonly lastActiveAt: { readonly column: 'last_active_at' };
+                readonly metadata: { readonly column: 'metadata' };
+                readonly mfa: { readonly column: 'mfa' };
+                readonly userId: { readonly column: 'user_id' };
+              };
+            };
+          };
           readonly Stage: {
             readonly fields: {
               readonly companyId: {
@@ -1407,6 +1594,13 @@ type ContractBase = Omit<
               { readonly name: 'Interview'; readonly value: 'interview' },
               { readonly name: 'Offer'; readonly value: 'offer' },
               { readonly name: 'Closed'; readonly value: 'closed' },
+            ];
+          };
+          readonly SessionMfa: {
+            readonly codecId: 'pg/text@1';
+            readonly members: readonly [
+              { readonly name: 'Pending'; readonly value: 'pending' },
+              { readonly name: 'Verified'; readonly value: 'verified' },
             ];
           };
           readonly StageKind: {

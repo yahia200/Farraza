@@ -16,6 +16,10 @@
       "model": "Membership",
       "namespace": "public"
     },
+    "sessions": {
+      "model": "Session",
+      "namespace": "public"
+    },
     "stages": {
       "model": "Stage",
       "namespace": "public"
@@ -89,6 +93,19 @@
               {
                 "name": "Closed",
                 "value": "closed"
+              }
+            ]
+          },
+          "SessionMfa": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "Pending",
+                "value": "pending"
+              },
+              {
+                "name": "Verified",
+                "value": "verified"
               }
             ]
           },
@@ -481,6 +498,110 @@
               },
               "namespaceId": "public",
               "table": "memberships"
+            }
+          },
+          "Session": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              },
+              "expiresAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "lastActiveAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              },
+              "metadata": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/jsonb@1",
+                  "kind": "scalar"
+                }
+              },
+              "mfa": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "SessionMfa",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "user": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "expiresAt": {
+                  "column": "expires_at"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "lastActiveAt": {
+                  "column": "last_active_at"
+                },
+                "metadata": {
+                  "column": "metadata"
+                },
+                "mfa": {
+                  "column": "mfa"
+                },
+                "userId": {
+                  "column": "user_id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "sessions"
             }
           },
           "Stage": {
@@ -1090,6 +1211,101 @@
                 }
               ]
             },
+            "sessions": {
+              "checks": [
+                {
+                  "expression": "\"mfa\" IN ('pending', 'verified')",
+                  "name": "sessions_mfa_check_5d9599e1",
+                  "prefix": "sessions_mfa_check"
+                }
+              ],
+              "columns": {
+                "created_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "expires_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "last_active_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "metadata": {
+                  "codecId": "pg/jsonb@1",
+                  "nativeType": "jsonb",
+                  "nullable": true
+                },
+                "mfa": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "SessionMfa",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "user_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "user_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "sessions"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "users"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "expires_at"
+                  ],
+                  "name": "sessions_expires_at_idx_35365ada",
+                  "prefix": "sessions_expires_at_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "user_id"
+                  ],
+                  "name": "sessions_user_id_idx_6c952402",
+                  "prefix": "sessions_user_id_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
             "stages": {
               "checks": [
                 {
@@ -1353,6 +1569,13 @@
                 "closed"
               ]
             },
+            "SessionMfa": {
+              "kind": "valueSet",
+              "values": [
+                "pending",
+                "verified"
+              ]
+            },
             "StageKind": {
               "kind": "valueSet",
               "values": [
@@ -1367,7 +1590,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "67197dbdc2ec832465433e1c0e52902d34d6b784fa4197856d15791b49315711"
+    "storageHash": "68dcbaac1fc44af174a38b0a7cc8374463ef8428c3aea33a8d5b46ab5e264ea6"
   },
   "execution": {
     "executionHash": "0fe7ded28ef1920f9f974e0b41f33efd21c981b0f81cba77a75841adbc36fc8b",

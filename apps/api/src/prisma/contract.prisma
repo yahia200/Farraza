@@ -114,3 +114,24 @@ model Stage {
   @@unique([jobId, name])
   @@map("stages")
 }
+
+enum SessionMfa {
+  Pending  = "pending"
+  Verified = "verified"
+}
+
+model Session {
+  id           String            @id
+  userId       Uuid              @map("user_id")
+  createdAt    TimestamptzJsDate @map("created_at")
+  expiresAt    TimestamptzJsDate @map("expires_at")
+  lastActiveAt TimestamptzJsDate @map("last_active_at")
+  mfa          SessionMfa?
+  metadata     Jsonb?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
