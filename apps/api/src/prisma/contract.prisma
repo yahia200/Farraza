@@ -27,7 +27,7 @@ model Company {
   name       String
   slug       String                     @unique
   logoUrl    String?                    @map("logo_url")
-  brandColor Char(7)?                   @map("brand_color")
+  brandColor String?                   @map("brand_color")
   createdAt  TimestamptzJsDate          @default(now()) @map("created_at")
   updatedAt  temporal.updatedAtJsDate() @map("updated_at")
 

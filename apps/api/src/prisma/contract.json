@@ -49,11 +49,8 @@
               "brandColor": {
                 "nullable": true,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 7
-                  }
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
                 }
               },
               "createdAt": {
@@ -365,12 +362,9 @@
               ],
               "columns": {
                 "brand_color": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": true,
-                  "typeParams": {
-                    "length": 7
-                  }
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
                 },
                 "created_at": {
                   "codecId": "pg/timestamptz-date@1",
@@ -632,7 +626,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "2047bfe463548eb0ba9ea4c06b0b9c6dc8c917b656c10a5fee7eca46e7f16ea5"
+    "storageHash": "46924e3c808e126c2777b0d85df6530ba1b7e7b4d4801167c65d8870e90d4adb"
   },
   "execution": {
     "executionHash": "687690a5c0afa2af7a0b318732c4b417898d1e7c0b514ce1331a971378728bdd",

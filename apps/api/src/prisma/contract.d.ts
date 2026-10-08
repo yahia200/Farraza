@@ -34,7 +34,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'2047bfe463548eb0ba9ea4c06b0b9c6dc8c917b656c10a5fee7eca46e7f16ea5'>;
+  StorageHashBase<'46924e3c808e126c2777b0d85df6530ba1b7e7b4d4801167c65d8870e90d4adb'>;
 export type ExecutionHash =
   ExecutionHashBase<'687690a5c0afa2af7a0b318732c4b417898d1e7c0b514ce1331a971378728bdd'>;
 export type ProfileHash =
@@ -251,7 +251,7 @@ type DefaultLiteralValue<CodecId extends string, Encoded> = CodecId extends keyo
 export type FieldOutputTypes = {
   readonly public: {
     readonly Company: {
-      readonly brandColor: Char<7> | null;
+      readonly brandColor: CodecTypes['pg/text@1']['output'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-date@1']['output'];
       readonly id: CodecTypes['pg/uuid@1']['output'];
       readonly logoUrl: CodecTypes['pg/text@1']['output'] | null;
@@ -280,7 +280,7 @@ export type FieldOutputTypes = {
 export type FieldInputTypes = {
   readonly public: {
     readonly Company: {
-      readonly brandColor: CodecTypes['sql/char@1']['input'] | null;
+      readonly brandColor: CodecTypes['pg/text@1']['input'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-date@1']['input'];
       readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly logoUrl: CodecTypes['pg/text@1']['input'] | null;
@@ -309,7 +309,7 @@ export type FieldInputTypes = {
 export type StorageColumnTypes = {
   readonly public: {
     readonly companies: {
-      readonly brand_color: Char<7> | null;
+      readonly brand_color: CodecTypes['pg/text@1']['output'] | null;
       readonly created_at: CodecTypes['pg/timestamptz-date@1']['output'];
       readonly id: CodecTypes['pg/uuid@1']['output'];
       readonly logo_url: CodecTypes['pg/text@1']['output'] | null;
@@ -338,7 +338,7 @@ export type StorageColumnTypes = {
 export type StorageColumnInputTypes = {
   readonly public: {
     readonly companies: {
-      readonly brand_color: CodecTypes['sql/char@1']['input'] | null;
+      readonly brand_color: CodecTypes['pg/text@1']['input'] | null;
       readonly created_at: CodecTypes['pg/timestamptz-date@1']['input'];
       readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly logo_url: CodecTypes['pg/text@1']['input'] | null;
@@ -367,7 +367,7 @@ export type StorageColumnInputTypes = {
 
 export namespace Models {
   export type public_Company = {
-    brandColor: Char<7> | null;
+    brandColor: CodecTypes['pg/text@1']['output'] | null;
     createdAt: CodecTypes['pg/timestamptz-date@1']['output'];
     id: CodecTypes['pg/uuid@1']['output'];
     logoUrl: CodecTypes['pg/text@1']['output'] | null;
@@ -429,10 +429,9 @@ type ContractBase = Omit<
             readonly companies: {
               columns: {
                 readonly brand_color: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
                   readonly nullable: true;
-                  readonly typeParams: { readonly length: 7 };
                 };
                 readonly created_at: {
                   readonly nativeType: 'timestamptz';
@@ -635,11 +634,7 @@ type ContractBase = Omit<
             readonly fields: {
               readonly brandColor: {
                 readonly nullable: true;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 7 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly createdAt: {
                 readonly nullable: false;
