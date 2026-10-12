@@ -115,6 +115,119 @@ model Stage {
   @@map("stages")
 }
 
+model FormVersion {
+  id          Uuid                       @id @default(sql`gen_random_uuid()`)
+  companyId   Uuid                       @map("company_id")
+  jobId       Uuid                       @map("job_id")
+  version     Int
+  fields      Jsonb                      @default(json`[]`)
+  publishedAt TimestamptzJsDate?         @map("published_at")
+  createdById Uuid?                      @map("created_by")
+  createdAt   TimestamptzJsDate          @default(now()) @map("created_at")
+  updatedAt   temporal.updatedAtJsDate() @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  job     Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, version])
+  @@index([jobId], where: "(published_at IS NULL)", unique: true, name: "form_versions_one_draft")
+  @@check(expression: "version > 0", name: "form_versions_version_positive")
+  @@map("form_versions")
+}
+
+enum ApplicationStatus {
+  Active    = "active"
+  Rejected  = "rejected"
+  Hired     = "hired"
+  Withdrawn = "withdrawn"
+}
+
+enum ApplicationEventType {
+  Applied      = "applied"
+  AutoRejected = "auto_rejected"
+  StageChanged = "stage_changed"
+  Rejected     = "rejected"
+  Hired        = "hired"
+  Withdrawn    = "withdrawn"
+  NoteAdded    = "note_added"
+}
+
+model Candidate {
+  id        Uuid                       @id @default(sql`gen_random_uuid()`)
+  companyId Uuid                       @map("company_id")
+  email     String
+  name      String
+  phone     String
+  createdAt TimestamptzJsDate          @default(now()) @map("created_at")
+  updatedAt temporal.updatedAtJsDate() @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, email])
+  @@check(expression: "email = lower(email)", name: "candidates_email_lowercase")
+  @@map("candidates")
+}
+
+model Application {
+  id                  Uuid                       @id @default(sql`gen_random_uuid()`)
+  companyId           Uuid                       @map("company_id")
+  jobId               Uuid                       @map("job_id")
+  candidateId         Uuid                       @map("candidate_id")
+  formVersionId       Uuid                       @map("form_version_id")
+  stageId             Uuid                       @map("stage_id")
+  status              ApplicationStatus          @default(Active)
+  answers             Jsonb                      @default(json`{}`)
+  source              String?
+  rejectionNotifiedAt TimestamptzJsDate?         @map("rejection_notified_at")
+  submittedAt         TimestamptzJsDate          @default(now()) @map("submitted_at")
+  updatedAt           temporal.updatedAtJsDate() @map("updated_at")
+
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  job         Job         @relation(fields: [jobId], references: [id], onDelete: NoAction)
+  candidate   Candidate   @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  formVersion FormVersion @relation(fields: [formVersionId], references: [id], onDelete: NoAction)
+  stage       Stage       @relation(fields: [stageId], references: [id], onDelete: NoAction)
+
+  @@unique([jobId, candidateId])
+  @@index([jobId, stageId])
+  @@index([candidateId])
+  @@map("applications")
+}
+
+model ApplicationEvent {
+  id            Uuid                 @id @default(sql`gen_random_uuid()`)
+  companyId     Uuid                 @map("company_id")
+  applicationId Uuid                 @map("application_id")
+  type          ApplicationEventType
+  fromStageId   Uuid?                @map("from_stage_id")
+  toStageId     Uuid?                @map("to_stage_id")
+  actorId       Uuid?                @map("actor_id")
+  data          Jsonb                @default(json`{}`)
+  createdAt     TimestamptzJsDate    @default(now()) @map("created_at")
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt])
+  @@map("application_events")
+}
+
+model Note {
+  id            Uuid                       @id @default(sql`gen_random_uuid()`)
+  companyId     Uuid                       @map("company_id")
+  applicationId Uuid                       @map("application_id")
+  authorId      Uuid?                      @map("author_id")
+  body          String
+  createdAt     TimestamptzJsDate          @default(now()) @map("created_at")
+  updatedAt     temporal.updatedAtJsDate() @map("updated_at")
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  author      User?       @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([applicationId, createdAt])
+  @@check(expression: "length(trim(body)) > 0", name: "notes_body_not_blank")
+  @@map("notes")
+}
+
 enum SessionMfa {
   Pending  = "pending"
   Verified = "verified"

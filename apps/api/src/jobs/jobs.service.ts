@@ -9,13 +9,14 @@ import type { UpdateJobDto } from './dto/update-job.dto.js';
 import type { Job, JobWithStages } from './job.js';
 import { JobPolicy } from './job.policy.js';
 import { JobsRepository } from './jobs.repository.js';
+import { isUniqueViolation } from '../common/db-errors.js';
 
 @Injectable()
 export class JobsService {
   constructor(
     private readonly jobs: JobsRepository,
     private readonly authorization: AuthorizationService,
-  ) {}
+  ) { }
 
   async create(user: User, membership: Membership, dto: CreateJobDto): Promise<JobWithStages> {
     await this.authorization.authorize(JobPolicy, 'create', user, membership);
@@ -32,7 +33,7 @@ export class JobsService {
         createdById: user.id,
       });
     } catch (error) {
-      if (error instanceof Error && 'sqlState' in error && error.sqlState === '23505') {
+        if (isUniqueViolation(error)) {
         throw new ConflictException('A job with this address was just created. Try again.');
       }
       throw error;
@@ -73,4 +74,31 @@ export class JobsService {
       ? `${base}-${randomBytes(2).toString('hex')}`
       : base;
   }
+
+  async open(user: User, membership: Membership, jobSlug: string): Promise<Job> {
+    await this.authorization.authorize(JobPolicy, 'update', user, membership);
+
+    const job = await this.get(membership, jobSlug);
+    if (!(await this.jobs.hasPublishedForm(job.id))) {
+      throw new ConflictException('Publish the application form before opening this job.');
+    }
+
+    const opened = await this.jobs.open(job.id, new Date());
+    if (!opened) {
+      throw new ConflictException('This job is already open.');
+    }
+    return opened;
+  }
+
+  async close(user: User, membership: Membership, jobSlug: string): Promise<Job> {
+    await this.authorization.authorize(JobPolicy, 'update', user, membership);
+
+    const job = await this.get(membership, jobSlug);
+    const closed = await this.jobs.close(job.id, new Date());
+    if (!closed) {
+      throw new ConflictException('This job is not open.');
+    }
+    return closed;
+  }
+
 }

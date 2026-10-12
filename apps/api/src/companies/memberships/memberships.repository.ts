@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { Member, MemberRole } from '../company.js';
+import { isUniqueViolation } from '../../common/db-errors.js';
 
 @Injectable()
 export class MembershipsRepository {
@@ -27,7 +28,7 @@ export class MembershipsRepository {
       await this.prisma.db.orm.public.Membership.create({ companyId, userId, role });
       return true;
     } catch (error) {
-      if (error instanceof Error && 'sqlState' in error && error.sqlState === '23505') {
+      if (isUniqueViolation(error)) {
         return false;
       }
       throw error;

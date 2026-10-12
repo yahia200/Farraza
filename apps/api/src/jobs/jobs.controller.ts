@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards, HttpCode } from '@nestjs/common';
 import { CurrentUser } from '@nestjs/authentication';
 import type { Membership } from '../companies/company.js';
 import { CompanyMemberGuard } from '../companies/company-member.guard.js';
@@ -11,7 +11,7 @@ import { JobsService } from './jobs.service.js';
 @Controller('companies/:companySlug/jobs')
 @UseGuards(CompanyMemberGuard)
 export class JobsController {
-  constructor(private readonly jobs: JobsService) {}
+  constructor(private readonly jobs: JobsService) { }
 
   @Post()
   create(
@@ -41,4 +41,25 @@ export class JobsController {
   ) {
     return this.jobs.update(user, membership, jobSlug, dto);
   }
+
+  @Post(':jobSlug/open')
+  @HttpCode(200)
+  open(
+    @CurrentUser() user: User,
+    @CurrentMembership() membership: Membership,
+    @Param('jobSlug') jobSlug: string,
+  ) {
+    return this.jobs.open(user, membership, jobSlug);
+  }
+
+  @Post(':jobSlug/close')
+  @HttpCode(200)
+  close(
+    @CurrentUser() user: User,
+    @CurrentMembership() membership: Membership,
+    @Param('jobSlug') jobSlug: string,
+  ) {
+    return this.jobs.close(user, membership, jobSlug);
+  }
+
 }
