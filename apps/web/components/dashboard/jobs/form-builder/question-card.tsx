@@ -34,6 +34,13 @@ const REJECT_WHEN_ITEMS = [
 /**
  * One question: a shadcn Collapsible card. The header summarises it and has
  * move/delete buttons; the body is the editor for its type.
+ *
+ * - `readOnly`: the viewer may only look (e.g. interviewers). Controls keep full
+ *   contrast and stay focusable and copyable, unlike `disabled`
+ *   (https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/readonly).
+ * - `disabled`: editing is temporarily unavailable (the restore-backup banner).
+ * Set on each control: Base UI's Switch, Checkbox and Select ignore a native
+ * `<fieldset disabled>`, and a disabled fieldset would also block the expand button.
  */
 export function QuestionCard({
   form,
@@ -41,7 +48,8 @@ export function QuestionCard({
   count,
   onMove,
   onRemove,
-  canEdit,
+  readOnly,
+  disabled,
   defaultOpen,
 }: {
   form: Form;
@@ -49,7 +57,8 @@ export function QuestionCard({
   count: number;
   onMove: (from: number, to: number) => void;
   onRemove: (index: number) => void;
-  canEdit: boolean;
+  readOnly: boolean;
+  disabled: boolean;
   defaultOpen: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -69,6 +78,7 @@ export function QuestionCard({
     (field.type === 'single_select' && field.config.rejectOptionIds.length > 0) ||
     (field.type === 'yes_no' && field.config.rejectWhen !== null);
   const idPrefix = `question-${field.key}`;
+  const editable = !readOnly && !disabled;
 
   return (
     <Collapsible
@@ -88,7 +98,7 @@ export function QuestionCard({
           {field.required && <Badge variant="secondary">Required</Badge>}
           {autoRejects && <Badge variant="outline">Auto-reject</Badge>}
         </CollapsibleTrigger>
-        {canEdit && (
+        {editable && (
           <div className="flex shrink-0 items-center">
             <Button type="button" variant="ghost" size="icon-sm" aria-label="Move up" disabled={index === 0} onClick={() => onMove(index, index - 1)}>
               <ArrowUpIcon />
@@ -114,7 +124,13 @@ export function QuestionCard({
               render={({ field: input, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor={`${idPrefix}-label`}>Question</FieldLabel>
-                  <Input {...input} id={`${idPrefix}-label`} aria-invalid={fieldState.invalid} />
+                  <Input
+                    {...input}
+                    id={`${idPrefix}-label`}
+                    readOnly={readOnly}
+                    disabled={disabled}
+                    aria-invalid={fieldState.invalid}
+                  />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}
@@ -127,6 +143,8 @@ export function QuestionCard({
                   <FieldLabel htmlFor={`${idPrefix}-help`}>Help text</FieldLabel>
                   <Input
                     id={`${idPrefix}-help`}
+                    readOnly={readOnly}
+                    disabled={disabled}
                     value={input.value ?? ''}
                     // Empty means no help text: the schema stores null.
                     onChange={(event) => input.onChange(event.target.value === '' ? null : event.target.value)}
@@ -144,12 +162,18 @@ export function QuestionCard({
               control={form.control}
               render={({ field: input }) => (
                 <Field orientation="horizontal">
-                  <Switch id={`${idPrefix}-required`} checked={input.value} onCheckedChange={input.onChange} />
+                  <Switch
+                    id={`${idPrefix}-required`}
+                    checked={input.value}
+                    onCheckedChange={input.onChange}
+                    readOnly={readOnly}
+                    disabled={disabled}
+                  />
                   <FieldLabel htmlFor={`${idPrefix}-required`}>Required</FieldLabel>
                 </Field>
               )}
             />
-  
+
             {(field.type === 'short_text' || field.type === 'long_text') && (
               <Controller
                 name={at(index, 'config.maxLength')}
@@ -159,6 +183,8 @@ export function QuestionCard({
                     <FieldLabel htmlFor={`${idPrefix}-max`}>Answer limit (characters)</FieldLabel>
                     <Input
                       id={`${idPrefix}-max`}
+                      readOnly={readOnly}
+                      disabled={disabled}
                       type="number"
                       inputMode="numeric"
                       className="w-32"
@@ -173,7 +199,7 @@ export function QuestionCard({
                 )}
               />
             )}
-  
+
             {(field.type === 'single_select' || field.type === 'multi_select') && (
               <Controller
                 name={at(index, 'config.options')}
@@ -199,12 +225,13 @@ export function QuestionCard({
                         errorAt(errors, `fields.${index}.config.rejectOptionIds`),
                       labels: field.config.options.map((_, i) => errorAt(errors, `fields.${index}.config.options.${i}.label`)),
                     }}
-                    disabled={!canEdit}
+                    readOnly={readOnly}
+                    disabled={disabled}
                   />
                 )}
               />
             )}
-  
+
             {field.type === 'multi_select' && (
               <Controller
                 name={at(index, 'config.maxSelections')}
@@ -223,6 +250,8 @@ export function QuestionCard({
                       onBlur={input.onBlur}
                       aria-describedby={`${idPrefix}-max-selections-help`}
                       aria-invalid={fieldState.invalid}
+                      readOnly={readOnly}
+                      disabled={disabled}
                     />
                     <FieldDescription id={`${idPrefix}-max-selections-help`}>Leave empty for no limit.</FieldDescription>
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -230,7 +259,7 @@ export function QuestionCard({
                 )}
               />
             )}
-  
+
             {field.type === 'yes_no' && (
               <Controller
                 name={at(index, 'config.rejectWhen')}
@@ -244,6 +273,8 @@ export function QuestionCard({
                         items={REJECT_WHEN_ITEMS}
                         value={value}
                         onValueChange={(next) => input.onChange(next === 'none' ? null : next === 'true')}
+                        readOnly={readOnly}
+                        disabled={disabled}
                       >
                         <SelectTrigger id={`${idPrefix}-reject`} className="w-fit">
                           <SelectValue />

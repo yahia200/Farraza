@@ -201,18 +201,22 @@ export function FormBuilder({
       )}
 
       <p className="text-sm text-muted-foreground">
-        Every application also asks for the candidate&apos;s name, email and phone number. Add the questions specific to
-        this job below.
+        Every application also asks for the candidate&apos;s name, email and phone number.{' '}
+        {canEdit ? 'Add the questions specific to this job below.' : 'Below are the questions specific to this job.'}
       </p>
 
       {/* The questions */}
-      <fieldset disabled={!editable} className="flex flex-col gap-2">
+      <fieldset className="flex flex-col gap-2">
         <legend className="sr-only">Questions</legend>
         {rows.length === 0 ? (
           <Empty className="border">
             <EmptyHeader>
               <EmptyTitle>No questions yet</EmptyTitle>
-              <EmptyDescription>Add one below, or publish as is to ask only for contact details.</EmptyDescription>
+              <EmptyDescription>
+                {canEdit
+                  ? 'Add one below, or publish as is to ask only for contact details.'
+                  : 'Applicants are only asked for their contact details.'}
+              </EmptyDescription>
             </EmptyHeader>
           </Empty>
         ) : (
@@ -224,7 +228,9 @@ export function FormBuilder({
               count={rows.length}
               onMove={move}
               onRemove={remove}
-              canEdit={editable}
+              // Viewers (e.g. interviewers) can open and read questions; the restore banner locks editing for a moment.
+              readOnly={!canEdit}
+              disabled={offerRestore}
               // rows (from useFieldArray) already hold the new question on this render;
               // useWatch values catch up a moment later, too late for the initial open state.
               defaultOpen={row.key === justAdded}
