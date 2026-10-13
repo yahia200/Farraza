@@ -62,7 +62,11 @@ export class CompaniesRepository {
     return row ? { userId, role: row.role as MemberRole, company: toCompany(company) } : null;
   }
 
-  async update(id: string, UpdateCompanyDto: { name?: string; brandColor?: string }): Promise<Company | null> {
+  /** Keys left out stay as they are; `null` clears the logo or brand color. */
+  async update(
+    id: string,
+    UpdateCompanyDto: { name?: string; logoUrl?: string | null; brandColor?: string | null },
+  ): Promise<Company | null> {
     const row = await this.companies.where({ id }).update(UpdateCompanyDto);
     return row ? toCompany(row) : null;
   }

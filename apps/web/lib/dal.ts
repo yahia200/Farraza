@@ -1,5 +1,6 @@
 import 'server-only';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
+import type { FormFields } from '@repo/shared';
 import { apiFetch } from './api';
 
 /**
@@ -39,6 +40,8 @@ export interface MyCompany {
   id: string;
   name: string;
   slug: string;
+  logoUrl: string | null;
+  brandColor: string | null;
   role: 'owner' | 'admin' | 'recruiter' | 'interviewer';
 }
 
@@ -59,5 +62,172 @@ export async function getMyCompanies(): Promise<MyCompany[]> {
   }
 
   const companies = (await response.json()) as MyCompany[];
-  return companies.map(({ id, name, slug, role }) => ({ id, name, slug, role }));
+  return companies.map(toMyCompany);
+}
+
+/**
+ * One company the signed-in user belongs to, by slug, or the not-found page.
+ * The API answers 404 to non-members as well, so this doubles as the
+ * membership check for every /dashboard/[companySlug] page.
+ */
+export async function getCompany(slug: string): Promise<MyCompany> {
+  'use cache: private';
+
+  const response = await apiFetch(`/api/companies/${encodeURIComponent(slug)}`);
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (response.status === 404) {
+    notFound();
+  }
+  if (!response.ok) {
+    throw new Error(`Could not load the company (HTTP ${response.status}).`);
+  }
+  return toMyCompany((await response.json()) as MyCompany);
+}
+
+/** Mirrors Member in apps/api/src/companies/company.ts (dates arrive as ISO strings). */
+export interface CompanyMember {
+  userId: string;
+  name: string;
+  email: string;
+  role: MyCompany['role'];
+  joinedAt: string;
+}
+
+/** The company's members. Any member may list them; the API checks membership. */
+export async function getMembers(slug: string): Promise<CompanyMember[]> {
+  'use cache: private';
+
+  const response = await apiFetch(`/api/companies/${encodeURIComponent(slug)}/members`);
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (response.status === 404) {
+    notFound();
+  }
+  if (!response.ok) {
+    throw new Error(`Could not load the members (HTTP ${response.status}).`);
+  }
+
+  const members = (await response.json()) as CompanyMember[];
+  return members.map(({ userId, name, email, role, joinedAt }) => ({ userId, name, email, role, joinedAt }));
+}
+
+export type JobStatus = 'draft' | 'open' | 'closed';
+
+/** Mirrors Job in apps/api/src/jobs/job.ts (dates arrive as ISO strings). */
+export interface CompanyJob {
+  id: string;
+  title: string;
+  slug: string;
+  description: string | null;
+  status: JobStatus;
+  openedAt: string | null;
+  closedAt: string | null;
+  createdAt: string;
+}
+
+/** Mirrors Stage in apps/api/src/jobs/job.ts. */
+export interface JobStage {
+  id: string;
+  name: string;
+  position: number;
+  kind: 'normal' | 'hired' | 'rejected';
+}
+
+const jobsPath = (companySlug: string, jobSlug?: string) =>
+  `/api/companies/${encodeURIComponent(companySlug)}/jobs${jobSlug ? `/${encodeURIComponent(jobSlug)}` : ''}`;
+
+/** A company's jobs, newest first (the API's order). */
+export async function getJobs(companySlug: string): Promise<CompanyJob[]> {
+  'use cache: private';
+
+  const response = await apiFetch(jobsPath(companySlug));
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (response.status === 404) {
+    notFound();
+  }
+  if (!response.ok) {
+    throw new Error(`Could not load the jobs (HTTP ${response.status}).`);
+  }
+  return ((await response.json()) as CompanyJob[]).map(toCompanyJob);
+}
+
+/** One job with its pipeline stages, or the not-found page. */
+export async function getJob(companySlug: string, jobSlug: string): Promise<CompanyJob & { stages: JobStage[] }> {
+  'use cache: private';
+
+  const response = await apiFetch(jobsPath(companySlug, jobSlug));
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (response.status === 404) {
+    notFound();
+  }
+  if (!response.ok) {
+    throw new Error(`Could not load the job (HTTP ${response.status}).`);
+  }
+  const job = (await response.json()) as CompanyJob & { stages: JobStage[] };
+  return {
+    ...toCompanyJob(job),
+    stages: job.stages.map(({ id, name, position, kind }) => ({ id, name, position, kind })),
+  };
+}
+
+/** Whether the job has a published application form: required before it can be opened. */
+export async function hasPublishedForm(companySlug: string, jobSlug: string): Promise<boolean> {
+  'use cache: private';
+
+  const response = await apiFetch(`${jobsPath(companySlug, jobSlug)}/form`);
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (!response.ok) {
+    throw new Error(`Could not load the application form (HTTP ${response.status}).`);
+  }
+  const form = (await response.json()) as { published: unknown | null };
+  return form.published !== null;
+}
+
+/** Mirrors FormVersion in apps/api/src/forms/form.ts (dates arrive as ISO strings). */
+export interface FormVersionView {
+  version: number;
+  fields: FormFields;
+  publishedAt: string | null;
+  updatedAt: string;
+}
+
+/** A job's application form: the version being edited and the one applicants see. */
+export async function getJobForm(
+  companySlug: string,
+  jobSlug: string,
+): Promise<{ draft: FormVersionView | null; published: FormVersionView | null }> {
+  'use cache: private';
+
+  const response = await apiFetch(`${jobsPath(companySlug, jobSlug)}/form`);
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (response.status === 404) {
+    notFound();
+  }
+  if (!response.ok) {
+    throw new Error(`Could not load the application form (HTTP ${response.status}).`);
+  }
+  const form = (await response.json()) as { draft: FormVersionView | null; published: FormVersionView | null };
+  const pick = (v: FormVersionView | null) =>
+    v && { version: v.version, fields: v.fields, publishedAt: v.publishedAt, updatedAt: v.updatedAt };
+  return { draft: pick(form.draft), published: pick(form.published) };
+}
+
+function toCompanyJob({ id, title, slug, description, status, openedAt, closedAt, createdAt }: CompanyJob): CompanyJob {
+  return { id, title, slug, description, status, openedAt, closedAt, createdAt };
+}
+
+/** Expose only what the UI needs. */
+function toMyCompany({ id, name, slug, logoUrl, brandColor, role }: MyCompany): MyCompany {
+  return { id, name, slug, logoUrl, brandColor, role };
 }

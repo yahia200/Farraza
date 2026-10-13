@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Righteous, Outfit } from "next/font/google";
 import "./globals.css";
 
-import NavBar from '@/components/NavBar'
 import { cn } from "@/lib/utils";
 
 const outfit = Outfit({subsets:['latin'],variable:'--font-sans'});
@@ -26,7 +25,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={cn("h-full", "antialiased", righteous.variable, "font-sans", outfit.variable)}
     >
       <body>
-        <NavBar />
         {children}
       </body>
     </html>

@@ -98,10 +98,68 @@ Linting: the API uses **oxlint** (`apps/api/oxlint.json`) and the web app uses E
 - **The DAL is the only place that reads "who is signed in".** `getCurrentUser()` and `getMyCompanies()` use `'use cache: private'` and redirect to `/sign-in` on 401. Any component that calls them must render inside `<Suspense>` (`cacheComponents` is on).
   - Any action that changes the session or memberships must call `revalidatePath('/', 'layout')` before redirecting, or the private cache serves stale data.
   - Docs: `02-guides/authentication-with-cache-components.md`.
+- **Route groups:**
+  - `(marketing)`: the landing page, and the only place with the floating `NavBar`.
+  - `(auth)`: sign-in and sign-up.
+  - `(onboarding)`: `/onboarding`.
+  - `(dashboard)`: the shadcn sidebar layout. Besides `/dashboard/…` it holds `/companies/new`, the two-step "Add company" page (name, then optional logo and color), which is linked from the company switcher. It isn't at `/dashboard/new` because "new" is a valid company slug.
+- **Company pages** live at `/dashboard/[companySlug]/…`, because top-level `/{company}/{job}` is reserved for public apply pages (`docs/db-schema.md`). Every company page wraps its content in `CompanyPage` (`components/dashboard/company-page.tsx`).
+  - `CompanyPage` awaits `params` inside `<Suspense>` and calls `getCompany(slug)`.
+  - That call doubles as the membership check: the API answers 404 to non-members, so they get `notFound()`. The status stays 200 after streaming, with `noindex` (`03-api-reference/04-functions/not-found.md`).
 - **Gating:** there is no `proxy.ts`. Pages enforce routing themselves:
   - Signed-out users are redirected to `/sign-in` by the DAL.
-  - `/dashboard` sends users with no company to `/onboarding`, and `/onboarding` sends users who have one back to `/dashboard`.
-  - Sign-up goes to `/onboarding`.
+  - `/dashboard` redirects to your first company, or to `/onboarding` if you have none. `/onboarding` sends users who have a company back to `/dashboard`.
+  - Sign-up goes to `/onboarding`. Creating a company redirects to that company's dashboard.
+- **Pitfalls hit while building the dashboard:**
+  - **Keep the sidebar frame (`AppSidebar`) out of `<Suspense>`.** On phones the provider switches to the mobile sheet right after hydrating, and a boundary that hydrates later no longer matches the server's desktop HTML. Pass the data parts in as async Server Component slots, each in its own boundary (see `app/(dashboard)/layout.tsx`).
+  - **A Server Component can't use a non-component value exported from a `'use client'` module.** It gets a client reference, not the value. Put shared constants in plain modules, like `components/dashboard/nav-items.ts`.
+  - **Under `cacheComponents`, `useParams()` suspends for dynamic segments**, so wrap components that use it in `<Suspense>` (`03-api-reference/04-functions/use-params.md`).
+  - **No `Math.random()` in anything prerendered**, including Suspense fallbacks. That's why we don't use shadcn's `SidebarMenuSkeleton`.
+- **Sidebar open/collapsed state is restored from shadcn's `sidebar_state` cookie without reading it on the server** (that would push the sidebar behind `<Suspense>`). See `components/dashboard/persistent-sidebar.tsx`:
+  - An inline script fixes the DOM before first paint.
+  - A lazy `useState` reads the same cookie, so hydration matches.
+  - Pattern: `02-guides/preventing-flash-before-hydration.md`, "Syncing with React state".
+  - If you change `collapsible` on `<Sidebar>`, use `SIDEBAR_COLLAPSIBLE` so the script stays in sync.
+- **Members (`/dashboard/[companySlug]/members`):** a data table following shadcn's data-table guide (https://ui.shadcn.com/docs/components/base/data-table), built on **TanStack Table v9**. v9's API differs from v8:
+  - `useTable` instead of `useReactTable`.
+  - Features and row models are registered with `tableFeatures({...})`.
+  - Columns use `createColumnHelper<Features, Row>()`, and cells render with `<table.FlexRender>`.
+  - `Column<Features, Row, Value>` needs its value type.
+  - Read the `.d.ts` files in `node_modules/@tanstack/table-core` before changing it.
+  - The table's typed `meta` (the `tableMeta` slot) tells the cells who is viewing.
+- **Member and job permissions live in `packages/shared/src/members.ts`** (`canManageJobs` included). The API's `MemberPolicy` and `JobPolicy` and the web UI all use them, so change the rules there.
+- **Data tables:** `components/data-table/data-table.tsx` (`DataTable`, `DataTableSortButton`, `DataTableColumnMeta`) only renders a table instance. Each feature keeps its own `data-table-features.ts` (v9 `tableFeatures`), `columns.tsx` and a `useTable` call; see members and jobs.
+- **Jobs:**
+  - The list at `/dashboard/[companySlug]/jobs` has a status filter (`ToggleGroup`, whose Base UI value is an array).
+  - Each job lives at `/dashboard/[companySlug]/jobs/[jobSlug]`. Its `layout.tsx` holds the header (status and open/close) and link-tabs (`JobTabs`) to Overview, `/form` and `/candidates`. The pipeline (`/candidates`) is still a placeholder.
+  - Pages use `JobPage` (like `CompanyPage`) to await params and load the company and job.
+- **Form builder (`/jobs/[jobSlug]/form`, `components/dashboard/jobs/form-builder/`):**
+  - One React Hook Form for the whole list: `useFieldArray({ name: 'fields' })`, validated by `zodResolver(z.object({ fields: formFieldsSchema }))`, the same schema the API uses.
+  - "Save draft" PUTs the draft and "Publish" POSTs publish, saving unsaved changes first (`app/actions/forms.ts`). API errors have paths relative to the list (`"2.config.options"`), so they're applied as `fields.${path}`.
+  - The page keys `FormBuilder` on the draft's `updatedAt` and the published version, so a save remounts it with fresh default values.
+  - The "file" type is hidden (there's no upload endpoint yet); `field-types.ts` lists the builder types.
+  - Choice options are a controlled list (`OptionsEditor`), not a nested `useFieldArray`: RHF writes its own `id` on rows, and options already have a real `id` that auto-reject rules point at.
+  - Unsaved changes are backed up to localStorage (`use-form-backup.ts`, read with `useSyncExternalStore`). If the backup differs from the saved form on load, editing is locked until the user restores or discards it.
+  - Paths into type-specific config go through `at(index, 'config.x')` in `question-card.tsx`, cast once, because the question types are a union.
+  - A question with an error opens itself by adjusting state during render (`if (hasError && !open) setOpen(true)`), so it stays open once the error is fixed (https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes).
+  - New questions open by comparing `row.key` from `useFieldArray`; `useWatch` values lag one render behind `append`.
+  - Cards animate open and closed with the height transition from Base UI's Collapsible docs (`docs/react/components/collapsible.md`). The panel's padding and border sit on an inner div, because they would still show at `height: 0`. Base UI resets the height to `auto` after opening, so content that grows later isn't clipped; in the hidden browser pane that only happens once frames are drawn.
+- **`html` has `scrollbar-gutter: stable`** (`globals.css`), so the page doesn't shift when popups lock scrolling. Base UI's scroll lock keeps that value instead of adding padding.
+- **Reset dialogs and forms before navigating away from them with `router.push`.** Next.js keeps the previous page mounted with its React state (Activity), so pressing Back otherwise reopens the dialog with the old values (`02-guides/preserving-ui-state.md`).
+  - Reset in the submit handler, as in `NewJobDialog`.
+  - Or, to avoid a flash, reset in a `useLayoutEffect` cleanup, which runs as the page is hidden (as in `AddCompanyWizard`).
+- **Keep element `id`s unique across the app.** Next.js 16 keeps recently visited routes mounted but hidden, so the same id on two pages, such as a dialog and a form, can break `<label for>`.
+- Dates shown in the UI are formatted on the server with `formatDate` (`lib/format.ts`).
+- **Toasts:** shadcn's `toast` (Base UI Toast, no extra package). Call `toast.add({ type, title, description })` from client code; the `<Toaster />` is in the dashboard layout.
+- **Base UI gotchas:**
+  - `DropdownMenuLabel` (`Menu.GroupLabel`) must sit inside a `DropdownMenuGroup`, or opening the menu crashes.
+  - `AlertDialogAction` is a plain Button and doesn't close the dialog; that's on purpose, so a pending action can keep it open.
+  - Radio menu items stay open unless given `closeOnClick`.
+  - `<Select>` needs `items` to show labels instead of raw values.
+- **Generated shadcn files we changed** (check these before running `shadcn add --overwrite`):
+  - `components/ui/dropdown-menu.tsx` gained `DropdownMenuLinkItem`, which wraps Base UI's `Menu.LinkItem`.
+  - `hooks/use-mobile.ts` uses `useSyncExternalStore` instead of calling `setState` in an effect.
+- **Testing in the hidden browser pane:** React's streamed reveals are scheduled with `requestAnimationFrame`, which doesn't run while the page isn't drawn. If Suspense content looks stuck, take a screenshot (which forces a draw) before concluding it's a bug.
 - **Forms:** React Hook Form with `zodResolver(<schema from @repo/shared>)` and shadcn `Field`/`FieldError` (https://ui.shadcn.com/docs/forms/react-hook-form).
   - `onSubmit` calls a Server Action, which re-validates and returns `ActionFailure<Field>` on failure or redirects on success.
   - `applyActionFailure()` puts server errors into the form.

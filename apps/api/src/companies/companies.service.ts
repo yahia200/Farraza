@@ -43,6 +43,11 @@ export class CompaniesService {
 
   async update(user: User, membership: Membership, changes: UpdateCompanyDto): Promise<Company | null> {
     await this.authorization.authorize(CompanyPolicy, 'update', user, membership);
+    // Nothing to change: answer with the company as it is (the ORM's update({})
+    // returns no row, which would otherwise become an empty 200).
+    if (Object.keys(changes).length === 0) {
+      return membership.company;
+    }
     return this.companies.update(membership.company.id, changes);
   }
 

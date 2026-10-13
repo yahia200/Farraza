@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: 'Get started · Khatwateen' };
 /** Shown until the user belongs to a company. The session read streams in behind <Suspense>. */
 export default function OnboardingPage() {
   return (
-    <main className="flex min-h-svh items-center justify-center px-4 pt-20 pb-8">
+    <main className="flex min-h-svh items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
         <Suspense fallback={<Spinner className="mx-auto size-6" />}>
           <Onboarding />
@@ -41,7 +41,7 @@ async function Onboarding() {
       <CardFooter className="justify-center text-sm text-muted-foreground">
         Not {user.name}?
         <form action={signOut}>
-          <Button type="submit" variant="link" size="sm" className="text-destructive">
+          <Button type="submit" variant="link" size="sm">
             Sign out
           </Button>
         </form>

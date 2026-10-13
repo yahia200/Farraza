@@ -83,7 +83,7 @@ function CreateCompanyForm() {
 
   async function onSubmit(values: CreateCompanyInput) {
     setFormError(undefined);
-    // Only returns on failure; success redirects to /dashboard.
+    // Only returns on failure; success redirects to the new company's dashboard.
     const failure = await createCompany(values);
     if (failure) {
       setFormError(applyActionFailure(form, failure));
@@ -103,10 +103,10 @@ function CreateCompanyForm() {
           control={form.control}
           render={({ field, fieldState }) => (
             <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="company-name">Company name</FieldLabel>
+              <FieldLabel htmlFor="onboarding-company-name">Company name</FieldLabel>
               <Input
                 {...field}
-                id="company-name"
+                id="onboarding-company-name"
                 autoComplete="organization"
                 autoFocus
                 aria-invalid={fieldState.invalid}
@@ -145,7 +145,7 @@ function JoinInstructions({ email }: { email: string }) {
         <FieldLabel htmlFor="your-email">Ask an admin at your company to add you with this email</FieldLabel>
         <div className="flex gap-2">
           <Input id="your-email" value={email} readOnly />
-          <Button type="button" variant="outline" onClick={copyEmail} aria-label="Copy email">
+          <Button type="button" variant="ghost" size="icon" onClick={copyEmail} aria-label="Copy email">
             {copied ? <CheckIcon /> : <CopyIcon />}
           </Button>
         </div>

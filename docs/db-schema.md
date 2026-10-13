@@ -74,7 +74,7 @@ The tenant.
 | `id` | `id` | `uuid` | PK |
 | `name` | `name` | `text` | NOT NULL |
 | `slug` | `slug` | `text` | NOT NULL, UNIQUE |
-| `logo_url` | `logoUrl` | `text` | NULL |
+| `logo_url` | `logoUrl` | `text` | NULL (an `https://` URL of at most 2,048 characters, checked in the application) |
 | `brand_color` | `brandColor` | `text` | NULL |
 | `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
 | `updated_at` | `updatedAt` | `timestamptz` | NOT NULL, set by the ORM |

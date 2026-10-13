@@ -173,6 +173,8 @@
     cursor: pointer;
   }
   html {
-    @apply font-sans;
+    /* Reserve the scrollbar's space so the page doesn't shift when it appears,
+       or when a popup locks scrolling (Base UI's scroll lock keeps this value). */
+    @apply font-sans scrollbar-gutter-stable;
   }
 }
