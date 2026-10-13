@@ -7,10 +7,10 @@ function NavBar() {
   return (
     <nav className='fixed top-2 left-1/2 -translate-x-1/2 w-1/2 max-w-2xl bg-white z-99 rounded-full flex items-center justify-between p-2 shadow-lg'>
         <div >
-            <img src="/logo.svg" alt="Logo" className='h-8 w-8' />
+            <img src="/logo.svg" alt="Logo" className='size-6' />
         </div>
         <div >
-            <Link className={cn(buttonVariants({ variant: "default" }), "px-6")} href="#">
+            <Link className={cn(buttonVariants({ variant: "default" }), "px-6")} href="/sign-up">
                 <span className='font-righteous capitalize'>get started</span>
             </Link>
         </div>

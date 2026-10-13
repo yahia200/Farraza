@@ -5,7 +5,7 @@ import { CompaniesService } from './companies.service.js';
 import type { Membership } from './company.js';
 import { CompanyMemberGuard } from './company-member.guard.js';
 import { CurrentMembership } from './current-membership.decorator.js';
-import { UpdateCompanyDto } from './dto/update-company.dto.js';
+import { updateCompanySchema, type UpdateCompanyDto } from './dto/update-company.dto.js';
 
 @Controller('companies/:companySlug')
 @UseGuards(CompanyMemberGuard)
@@ -21,7 +21,7 @@ export class CompanyController {
   update(
     @CurrentUser() user: User,
     @CurrentMembership() membership: Membership,
-    @Body() changes: UpdateCompanyDto,
+    @Body({ schema: updateCompanySchema }) changes: UpdateCompanyDto,
   ) {
     return this.companiesService.update(user, membership, changes);
   }

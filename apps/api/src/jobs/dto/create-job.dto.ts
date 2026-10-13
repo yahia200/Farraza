@@ -1,13 +1,4 @@
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import type { CreateJobInput } from '@repo/shared';
 
-export class CreateJobDto {
-  @IsString()
-  @MinLength(2)
-  @MaxLength(120)
-  title: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(10000)
-  description?: string;
-}
+export { createJobSchema } from '@repo/shared';
+export type CreateJobDto = CreateJobInput;

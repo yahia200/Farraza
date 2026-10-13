@@ -1,7 +1,4 @@
-import { ArrayMaxSize, IsArray } from 'class-validator';
+import type { SaveFormInput } from '@repo/shared';
 
-export class SaveFormDto {
-  @IsArray()
-  @ArrayMaxSize(50)
-  fields: unknown[];
-}
+export { saveFormSchema } from '@repo/shared';
+export type SaveFormDto = SaveFormInput;

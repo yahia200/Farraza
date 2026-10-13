@@ -1,8 +1,4 @@
-import { IsString, MaxLength, MinLength } from 'class-validator';
+import type { CreateCompanyInput } from '@repo/shared';
 
-export class CreateCompanyDto {
-  @IsString()
-  @MinLength(2)
-  @MaxLength(100)
-  name: string;
-}
+export { createCompanySchema } from '@repo/shared';
+export type CreateCompanyDto = CreateCompanyInput;

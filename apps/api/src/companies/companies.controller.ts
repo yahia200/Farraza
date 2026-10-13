@@ -1,8 +1,8 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
 import { CompaniesService } from './companies.service.js';
-import { CreateCompanyDto } from './dto/create-company.dto.js';
+import { createCompanySchema, type CreateCompanyDto } from './dto/create-company.dto.js';
 import { CurrentUser, Public } from '@nestjs/authentication';
-import { UpdateCompanyDto } from './dto/update-company.dto.js';
+import { updateCompanySchema, type UpdateCompanyDto } from './dto/update-company.dto.js';
 import type { Membership } from './company.js';
 import type { User } from '../users/user.js';
 import { CompanyMemberGuard } from './company-member.guard.js';
@@ -13,7 +13,7 @@ export class CompaniesController {
   constructor(private readonly companiesService: CompaniesService) { }
 
   @Post()
-  create(@CurrentUser('id') userId: string, @Body() createCompanyDto: CreateCompanyDto) {
+  create(@CurrentUser('id') userId: string, @Body({ schema: createCompanySchema }) createCompanyDto: CreateCompanyDto) {
     return this.companiesService.create(userId, createCompanyDto);
   }
 
@@ -26,7 +26,7 @@ export class CompaniesController {
   update(
     @CurrentUser() user: User,
     @CurrentMembership() membership: Membership,
-    @Body() updateCompanyDto: UpdateCompanyDto,
+    @Body({ schema: updateCompanySchema }) updateCompanyDto: UpdateCompanyDto,
   ) {
     return this.companiesService.update(user, membership, updateCompanyDto);
   }

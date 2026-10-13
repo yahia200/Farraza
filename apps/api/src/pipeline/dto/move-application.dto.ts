@@ -1,6 +1,4 @@
-import { IsUUID } from 'class-validator';
+import type { MoveApplicationInput } from '@repo/shared';
 
-export class MoveApplicationDto {
-  @IsUUID()
-  stageId: string;
-}
+export { moveApplicationSchema } from '@repo/shared';
+export type MoveApplicationDto = MoveApplicationInput;

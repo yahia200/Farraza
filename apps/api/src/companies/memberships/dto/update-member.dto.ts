@@ -1,6 +1,4 @@
-import { IsIn } from 'class-validator';
+import type { UpdateMemberInput } from '@repo/shared';
 
-export class UpdateMemberDto {
-  @IsIn(['admin', 'recruiter', 'interviewer'])
-  role: 'admin' | 'recruiter' | 'interviewer';
-}
+export { updateMemberSchema } from '@repo/shared';
+export type UpdateMemberDto = UpdateMemberInput;

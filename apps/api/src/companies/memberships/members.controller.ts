@@ -4,9 +4,9 @@ import type { User } from '../../users/user.js';
 import type { Membership } from '../company.js';
 import { CompanyMemberGuard } from '../company-member.guard.js';
 import { CurrentMembership } from '../current-membership.decorator.js';
-import { AddMemberDto } from '../dto/add-member.dto.js';
+import { addMemberSchema, type AddMemberDto } from '../dto/add-member.dto.js';
 import { MembersService } from './members.service.js';
-import { UpdateMemberDto } from './dto/update-member.dto.js';
+import { updateMemberSchema, type UpdateMemberDto } from './dto/update-member.dto.js';
 
 @Controller('companies/:companySlug/members')
 @UseGuards(CompanyMemberGuard)
@@ -22,7 +22,7 @@ export class MembersController {
   add(
     @CurrentUser() user: User,
     @CurrentMembership() membership: Membership,
-    @Body() dto: AddMemberDto,
+    @Body({ schema: addMemberSchema }) dto: AddMemberDto,
   ) {
     return this.members.add(user, membership, dto);
   }
@@ -32,7 +32,7 @@ export class MembersController {
     @CurrentUser() user: User,
     @CurrentMembership() membership: Membership,
     @Param('userId', ParseUUIDPipe) userId: string,
-    @Body() dto: UpdateMemberDto,
+    @Body({ schema: updateMemberSchema }) dto: UpdateMemberDto,
   ) {
     return this.members.changeRole(user, membership, userId, dto);
   }

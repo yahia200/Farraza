@@ -12,7 +12,7 @@ export class CredentialsService {
 
   async register(name: string, email: string, password: string): Promise<User> {
     if (await this.usersRepository.findByEmail(email)) {
-      throw new ConflictException('Email already registered');
+      throw new ConflictException('An account with this email already exists. Try signing in instead.');
     }
     return this.usersRepository.create({
       name,

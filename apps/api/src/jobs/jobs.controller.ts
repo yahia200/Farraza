@@ -4,8 +4,8 @@ import type { Membership } from '../companies/company.js';
 import { CompanyMemberGuard } from '../companies/company-member.guard.js';
 import { CurrentMembership } from '../companies/current-membership.decorator.js';
 import type { User } from '../users/user.js';
-import { CreateJobDto } from './dto/create-job.dto.js';
-import { UpdateJobDto } from './dto/update-job.dto.js';
+import { createJobSchema, type CreateJobDto } from './dto/create-job.dto.js';
+import { updateJobSchema, type UpdateJobDto } from './dto/update-job.dto.js';
 import { JobsService } from './jobs.service.js';
 
 @Controller('companies/:companySlug/jobs')
@@ -17,7 +17,7 @@ export class JobsController {
   create(
     @CurrentUser() user: User,
     @CurrentMembership() membership: Membership,
-    @Body() dto: CreateJobDto,
+    @Body({ schema: createJobSchema }) dto: CreateJobDto,
   ) {
     return this.jobs.create(user, membership, dto);
   }
@@ -37,7 +37,7 @@ export class JobsController {
     @CurrentUser() user: User,
     @CurrentMembership() membership: Membership,
     @Param('jobSlug') jobSlug: string,
-    @Body() dto: UpdateJobDto,
+    @Body({ schema: updateJobSchema }) dto: UpdateJobDto,
   ) {
     return this.jobs.update(user, membership, jobSlug, dto);
   }

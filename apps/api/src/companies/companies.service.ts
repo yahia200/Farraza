@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
+import { isUniqueViolation } from '../common/db-errors.js';
+import { slugify } from '../common/slugify.js';
 import { CompaniesRepository } from './companies.repository.js';
 import type { CompanyWithRole, Company } from './company.js';
-import { CreateCompanyDto } from './dto/create-company.dto.js';
+import type { CreateCompanyDto } from './dto/create-company.dto.js';
 import { AuthorizationService } from '@nestjs/authorization';
-import { UpdateCompanyDto } from './dto/update-company.dto.js';
+import type { UpdateCompanyDto } from './dto/update-company.dto.js';
 import type { User } from '../users/user.js';
 import { CompanyPolicy } from './company.policy.js';
 import type { Membership } from './company.js';
@@ -15,8 +17,16 @@ export class CompaniesService {
 
   async create(userId: string, CreateCompanyDto: CreateCompanyDto): Promise<CompanyWithRole> {
     const slug = await this.availableSlug(CreateCompanyDto.name);
-    const company = await this.companies.createWithOwner({ name: CreateCompanyDto.name, slug, ownerId: userId });
-    return { ...company, role: 'owner' };
+    try {
+      const company = await this.companies.createWithOwner({ name: CreateCompanyDto.name, slug, ownerId: userId });
+      return { ...company, role: 'owner' };
+    } catch (error) {
+      // Someone took the slug between the check and the insert (same handling as JobsService.create).
+      if (isUniqueViolation(error)) {
+        throw new ConflictException('A company with this address was just created. Try again.');
+      }
+      throw error;
+    }
   }
 
   listForUser(userId: string): Promise<CompanyWithRole[]> {
@@ -37,12 +47,8 @@ export class CompaniesService {
   }
 
   private async availableSlug(name: string): Promise<string> {
-    const base =
-      name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, 30) || 'company';
+    // 30 + "-xxxx" stays within the 40-character limit of companies_slug_format.
+    const base = slugify(name, 30, 'company');
 
     return (await this.companies.slugExists(base))
       ? `${base}-${randomBytes(2).toString('hex')}`

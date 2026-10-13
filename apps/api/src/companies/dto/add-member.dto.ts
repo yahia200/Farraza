@@ -1,9 +1,4 @@
-import { IsEmail, IsIn } from 'class-validator';
+import type { AddMemberInput } from '@repo/shared';
 
-export class AddMemberDto {
-  @IsEmail()
-  email: string;
-
-  @IsIn(['admin', 'recruiter', 'interviewer'])
-  role: 'admin' | 'recruiter' | 'interviewer';
-}
+export { addMemberSchema } from '@repo/shared';
+export type AddMemberDto = AddMemberInput;

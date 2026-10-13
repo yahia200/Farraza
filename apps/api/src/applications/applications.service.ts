@@ -42,7 +42,7 @@ export class ApplicationsService {
 
     const parsed = parseAnswers(found.form.fields, dto.answers);
     if (!parsed.ok) {
-      throw new BadRequestException({ message: 'Some answers are not valid', errors: parsed.errors });
+      throw new BadRequestException({ message: 'Some answers need attention.', errors: parsed.errors });
     }
 
     const knockout = findKnockout(found.form.fields, parsed.answers);

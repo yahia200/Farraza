@@ -1,6 +1,6 @@
 import { Body, Controller, HttpCode, Post, UnauthorizedException } from '@nestjs/common';
 import { Public, SignInService } from '@nestjs/authentication';
-import { SignInDto, SignUpDto } from './dto/auth.dto.js';
+import { signInSchema, signUpSchema, type SignInDto, type SignUpDto } from './dto/auth.dto.js';
 import { CredentialsService } from './credentials.service.js';
 
 @Public()
@@ -12,7 +12,7 @@ export class AuthController {
   ) { }
 
   @Post('sign-up')
-  async signUp(@Body() body: SignUpDto) {
+  async signUp(@Body({ schema: signUpSchema }) body: SignUpDto) {
     const user = await this.credentialsService.register(body.name, body.email, body.password);
     await this.signInService.signIn(user.id, { method: 'password' });
     return user;
@@ -20,10 +20,10 @@ export class AuthController {
 
   @Post('sign-in')
   @HttpCode(200)
-  async signIn(@Body() body: SignInDto) {
+  async signIn(@Body({ schema: signInSchema }) body: SignInDto) {
     const user = await this.credentialsService.verify(body.email, body.password);
     if (!user) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException("That email and password don't match an account.");
     }
     await this.signInService.signIn(user.id, { method: 'password' });
     return user;

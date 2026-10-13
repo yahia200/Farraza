@@ -1,24 +1,6 @@
-import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
+import type { SignInInput, SignUpInput } from '@repo/shared';
 
-export class SignUpDto {
-  @IsString()
-  @MinLength(2)
-  @MaxLength(100)
-  name: string;
-
-  @IsEmail()
-  email: string;
-
-  @IsString()
-  @MinLength(12)
-  @MaxLength(128)
-  password: string;
-}
-
-export class SignInDto {
-  @IsEmail()
-  email: string;
-
-  @IsString()
-  password: string;
-}
+/** Validated by StandardSchemaValidationPipe via `@Body({ schema })`. */
+export { signInSchema, signUpSchema } from '@repo/shared';
+export type SignUpDto = SignUpInput;
+export type SignInDto = SignInInput;

@@ -4,7 +4,7 @@ import type { Membership } from '../companies/company.js';
 import { CompanyMemberGuard } from '../companies/company-member.guard.js';
 import { CurrentMembership } from '../companies/current-membership.decorator.js';
 import type { User } from '../users/user.js';
-import { SaveFormDto } from './dto/save-form.dto.js';
+import { saveFormSchema, type SaveFormDto } from './dto/save-form.dto.js';
 import { FormsService } from './forms.service.js';
 
 @Controller('companies/:companySlug/jobs/:jobSlug/form')
@@ -22,7 +22,7 @@ export class FormsController {
     @CurrentUser() user: User,
     @CurrentMembership() membership: Membership,
     @Param('jobSlug') jobSlug: string,
-    @Body() dto: SaveFormDto,
+    @Body({ schema: saveFormSchema }) dto: SaveFormDto,
   ) {
     return this.forms.saveDraft(user, membership, jobSlug, dto.fields);
   }

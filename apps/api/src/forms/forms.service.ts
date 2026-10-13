@@ -36,7 +36,7 @@ export class FormsService {
 
     const parsed = parseFormFields(input);
     if (!parsed.ok) {
-      throw new BadRequestException({ message: 'The form is not valid', errors: parsed.errors });
+      throw new BadRequestException({ message: 'Some questions in this form need attention.', errors: parsed.errors });
     }
 
     const job = await this.jobs.get(membership, jobSlug);

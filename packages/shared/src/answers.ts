@@ -51,53 +51,53 @@ function checkValue(field: PublicFormField, value: unknown): Checked {
   switch (field.type) {
     case 'short_text':
     case 'long_text': {
-      if (typeof value !== 'string') return { error: 'Expected text' };
+      if (typeof value !== 'string') return { error: 'Enter a text answer.' };
       const text = value.trim();
       return text.length > field.config.maxLength
-        ? { error: `Must be ${field.config.maxLength} characters or fewer` }
+        ? { error: `Keep your answer to ${field.config.maxLength} characters or fewer.` }
         : { value: text };
     }
 
     case 'single_select': {
       if (typeof value !== 'string' || !field.config.options.some((o) => o.id === value)) {
-        return { error: 'Choose one of the options' };
+        return { error: 'Choose one of the options.' };
       }
       return { value };
     }
 
     case 'multi_select': {
       if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) {
-        return { error: 'Expected a list of options' };
+        return { error: 'Choose from the listed options.' };
       }
       const selected = value as string[];
       const optionIds = new Set(field.config.options.map((o) => o.id));
       if (new Set(selected).size !== selected.length) {
-        return { error: 'An option was selected twice' };
+        return { error: 'Each option can only be chosen once.' };
       }
       if (!selected.every((id) => optionIds.has(id))) {
-        return { error: 'Choose from the listed options' };
+        return { error: 'Choose from the listed options.' };
       }
       const max = field.config.maxSelections;
       if (max !== null && selected.length > max) {
-        return { error: `Choose at most ${max}` };
+        return { error: `Choose up to ${max} ${max === 1 ? 'option' : 'options'}.` };
       }
       return { value: selected };
     }
 
     case 'yes_no':
-      return typeof value === 'boolean' ? { value } : { error: 'Answer yes or no' };
+      return typeof value === 'boolean' ? { value } : { error: 'Choose yes or no.' };
 
     case 'file':
       return typeof value === 'string' && UUID.test(value)
         ? { value }
-        : { error: 'Upload a file' };
+        : { error: 'Upload a file.' };
   }
 }
 
 /** Checks an applicant's answers against a form's fields. */
 export function parseAnswers(fields: readonly PublicFormField[], input: unknown): AnswersResult {
   if (typeof input !== 'object' || input === null || Array.isArray(input)) {
-    return { ok: false, errors: [{ path: '', message: 'Answers must be an object' }] };
+    return { ok: false, errors: [{ path: '', message: 'Something went wrong sending your answers. Reload the page and try again.' }] };
   }
 
   const raw = input as Record<string, unknown>;
@@ -107,7 +107,7 @@ export function parseAnswers(fields: readonly PublicFormField[], input: unknown)
 
   for (const key of Object.keys(raw)) {
     if (!knownKeys.has(key)) {
-      errors.push({ path: key, message: 'This field is not part of the form' });
+      errors.push({ path: key, message: 'This question is no longer on the form. Reload the page and try again.' });
     }
   }
 
@@ -116,7 +116,7 @@ export function parseAnswers(fields: readonly PublicFormField[], input: unknown)
 
     if (isEmpty(value)) {
       if (field.required) {
-        errors.push({ path: field.key, message: 'This field is required' });
+        errors.push({ path: field.key, message: 'This question needs an answer.' });
       }
       continue;
     }

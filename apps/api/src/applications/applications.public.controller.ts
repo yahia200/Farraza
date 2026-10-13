@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { Public } from '@nestjs/authentication';
 import { Throttle, minutes } from '@nestjs/throttler';
 import { ApplicationsService } from './applications.service.js';
-import { SubmitApplicationDto } from './dto/submit-application.dto.js';
+import { submitApplicationSchema, type SubmitApplicationDto } from './dto/submit-application.dto.js';
 
 @Public()
 @Controller('public/:companySlug/:jobSlug')
@@ -19,7 +19,7 @@ export class PublicController {
   submit(
     @Param('companySlug') companySlug: string,
     @Param('jobSlug') jobSlug: string,
-    @Body() dto: SubmitApplicationDto,
+    @Body({ schema: submitApplicationSchema }) dto: SubmitApplicationDto,
   ) {
     return this.applications.submit(companySlug, jobSlug, dto);
   }

@@ -4,8 +4,8 @@ import type { Membership } from '../companies/company.js';
 import { CompanyMemberGuard } from '../companies/company-member.guard.js';
 import { CurrentMembership } from '../companies/current-membership.decorator.js';
 import type { User } from '../users/user.js';
-import { CreateNoteDto } from './dto/create-note.dto.js';
-import { MoveApplicationDto } from './dto/move-application.dto.js';
+import { createNoteSchema, type CreateNoteDto } from './dto/create-note.dto.js';
+import { moveApplicationSchema, type MoveApplicationDto } from './dto/move-application.dto.js';
 import { PipelineService } from './pipeline.service.js';
 
 @Controller('companies/:companySlug/jobs/:jobSlug/applications')
@@ -34,7 +34,7 @@ export class PipelineController {
     @CurrentMembership() membership: Membership,
     @Param('jobSlug') jobSlug: string,
     @Param('applicationId', ParseUUIDPipe) applicationId: string,
-    @Body() dto: MoveApplicationDto,
+    @Body({ schema: moveApplicationSchema }) dto: MoveApplicationDto,
   ) {
     return this.pipeline.move(user, membership, jobSlug, applicationId, dto);
   }
@@ -45,7 +45,7 @@ export class PipelineController {
     @CurrentMembership() membership: Membership,
     @Param('jobSlug') jobSlug: string,
     @Param('applicationId', ParseUUIDPipe) applicationId: string,
-    @Body() dto: CreateNoteDto,
+    @Body({ schema: createNoteSchema }) dto: CreateNoteDto,
   ) {
     return this.pipeline.addNote(user, membership, jobSlug, applicationId, dto);
   }

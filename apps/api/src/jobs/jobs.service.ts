@@ -96,7 +96,7 @@ export class JobsService {
     const job = await this.get(membership, jobSlug);
     const closed = await this.jobs.close(job.id, new Date());
     if (!closed) {
-      throw new ConflictException('This job is not open.');
+      throw new ConflictException('Only open jobs can be closed.');
     }
     return closed;
   }

@@ -1,131 +1,164 @@
 # Hiring Pipeline SaaS: Database Schema
 
-Target: PostgreSQL 15 or newer. Table and column names are snake_case; map them to PascalCase models in Prisma with `@@map` / `@map`.
+**Source of truth:** [`apps/api/src/prisma/contract.prisma`](../apps/api/src/prisma/contract.prisma). This document describes that contract as it is applied to PostgreSQL (from the emitted `contract.json`). If the two disagree, the contract wins: update this file. JSONB shapes are defined by the Zod schemas in [`packages/shared/src`](../packages/shared/src).
+
+Target: PostgreSQL 15 or newer.
+
+Sections 1–7 describe what is built. Section 8 lists designed tables and constraints that are not built yet.
 
 ## 1. Conventions
 
-- **Primary keys:** `id uuid PRIMARY KEY DEFAULT gen_random_uuid()` on every table.
-- **Timestamps:** `timestamptz`, stored in UTC. `created_at` defaults to `now()`. `updated_at` defaults to `now()` and is maintained by the application (Prisma `@updatedAt`).
-- **Emails and slugs:** `citext`, so uniqueness is case-insensitive.
-- **Tenant column:** every company-owned table has `company_id`. The application copies it from the parent row on insert and filters by it on every query.
-- **Blocking deletes:** where a delete must be refused, use `ON DELETE NO ACTION`, not `RESTRICT`. `NO ACTION` is checked at the end of the statement, so deleting a whole company still cascades cleanly. `RESTRICT` is checked immediately and can make that cascade fail.
-- **Required extension:** `CREATE EXTENSION IF NOT EXISTS citext;`
+- **Naming:** tables and columns are snake_case in Postgres. In `contract.prisma`, models are PascalCase and fields camelCase, mapped with `@@map` / `@map`. Each table below gives its model name, and each column gives its contract field name.
+- **Primary keys:** `id uuid DEFAULT gen_random_uuid()` on every table except `sessions`, whose text id comes from the auth library. `gen_random_uuid()` is built into PostgreSQL 13+, so no extension is needed.
+- **Timestamps:** `timestamptz` (`TimestamptzJsDate` in the contract). `created_at` defaults to `now()`. `updated_at` is `NOT NULL` with **no database default**: the contract declares it as `temporal.updatedAtJsDate()`, and the Prisma ORM sets it on every create and update. Any write that bypasses the ORM must set it too.
+- **Enums are text plus a CHECK.** Contract `enum`s become `text` columns with a `CHECK (col IN (...))` constraint, not Postgres enum types. The contract uses PascalCase member names (for example `Draft = "draft"`), but only the lowercase string values are stored.
+- **Emails:** plain `text`, not `citext`. The application normalizes them before writing (trim, Unicode NFC, lowercase), and `CHECK (email = lower(email))` backs this up, which makes uniqueness case-insensitive.
+- **Slugs:** plain `text` with a regex CHECK that only allows lowercase letters, digits, and hyphens.
+- **Tenant column:** every company-owned table has `company_id`. The application copies it from the parent row on insert and filters by it on every query. It is not always a foreign key: see `application_events` and `notes`.
+- **Blocking deletes:** `applications` references `jobs`, `form_versions`, and `stages` with `ON DELETE NO ACTION`, which is `onDelete: NoAction` in the contract and the Postgres default. `NO ACTION` is checked at the end of the statement, so deleting a whole company still cascades cleanly. `RESTRICT` would be checked immediately and could make that cascade fail.
+- **Constraint and index names:** Prisma appends a hash to the names it generates (for example `form_versions_one_draft_5c11b249`). This document uses the names without the hash.
 
 ## 2. Enums
 
-| Enum | Values |
-|---|---|
-| `member_role` | `owner`, `admin`, `recruiter`, `interviewer` |
-| `job_status` | `draft`, `open`, `closed` |
-| `stage_kind` | `normal`, `hired`, `rejected` |
-| `public_label` | `received`, `in_review`, `interview`, `offer`, `closed` |
-| `application_status` | `active`, `rejected`, `hired`, `withdrawn` |
-| `file_purpose` | `cv`, `answer` |
-| `file_status` | `pending`, `uploaded` |
-| `event_type` | `applied`, `stage_changed`, `auto_rejected`, `rejected`, `hired`, `withdrawn`, `note_added`, `score_added`, `email_sent` |
+| Contract enum | Used by | Values |
+|---|---|---|
+| `MemberRole` | `memberships.role` | `owner`, `admin`, `recruiter`, `interviewer` |
+| `JobStatus` | `jobs.status` | `draft`, `open`, `closed` |
+| `StageKind` | `stages.kind` | `normal`, `hired`, `rejected` |
+| `PublicLabel` | `stages.public_label` | `received`, `in_review`, `interview`, `offer`, `closed` |
+| `ApplicationStatus` | `applications.status` | `active`, `rejected`, `hired`, `withdrawn` |
+| `ApplicationEventType` | `application_events.type` | `applied`, `auto_rejected`, `stage_changed`, `rejected`, `hired`, `withdrawn`, `note_added` |
+| `SessionMfa` | `sessions.mfa` | `pending`, `verified` |
+
+No code writes `withdrawn` yet, either as a status or as an event type.
 
 ## 3. Tables
 
-### 3.1 `users`
+### 3.1 `users` (model `User`)
 Company-side people (recruiters, admins). Candidates are not stored here.
 
-| Column | Type | Constraints |
-|---|---|---|
-| `id` | `uuid` | PK |
-| `email` | `citext` | NOT NULL, UNIQUE |
-| `password_hash` | `text` | NOT NULL |
-| `name` | `text` | NOT NULL |
-| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
-| `updated_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK |
+| `email` | `email` | `text` | NOT NULL, UNIQUE |
+| `email_verified` | `emailVerified` | `boolean` | NOT NULL, DEFAULT `false` |
+| `password_hash` | `passwordHash` | `text` | NULL (no password set) |
+| `name` | `name` | `text` | NOT NULL |
+| `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+| `updated_at` | `updatedAt` | `timestamptz` | NOT NULL, set by the ORM |
 
-### 3.2 `companies`
+- CHECK `users_email_lowercase`: `email = lower(email)`
+
+### 3.2 `sessions` (model `Session`)
+Server-side sessions for `users`, persisted by `PrismaSessionStore` for `@nestjs/authentication`. The session cookie carries the id. Lifetimes are configured in `app.module.ts`: 14 days absolute, 3 days idle.
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `text` | PK (generated by the auth library) |
+| `user_id` | `userId` | `uuid` | NOT NULL, FK → `users.id` ON DELETE CASCADE |
+| `created_at` | `createdAt` | `timestamptz` | NOT NULL (no default) |
+| `expires_at` | `expiresAt` | `timestamptz` | NOT NULL |
+| `last_active_at` | `lastActiveAt` | `timestamptz` | NOT NULL |
+| `mfa` | `mfa` | `text` (`SessionMfa`) | NULL |
+| `metadata` | `metadata` | `jsonb` | NULL |
+
+- INDEX (`user_id`)
+- INDEX (`expires_at`)
+- Expired rows are deleted whenever a new session is created. There is no separate cleanup job.
+
+### 3.3 `companies` (model `Company`)
 The tenant.
 
-| Column | Type | Constraints |
-|---|---|---|
-| `id` | `uuid` | PK |
-| `name` | `text` | NOT NULL |
-| `slug` | `citext` | NOT NULL, UNIQUE, CHECK `slug ~ '^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$'` |
-| `logo_url` | `text` | NULL |
-| `brand_color` | `char(7)` | NULL, CHECK `brand_color ~ '^#[0-9a-fA-F]{6}$'` |
-| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
-| `updated_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK |
+| `name` | `name` | `text` | NOT NULL |
+| `slug` | `slug` | `text` | NOT NULL, UNIQUE |
+| `logo_url` | `logoUrl` | `text` | NULL |
+| `brand_color` | `brandColor` | `text` | NULL |
+| `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+| `updated_at` | `updatedAt` | `timestamptz` | NOT NULL, set by the ORM |
 
-### 3.3 `memberships`
+- CHECK `companies_slug_format`: `slug ~ '^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$'`
+- CHECK `companies_brand_color_format`: `brand_color ~ '^#[0-9a-fA-F]{6}$'`
+
+### 3.4 `memberships` (model `Membership`)
 Links a user to a company with a role.
 
-| Column | Type | Constraints |
-|---|---|---|
-| `id` | `uuid` | PK |
-| `user_id` | `uuid` | NOT NULL, FK → `users.id` ON DELETE CASCADE |
-| `company_id` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
-| `role` | `member_role` | NOT NULL |
-| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK |
+| `user_id` | `userId` | `uuid` | NOT NULL, FK → `users.id` ON DELETE CASCADE |
+| `company_id` | `companyId` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
+| `role` | `role` | `text` (`MemberRole`) | NOT NULL |
+| `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
 
 - UNIQUE (`user_id`, `company_id`)
-- INDEX (`company_id`)
+- INDEX (`company_id`), INDEX (`user_id`)
 
-### 3.4 `jobs`
+### 3.5 `jobs` (model `Job`)
 
-| Column | Type | Constraints |
-|---|---|---|
-| `id` | `uuid` | PK |
-| `company_id` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
-| `title` | `text` | NOT NULL |
-| `slug` | `text` | NOT NULL, CHECK `slug ~ '^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$'` |
-| `description` | `text` | NULL |
-| `status` | `job_status` | NOT NULL, DEFAULT `'draft'` |
-| `published_form_version_id` | `uuid` | NULL, FK → `form_versions.id` ON DELETE NO ACTION |
-| `created_by` | `uuid` | NULL, FK → `users.id` ON DELETE SET NULL |
-| `opened_at` | `timestamptz` | NULL |
-| `closed_at` | `timestamptz` | NULL |
-| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
-| `updated_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK |
+| `company_id` | `companyId` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
+| `title` | `title` | `text` | NOT NULL |
+| `slug` | `slug` | `text` | NOT NULL |
+| `description` | `description` | `text` | NULL |
+| `status` | `status` | `text` (`JobStatus`) | NOT NULL, DEFAULT `'draft'` |
+| `created_by` | `createdById` | `uuid` | NULL, FK → `users.id` ON DELETE SET NULL |
+| `opened_at` | `openedAt` | `timestamptz` | NULL |
+| `closed_at` | `closedAt` | `timestamptz` | NULL |
+| `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+| `updated_at` | `updatedAt` | `timestamptz` | NOT NULL, set by the ORM |
 
 - UNIQUE (`company_id`, `slug`). The public apply URL is `/{company.slug}/{job.slug}`.
-- INDEX (`company_id`, `status`)
-- CHECK `status <> 'open' OR published_form_version_id IS NOT NULL` (a job cannot be open without a published form)
-- `published_form_version_id` and `form_versions.job_id` reference each other. Create `jobs` without this FK, create `form_versions`, then add the FK with `ALTER TABLE`.
+- INDEX (`company_id`), INDEX (`company_id`, `status`), INDEX (`created_by`)
+- CHECK `jobs_slug_format`: `slug ~ '^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$'`
+- There is no pointer to the published form. A job's published form is its `form_versions` row with the highest `version` where `published_at IS NOT NULL`. The application refuses to open a job that has no published version.
 
-### 3.5 `form_versions`
+### 3.6 `form_versions` (model `FormVersion`)
 One row per version of a job's application form. A published version is never edited; changes go into a new draft.
 
-| Column | Type | Constraints |
-|---|---|---|
-| `id` | `uuid` | PK |
-| `company_id` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
-| `job_id` | `uuid` | NOT NULL, FK → `jobs.id` ON DELETE CASCADE |
-| `version` | `integer` | NOT NULL, CHECK `version > 0` |
-| `fields` | `jsonb` | NOT NULL, DEFAULT `'[]'`, CHECK `jsonb_typeof(fields) = 'array'` |
-| `published_at` | `timestamptz` | NULL (NULL means draft) |
-| `created_by` | `uuid` | NULL, FK → `users.id` ON DELETE SET NULL |
-| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
-| `updated_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK |
+| `company_id` | `companyId` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
+| `job_id` | `jobId` | `uuid` | NOT NULL, FK → `jobs.id` ON DELETE CASCADE |
+| `version` | `version` | `integer` | NOT NULL |
+| `fields` | `fields` | `jsonb` | NOT NULL, DEFAULT `'[]'` (shape in §4.1) |
+| `published_at` | `publishedAt` | `timestamptz` | NULL (NULL means draft) |
+| `created_by` | `createdById` | `uuid` | NULL, **no FK** |
+| `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+| `updated_at` | `updatedAt` | `timestamptz` | NOT NULL, set by the ORM |
 
 - UNIQUE (`job_id`, `version`)
-- UNIQUE (`job_id`) WHERE `published_at IS NULL` (at most one draft per job)
-- Immutability after publishing is enforced in the application.
+- UNIQUE INDEX `form_versions_one_draft` (`job_id`) WHERE `published_at IS NULL`: at most one draft per job
+- INDEX (`company_id`)
+- CHECK `form_versions_version_positive`: `version > 0`
+- A new draft gets `version` = latest published version + 1. Immutability after publishing is enforced in the application.
 
-### 3.6 `stages`
-Pipeline stages, owned by a job. Seeded from a default set when the job is created.
+### 3.7 `stages` (model `Stage`)
+Pipeline stages, owned by a job. Created from a default set when the job is created.
 
-| Column | Type | Constraints |
-|---|---|---|
-| `id` | `uuid` | PK |
-| `company_id` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
-| `job_id` | `uuid` | NOT NULL, FK → `jobs.id` ON DELETE CASCADE |
-| `name` | `text` | NOT NULL (internal, never shown to candidates) |
-| `position` | `integer` | NOT NULL, CHECK `position >= 0` |
-| `kind` | `stage_kind` | NOT NULL, DEFAULT `'normal'` |
-| `public_label` | `public_label` | NOT NULL, DEFAULT `'in_review'` |
-| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
-| `updated_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK |
+| `company_id` | `companyId` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
+| `job_id` | `jobId` | `uuid` | NOT NULL, FK → `jobs.id` ON DELETE CASCADE |
+| `name` | `name` | `text` | NOT NULL (internal, never shown to candidates) |
+| `position` | `position` | `integer` | NOT NULL |
+| `kind` | `kind` | `text` (`StageKind`) | NOT NULL, DEFAULT `'normal'` |
+| `public_label` | `publicLabel` | `text` (`PublicLabel`) | NOT NULL, DEFAULT `'in_review'` |
+| `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+| `updated_at` | `updatedAt` | `timestamptz` | NOT NULL, set by the ORM |
 
-- UNIQUE (`job_id`, `position`) DEFERRABLE INITIALLY DEFERRED (lets you reorder stages inside one transaction)
+- UNIQUE (`job_id`, `position`) (not deferrable)
 - UNIQUE (`job_id`, `name`)
-- UNIQUE (`job_id`, `kind`) WHERE `kind <> 'normal'` (exactly one hired and one rejected stage per job)
+- INDEX (`company_id`), INDEX (`job_id`)
+- The database does not enforce one `hired` and one `rejected` stage per job. The default set guarantees it, and there is no stage-editing API yet.
 
-Default stages:
+Default stages (`DEFAULT_STAGES` in `apps/api/src/jobs/job.ts`):
 
 | Position | Name | Kind | Public label |
 |---|---|---|---|
@@ -136,79 +169,223 @@ Default stages:
 | 4 | Hired | `hired` | `closed` |
 | 5 | Rejected | `rejected` | `closed` |
 
-### 3.7 `candidate_accounts`
-Platform-wide identity for a candidate. Created only when someone proves they own the email by using a login link. Only the verified candidate can edit it.
+### 3.8 `candidates` (model `Candidate`)
+A company's own record of a person: what was submitted to that company. It is written by the public apply form, which upserts on (`company_id`, `email`) and overwrites `name` and `phone` with the latest submission.
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK |
+| `company_id` | `companyId` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
+| `email` | `email` | `text` | NOT NULL |
+| `name` | `name` | `text` | NOT NULL |
+| `phone` | `phone` | `text` | NOT NULL (validated in the application: `^\+?[0-9 ()-]{7,20}$`) |
+| `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+| `updated_at` | `updatedAt` | `timestamptz` | NOT NULL, set by the ORM |
+
+- UNIQUE (`company_id`, `email`)
+- INDEX (`company_id`)
+- CHECK `candidates_email_lowercase`: `email = lower(email)`
+
+### 3.9 `applications` (model `Application`)
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK |
+| `company_id` | `companyId` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
+| `job_id` | `jobId` | `uuid` | NOT NULL, FK → `jobs.id` ON DELETE NO ACTION |
+| `candidate_id` | `candidateId` | `uuid` | NOT NULL, FK → `candidates.id` ON DELETE CASCADE |
+| `form_version_id` | `formVersionId` | `uuid` | NOT NULL, FK → `form_versions.id` ON DELETE NO ACTION |
+| `stage_id` | `stageId` | `uuid` | NOT NULL, FK → `stages.id` ON DELETE NO ACTION |
+| `status` | `status` | `text` (`ApplicationStatus`) | NOT NULL, DEFAULT `'active'` |
+| `answers` | `answers` | `jsonb` | NOT NULL, DEFAULT `'{}'` (shape in §4.2) |
+| `source` | `source` | `text` | NULL (for example a `utm_source` value, max 100 chars) |
+| `rejection_notified_at` | `rejectionNotifiedAt` | `timestamptz` | NULL (meant to gate when candidates see a rejection; not set by any code yet) |
+| `submitted_at` | `submittedAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+| `updated_at` | `updatedAt` | `timestamptz` | NOT NULL, set by the ORM |
+
+- UNIQUE (`job_id`, `candidate_id`): one application per person per job. A duplicate submission returns 409.
+- INDEX (`job_id`, `stage_id`) for the pipeline board
+- INDEX (`candidate_id`), INDEX (`company_id`), INDEX (`job_id`), INDEX (`form_version_id`), INDEX (`stage_id`)
+- A job with applications cannot be deleted; close it instead. Deleting a candidate removes their applications, which is what a data-erasure request needs.
+
+### 3.10 `application_events` (model `ApplicationEvent`)
+Append-only history of everything that happens to an application. The application never updates or deletes these rows.
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK |
+| `company_id` | `companyId` | `uuid` | NOT NULL, **no FK** |
+| `application_id` | `applicationId` | `uuid` | NOT NULL, FK → `applications.id` ON DELETE CASCADE |
+| `type` | `type` | `text` (`ApplicationEventType`) | NOT NULL |
+| `from_stage_id` | `fromStageId` | `uuid` | NULL, **no FK** |
+| `to_stage_id` | `toStageId` | `uuid` | NULL, **no FK** |
+| `actor_id` | `actorId` | `uuid` | NULL, **no FK** (NULL means the system) |
+| `data` | `data` | `jsonb` | NOT NULL, DEFAULT `'{}'` (shape in §4.3) |
+| `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+
+- INDEX (`application_id`, `created_at`), INDEX (`application_id`)
+- Stage names are copied into `data` so the history still reads correctly if a stage is later renamed or deleted. Because the stage and actor ids have no FKs, deleting a stage or user leaves them in place rather than nulling them.
+
+### 3.11 `notes` (model `Note`)
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK |
+| `company_id` | `companyId` | `uuid` | NOT NULL, **no FK** |
+| `application_id` | `applicationId` | `uuid` | NOT NULL, FK → `applications.id` ON DELETE CASCADE |
+| `author_id` | `authorId` | `uuid` | NULL, FK → `users.id` ON DELETE SET NULL |
+| `body` | `body` | `text` | NOT NULL |
+| `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+| `updated_at` | `updatedAt` | `timestamptz` | NOT NULL, set by the ORM |
+
+- INDEX (`application_id`, `created_at`), INDEX (`application_id`), INDEX (`author_id`)
+- CHECK `notes_body_not_blank`: `length(trim(body)) > 0`
+- Adding a note also writes a `note_added` event in the same transaction.
+
+## 4. JSONB shapes
+
+The database does not validate these. The application does, using the Zod schemas and parsers in `packages/shared` (`@repo/shared`).
+
+### 4.1 `form_versions.fields`
+An array of at most 50 field objects (`formFieldsSchema` in `form-fields.ts`, checked with `parseFormFields()`). Array order is display order.
+
+```json
+[
+  {
+    "key": "3f1c9a52-6f0e-4b7a-9a43-1d2c8e5b7f10",
+    "type": "yes_no",
+    "label": "Are you able to work on-site in Cairo?",
+    "helpText": null,
+    "required": true,
+    "config": { "rejectWhen": false }
+  }
+]
+```
+
+| Property | Type | Rules |
+|---|---|---|
+| `key` | uuid string | Unique within the form. Stays the same across versions for the same question. |
+| `type` | string | One of the field types below. |
+| `label` | string | Trimmed, 1–200 characters. |
+| `helpText` | string or null | Trimmed, at most 500 characters. |
+| `required` | boolean | |
+| `config` | object | Shape depends on `type`. |
+
+| Type | `config` | Answer value in `applications.answers` |
+|---|---|---|
+| `short_text` | `{ "maxLength": 200 }` (1–500) | string, trimmed, at most `maxLength` |
+| `long_text` | `{ "maxLength": 5000 }` (1–10000) | string, trimmed, at most `maxLength` |
+| `single_select` | `{ "options": [{ "id": "uuid", "label": "..." }], "rejectOptionIds": ["uuid"] }` | option id (string) |
+| `multi_select` | `{ "options": [...], "maxSelections": 3 }` (`maxSelections` ≥ 1, or `null` for no limit) | array of distinct option ids |
+| `yes_no` | `{ "rejectWhen": false }` (`true`, `false`, or `null` for no knockout) | boolean |
+| `file` | `{ "allowedTypes": ["pdf", "image", "document"], "maxSizeMb": 10 }` (at least one type; 1–25 MB) | file id (uuid string). Only the format is checked until `files` exists (§8). |
+
+Rules across properties:
+
+- `options` has 2–50 entries. Option labels are trimmed, 1–100 characters.
+- Option ids are unique within a field. Options are referenced by `id`, not label, so relabelling an option does not break old answers.
+- Every id in `rejectOptionIds` must be one of the field's options. The list may be empty.
+- `maxSelections` cannot exceed the number of options.
+
+**Knockout rules** (`rejectOptionIds`, `rejectWhen`) are never sent to applicants. `toPublicFields()` removes them before the public endpoint returns a form.
+
+Name, email, and phone are not part of `fields`. They are fixed inputs on every form and are stored in `candidates`.
+
+### 4.2 `applications.answers`
+An object keyed by field key, checked with `parseAnswers()` in `answers.ts` against the published form version at submit time:
+
+```json
+{
+  "3f1c9a52-6f0e-4b7a-9a43-1d2c8e5b7f10": true,
+  "a8d2e7b1-0c4f-4e9d-8b21-5f6a7c8d9e01": "I have four years of experience with..."
+}
+```
+
+- Unanswered optional fields are omitted. Empty strings and empty arrays count as unanswered.
+- Keys that are not fields of the form are rejected.
+
+### 4.3 `application_events.data`
+
+| Event type | Written when | `data` | Stages | `actor_id` |
+|---|---|---|---|---|
+| `applied` | An application is submitted | `{ "source": "linkedin" }` (or `null`) | `NULL` → first stage | `NULL` |
+| `auto_rejected` | A knockout rule matched on submit | `{ "fieldKey": "uuid", "fieldLabel": "..." }` | first stage → rejected stage | `NULL` |
+| `stage_changed` | Moved to a `normal` stage | `{ "fromStageName": "...", "toStageName": "..." }` | from → to | user |
+| `hired` | Moved to the `hired` stage | `{ "fromStageName": "...", "toStageName": "..." }` | from → to | user |
+| `rejected` | Moved to the `rejected` stage | `{ "fromStageName": "...", "toStageName": "..." }` | from → to | user |
+| `note_added` | A note is added | `{ "noteId": "uuid" }` | `NULL` | note author |
+| `withdrawn` | Not written yet | | | |
+
+A knocked-out application is created directly in the Rejected stage with `status = 'rejected'`. It gets both an `applied` and an `auto_rejected` event.
+
+## 5. Relationships
+
+These are the relations declared in `contract.prisma`. Columns marked "no FK" above are not relations.
+
+- A `company` has many `memberships`, `jobs`, `stages`, `form_versions`, `candidates`, and `applications`.
+- A `user` has many `memberships` and `sessions`, and is referenced by `jobs.created_by` and `notes.author_id`.
+- A `job` has many `form_versions`, `stages`, and `applications`.
+- A `candidate` has many `applications`.
+- An `application` belongs to one `job`, one `candidate`, one `form_version`, and one `stage`, and has many `application_events` and `notes`.
+
+## 6. Changing the schema
+
+Don't write DDL by hand. Edit `apps/api/src/prisma/contract.prisma`, then:
+
+```bash
+pnpm --filter api exec prisma contract emit   # regenerate contract.json / contract.d.ts
+pnpm --filter api exec prisma db update       # bring the dev database in line with the contract
+```
+
+Prisma works out table creation order and constraint names from the contract. Commit the regenerated `contract.json` and `contract.d.ts`, plus any new files under `apps/api/migrations/`, then update this document.
+
+## 7. Rules enforced in the application
+
+The database cannot check these, so the services must:
+
+- `company_id` on a child row equals the `company_id` of its parent. It is copied from the parent on insert, and every read filters by it.
+- Columns without an FK (`application_events.company_id`/`from_stage_id`/`to_stage_id`/`actor_id`, `notes.company_id`, `form_versions.created_by`) hold valid ids at the time of writing.
+- `applications.stage_id` belongs to the same job as the application. A move is rejected unless the target is one of the job's stages.
+- `applications.form_version_id` is the job's latest published version at submit time, and `applications.answers` is valid against its fields.
+- A published `form_versions` row is never modified. Draft updates and publishing are conditional on `published_at IS NULL`.
+- A job can be opened only if it has a published form version. Opening and closing are conditional on the current `status`.
+- On every stage move, `applications.status` follows the target stage's kind (`normal` → `active`, `hired` → `hired`, `rejected` → `rejected`). It is updated in the same transaction as `stage_id`, together with an `application_events` row. The update is conditional on the application still being in its source stage, so concurrent moves get a 409 instead of overwriting each other.
+- Every state change writes its `application_events` row in the same transaction. Events are never updated or deleted.
+- Each job has exactly one `hired` and one `rejected` stage (currently guaranteed by `DEFAULT_STAGES`).
+- Emails are normalized (trim, NFC, lowercase) before they are written to `users` or `candidates`.
+
+## 8. Not built yet
+
+These come from the original design and are not in `contract.prisma`. When one is added, move it into sections 2–7.
+
+### 8.1 Planned tables
+
+**`candidate_accounts`**: a platform-wide identity for a candidate. It is created only when someone proves they own the email by using a login link, and only the verified candidate can edit it.
 
 | Column | Type | Constraints |
 |---|---|---|
 | `id` | `uuid` | PK |
-| `email` | `citext` | NOT NULL, UNIQUE |
+| `email` | `text` | NOT NULL, UNIQUE, lowercase CHECK |
 | `name` | `text` | NULL |
 | `phone` | `text` | NULL |
 | `verified_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
 | `last_login_at` | `timestamptz` | NULL |
-| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
-| `updated_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+| `created_at`, `updated_at` | `timestamptz` | as usual |
 
-### 3.8 `login_tokens`
-Magic-link tokens for candidates. Keyed by email, not account, because the account may not exist until the link is used.
+It also adds `candidates.account_id uuid NULL` (FK → `candidate_accounts.id` ON DELETE SET NULL) and INDEX (`candidates.account_id`), INDEX (`candidates.email`). When a login token is used, set `account_id` on every `candidates` row whose email matches.
+
+**`login_tokens`**: magic-link tokens for candidates. They are keyed by email, not account, because the account may not exist until the link is used.
 
 | Column | Type | Constraints |
 |---|---|---|
 | `id` | `uuid` | PK |
-| `email` | `citext` | NOT NULL |
+| `email` | `text` | NOT NULL, INDEX |
 | `token_hash` | `text` | NOT NULL, UNIQUE (SHA-256 of the token; never store the raw token) |
-| `expires_at` | `timestamptz` | NOT NULL |
+| `expires_at` | `timestamptz` | NOT NULL, INDEX (for the cleanup job) |
 | `used_at` | `timestamptz` | NULL |
 | `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
 
-- INDEX (`email`)
-- INDEX (`expires_at`) for the cleanup job
-
-### 3.9 `candidates`
-A company's own record of a person: what was submitted to that company. Written by the apply form and by that company's recruiters.
-
-| Column | Type | Constraints |
-|---|---|---|
-| `id` | `uuid` | PK |
-| `company_id` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
-| `account_id` | `uuid` | NULL, FK → `candidate_accounts.id` ON DELETE SET NULL |
-| `email` | `citext` | NOT NULL |
-| `name` | `text` | NOT NULL |
-| `phone` | `text` | NOT NULL (validated as E.164 in the application) |
-| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
-| `updated_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
-
-- UNIQUE (`company_id`, `email`)
-- INDEX (`account_id`)
-- INDEX (`email`) (used to attach all matching rows when an account is verified)
-
-### 3.10 `applications`
-
-| Column | Type | Constraints |
-|---|---|---|
-| `id` | `uuid` | PK |
-| `company_id` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
-| `job_id` | `uuid` | NOT NULL, FK → `jobs.id` ON DELETE NO ACTION |
-| `candidate_id` | `uuid` | NOT NULL, FK → `candidates.id` ON DELETE CASCADE |
-| `form_version_id` | `uuid` | NOT NULL, FK → `form_versions.id` ON DELETE NO ACTION |
-| `stage_id` | `uuid` | NOT NULL, FK → `stages.id` ON DELETE NO ACTION |
-| `status` | `application_status` | NOT NULL, DEFAULT `'active'` |
-| `answers` | `jsonb` | NOT NULL, DEFAULT `'{}'`, CHECK `jsonb_typeof(answers) = 'object'` |
-| `source` | `text` | NULL (for example a `utm_source` value) |
-| `rejection_notified_at` | `timestamptz` | NULL (candidates see a rejection only after this is set) |
-| `submitted_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
-| `updated_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
-
-- UNIQUE (`job_id`, `candidate_id`) (one application per person per job)
-- INDEX (`job_id`, `stage_id`) (pipeline board)
-- INDEX (`candidate_id`)
-- INDEX (`company_id`, `submitted_at` DESC)
-- GIN INDEX on `answers` using `jsonb_path_ops` (filtering by custom fields)
-- A job with applications cannot be deleted; close it instead. Deleting a candidate removes their applications, which is what a data-erasure request needs.
-
-### 3.11 `files`
-Uploaded CVs and file-type answers. Rows are created before the upload starts, and often before the application exists.
+**`files`**: uploaded CVs and file-type answers. Rows are created before the upload starts, often before the application exists. New enums: `FilePurpose` (`cv`, `answer`) and `FileStatus` (`pending`, `uploaded`).
 
 | Column | Type | Constraints |
 |---|---|---|
@@ -216,56 +393,25 @@ Uploaded CVs and file-type answers. Rows are created before the upload starts, a
 | `company_id` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
 | `job_id` | `uuid` | NOT NULL, FK → `jobs.id` ON DELETE CASCADE |
 | `application_id` | `uuid` | NULL, FK → `applications.id` ON DELETE CASCADE (set when the form is submitted) |
-| `purpose` | `file_purpose` | NOT NULL |
+| `purpose` | `text` (`FilePurpose`) | NOT NULL |
 | `field_key` | `uuid` | NULL |
 | `storage_key` | `text` | NOT NULL, UNIQUE |
 | `original_name` | `text` | NOT NULL |
 | `mime_type` | `text` | NOT NULL |
 | `size_bytes` | `bigint` | NOT NULL, CHECK `size_bytes > 0` |
-| `status` | `file_status` | NOT NULL, DEFAULT `'pending'` |
+| `status` | `text` (`FileStatus`) | NOT NULL, DEFAULT `'pending'` |
 | `uploaded_at` | `timestamptz` | NULL |
 | `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
 
+Constraints and notes for `files`:
+
 - CHECK `(purpose = 'answer') = (field_key IS NOT NULL)`
-- UNIQUE (`application_id`) WHERE `purpose = 'cv'` (one CV per application)
-- INDEX (`application_id`)
-- INDEX (`status`, `created_at`) (cleanup job for uploads that never finished or were never attached)
+- UNIQUE (`application_id`) WHERE `purpose = 'cv'`: one CV per application
+- INDEX (`application_id`), and INDEX (`status`, `created_at`) for cleaning up uploads that never finished or were never attached
+- `file` answers in `applications.answers` would then have to reference an `uploaded` row for the same job and field.
 - Deleting a row does not delete the object in storage. The application must delete the object as well.
 
-### 3.12 `application_events`
-Append-only history of everything that happens to an application. Never updated or deleted by the application.
-
-| Column | Type | Constraints |
-|---|---|---|
-| `id` | `uuid` | PK |
-| `company_id` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
-| `application_id` | `uuid` | NOT NULL, FK → `applications.id` ON DELETE CASCADE |
-| `type` | `event_type` | NOT NULL |
-| `from_stage_id` | `uuid` | NULL, FK → `stages.id` ON DELETE SET NULL |
-| `to_stage_id` | `uuid` | NULL, FK → `stages.id` ON DELETE SET NULL |
-| `actor_id` | `uuid` | NULL, FK → `users.id` ON DELETE SET NULL (NULL means the system) |
-| `data` | `jsonb` | NOT NULL, DEFAULT `'{}'` |
-| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
-
-- INDEX (`application_id`, `created_at`)
-- Store the stage names in `data` as well, so the history still reads correctly if a stage is later deleted.
-
-### 3.13 `notes`
-
-| Column | Type | Constraints |
-|---|---|---|
-| `id` | `uuid` | PK |
-| `company_id` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
-| `application_id` | `uuid` | NOT NULL, FK → `applications.id` ON DELETE CASCADE |
-| `author_id` | `uuid` | NULL, FK → `users.id` ON DELETE SET NULL |
-| `body` | `text` | NOT NULL, CHECK `length(trim(body)) > 0` |
-| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
-| `updated_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
-
-- INDEX (`application_id`, `created_at`)
-
-### 3.14 `scores`
-A reviewer's rating of an application overall, or of one answer.
+**`scores`**: a reviewer's rating of an application overall, or of one answer. Adds `score_added` (`{ "scoreId": "uuid", "value": 4 }`) to `ApplicationEventType`.
 
 | Column | Type | Constraints |
 |---|---|---|
@@ -276,129 +422,20 @@ A reviewer's rating of an application overall, or of one answer.
 | `field_key` | `uuid` | NULL (NULL means an overall score) |
 | `value` | `smallint` | NOT NULL, CHECK `value BETWEEN 1 AND 5` |
 | `comment` | `text` | NULL |
-| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
-| `updated_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+| `created_at`, `updated_at` | `timestamptz` | as usual |
 
-- UNIQUE NULLS NOT DISTINCT (`application_id`, `reviewer_id`, `field_key`) (one score per reviewer per answer, and one overall score; needs PostgreSQL 15+)
+- UNIQUE NULLS NOT DISTINCT (`application_id`, `reviewer_id`, `field_key`): one score per reviewer per answer, and one overall score. Needs PostgreSQL 15+.
 
-## 4. JSONB shapes
+### 8.2 Constraints and indexes from the original design that aren't applied
 
-These are validated in the application, not by the database.
+- `stages`: UNIQUE (`job_id`, `kind`) WHERE `kind <> 'normal'`; CHECK `position >= 0`; make UNIQUE (`job_id`, `position`) DEFERRABLE INITIALLY DEFERRED so stages can be reordered inside one transaction. These matter once stages become editable.
+- `form_versions`: CHECK `jsonb_typeof(fields) = 'array'`.
+- `applications`: CHECK `jsonb_typeof(answers) = 'object'`; INDEX (`company_id`, `submitted_at` DESC); GIN INDEX on `answers` using `jsonb_path_ops` for filtering by custom fields.
+- FKs on the "no FK" columns: `application_events.company_id` → `companies` (CASCADE), `from_stage_id`/`to_stage_id` → `stages` (SET NULL), `actor_id` → `users` (SET NULL); `notes.company_id` → `companies` (CASCADE); `form_versions.created_by` → `users` (SET NULL).
 
-### 4.1 `form_versions.fields`
-An array of field objects:
+### 8.3 Later features
 
-```json
-[
-  {
-    "key": "3f1c9a52-6f0e-4b7a-9a43-1d2c8e5b7f10",
-    "type": "yes_no",
-    "label": "Are you able to work on-site in Cairo?",
-    "helpText": null,
-    "required": true,
-    "order": 0,
-    "config": {
-      "knockout": { "rejectWhen": false }
-    }
-  }
-]
-```
-
-| Property | Type | Rules |
-|---|---|---|
-| `key` | uuid string | Unique within the form. Stays the same across versions for the same question. |
-| `type` | string | One of the field types below. |
-| `label` | string | Required, non-empty. |
-| `helpText` | string or null | Optional. |
-| `required` | boolean | Required. |
-| `order` | integer | Unique within the form. |
-| `config` | object | Shape depends on `type`. |
-
-Field types for the first version:
-
-| Type | `config` | Answer value in `applications.answers` |
-|---|---|---|
-| `short_text` | `{ "maxLength": 200 }` | string |
-| `long_text` | `{ "maxLength": 5000 }` | string |
-| `single_select` | `{ "options": [{ "id": "uuid", "label": "..." }], "knockout": { "rejectOptionIds": ["uuid"] } }` | option id (string) |
-| `multi_select` | `{ "options": [...], "maxSelections": 3 }` | array of option ids |
-| `yes_no` | `{ "knockout": { "rejectWhen": false } }` | boolean |
-| `file` | `{ "allowedMimeTypes": ["application/pdf"], "maxSizeBytes": 10485760 }` | file id (uuid string) |
-
-`knockout` is optional on `single_select` and `yes_no`. Options are referenced by `id`, not label, so relabelling an option does not break old answers.
-
-Name, email, phone, and CV are not part of `fields`. They are fixed inputs on every form and are stored in `candidates` and `files`.
-
-### 4.2 `applications.answers`
-An object keyed by field key:
-
-```json
-{
-  "3f1c9a52-6f0e-4b7a-9a43-1d2c8e5b7f10": true,
-  "a8d2e7b1-0c4f-4e9d-8b21-5f6a7c8d9e01": "I have four years of experience with..."
-}
-```
-
-Unanswered optional fields are omitted.
-
-### 4.3 `application_events.data`
-
-| Event type | `data` |
-|---|---|
-| `applied` | `{ "source": "linkedin" }` |
-| `stage_changed` | `{ "fromStageName": "Screening", "toStageName": "Interview" }` |
-| `auto_rejected` | `{ "fieldKey": "uuid", "fieldLabel": "..." }` |
-| `rejected` | `{ "reason": "..." }` |
-| `email_sent` | `{ "template": "application_received" }` |
-| `note_added` | `{ "noteId": "uuid" }` |
-| `score_added` | `{ "scoreId": "uuid", "value": 4 }` |
-| `hired`, `withdrawn` | `{}` |
-
-## 5. Relationships
-
-- A `company` has many `memberships`, `jobs`, and `candidates`.
-- A `user` has many `memberships`.
-- A `job` has many `form_versions`, `stages`, `applications`, and `files`, and points at one published `form_version`.
-- A `candidate_account` has many `candidates` (one per company the person applied to).
-- A `candidate` has many `applications`.
-- An `application` belongs to one `job`, one `candidate`, one `form_version`, and one `stage`, and has many `files`, `application_events`, `notes`, and `scores`.
-
-## 6. Creation order
-
-1. Extension `citext`
-2. Enums
-3. `users`
-4. `companies`
-5. `memberships`
-6. `jobs` (without the `published_form_version_id` FK)
-7. `form_versions`
-8. `ALTER TABLE jobs` to add the `published_form_version_id` FK
-9. `stages`
-10. `candidate_accounts`
-11. `login_tokens`
-12. `candidates`
-13. `applications`
-14. `files`
-15. `application_events`
-16. `notes`
-17. `scores`
-
-## 7. Rules enforced in the application
-
-The database cannot check these, so the services must:
-
-- `company_id` on a child row equals the `company_id` of its parent.
-- `applications.stage_id` belongs to the same job as the application.
-- `applications.form_version_id` belongs to the same job and is a published version.
-- `applications.answers` is valid against the fields of that form version.
-- A published `form_versions` row is never modified.
-- `candidate_accounts` is written only from a verified candidate session.
-- When a login token is used, set `candidates.account_id` on every row whose email matches.
-- When an application moves to a `hired` or `rejected` stage, update `applications.status` in the same transaction and write an `application_events` row.
-
-## 8. Not included yet
-
-- **Invitations** (inviting teammates by email): add with the team feature.
-- **Refresh tokens or sessions for `users`:** add if you use refresh-token rotation instead of short-lived access tokens only.
-- **Structured experience, timed questions, and video fields:** new field types in `form_versions.fields`; video will also need transcoding columns on `files`.
+- **Invitations** (inviting teammates by email): add with the team feature. For now, members are added directly by email.
+- **Emails sent to candidates:** adds `email_sent` (`{ "template": "application_received" }`) to `ApplicationEventType`, and uses `applications.rejection_notified_at`.
+- **Structured experience, timed questions, and video fields:** new field types in `form_versions.fields`. Video will also need transcoding columns on `files`.
 - **Billing and plans.**
