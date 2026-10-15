@@ -19,6 +19,7 @@ export function MoveToStageSelect({
   currentStageId,
   disabled,
   onMove,
+  label = 'Move to stage',
   size,
   className,
 }: {
@@ -27,6 +28,8 @@ export function MoveToStageSelect({
   /** True while a move is in flight. */
   disabled?: boolean;
   onMove: (stageId: string) => void;
+  /** The control's accessible name. Where many are on screen (the board), include who it moves. */
+  label?: string;
   size?: 'sm' | 'default';
   className?: string;
 }) {
@@ -44,7 +47,7 @@ export function MoveToStageSelect({
         }
       }}
     >
-      <SelectTrigger aria-label="Move to stage" size={size} className={className}>
+      <SelectTrigger aria-label={label} size={size} className={className}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

@@ -16,8 +16,9 @@ import { formatDate } from '@/lib/format';
 export const metadata: Metadata = { title: 'Candidates · Khatwateen' };
 
 /**
- * Everyone who applied to the job, read-only for now (moving between stages
- * comes later). Every member can view it, interviewers too.
+ * Everyone who applied to the job. Every member can view it, interviewers
+ * too; those who can move candidates (canMoveApplications) can also do so
+ * from the board (drag, or the card's Select) and from the detail sheet.
  * ?view=table|board picks the view (table by default); ?application=<id>
  * opens one candidate in a side sheet, in either view.
  */
@@ -54,7 +55,13 @@ async function Candidates({
     <div className="flex flex-col gap-4">
       <CandidatesViewToggle basePath={basePath} view={view} application={selected} />
       {view === 'board' ? (
-        <PipelineBoard columns={columns} basePath={basePath} />
+        <PipelineBoard
+          columns={columns}
+          basePath={basePath}
+          companySlug={company.slug}
+          jobSlug={job.slug}
+          canMove={canMoveApplications(company.role)}
+        />
       ) : (
         <TableView columns={columns} stages={job.stages} basePath={basePath} />
       )}
