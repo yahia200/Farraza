@@ -31,6 +31,6 @@ export const DEFAULT_STAGES: ReadonlyArray<Omit<Stage, 'id'>> = [
   { name: 'Screening', position: 1, kind: 'normal', publicLabel: 'in_review' },
   { name: 'Interview', position: 2, kind: 'normal', publicLabel: 'interview' },
   { name: 'Offer', position: 3, kind: 'normal', publicLabel: 'offer' },
-  { name: 'Hired', position: 4, kind: 'hired', publicLabel: 'closed' },
-  { name: 'Rejected', position: 5, kind: 'rejected', publicLabel: 'closed' },
+  { name: 'Rejected', position: 4, kind: 'rejected', publicLabel: 'closed' },
+  { name: 'Hired', position: 5, kind: 'hired', publicLabel: 'closed' },
 ];
