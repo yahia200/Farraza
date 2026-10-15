@@ -225,6 +225,13 @@
                   "kind": "scalar"
                 }
               },
+              "email": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "formVersionId": {
                 "nullable": false,
                 "type": {
@@ -243,6 +250,13 @@
                 "nullable": false,
                 "type": {
                   "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "phone": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
                   "kind": "scalar"
                 }
               },
@@ -388,6 +402,9 @@
                 "companyId": {
                   "column": "company_id"
                 },
+                "email": {
+                  "column": "email"
+                },
                 "formVersionId": {
                   "column": "form_version_id"
                 },
@@ -396,6 +413,9 @@
                 },
                 "jobId": {
                   "column": "job_id"
+                },
+                "phone": {
+                  "column": "phone"
                 },
                 "rejectionNotifiedAt": {
                   "column": "rejection_notified_at"
@@ -1739,6 +1759,16 @@
             "applications": {
               "checks": [
                 {
+                  "expression": "email = lower(email)",
+                  "name": "applications_email_lowercase_9b410a78",
+                  "prefix": "applications_email_lowercase"
+                },
+                {
+                  "expression": "phone ~ '^[+][1-9][0-9]{6,14}$'",
+                  "name": "applications_phone_format_2ce9bbed",
+                  "prefix": "applications_phone_format"
+                },
+                {
                   "expression": "\"status\" IN ('active', 'rejected', 'hired', 'withdrawn')",
                   "name": "applications_status_check_b3e1d1dd",
                   "prefix": "applications_status_check"
@@ -1764,6 +1794,11 @@
                   "nativeType": "uuid",
                   "nullable": false
                 },
+                "email": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
                 "form_version_id": {
                   "codecId": "pg/uuid@1",
                   "nativeType": "uuid",
@@ -1781,6 +1816,11 @@
                 "job_id": {
                   "codecId": "pg/uuid@1",
                   "nativeType": "uuid",
+                  "nullable": false
+                },
+                "phone": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
                   "nullable": false
                 },
                 "rejection_notified_at": {
@@ -1974,6 +2014,18 @@
                     "job_id",
                     "candidate_id"
                   ]
+                },
+                {
+                  "columns": [
+                    "job_id",
+                    "email"
+                  ]
+                },
+                {
+                  "columns": [
+                    "job_id",
+                    "phone"
+                  ]
                 }
               ]
             },
@@ -1983,6 +2035,11 @@
                   "expression": "email = lower(email)",
                   "name": "candidates_email_lowercase_9b410a78",
                   "prefix": "candidates_email_lowercase"
+                },
+                {
+                  "expression": "phone ~ '^[+][1-9][0-9]{6,14}$'",
+                  "name": "candidates_phone_format_2ce9bbed",
+                  "prefix": "candidates_phone_format"
                 }
               ],
               "columns": {
@@ -3087,7 +3144,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "d856d1d6f27ff79b239521e46046f1dd5b69025fbdec368106a28b757f48c6ac"
+    "storageHash": "2087fdf542a4d13c1e168e5178548535357534c7ddc9ff9a2da740c9c66da498"
   },
   "execution": {
     "executionHash": "c19b53563967fe1cdc97d45552456039c34d42f7b292484a823348d6f653f142",

@@ -165,6 +165,7 @@ model Candidate {
 
   @@unique([companyId, email])
   @@check(expression: "email = lower(email)", name: "candidates_email_lowercase")
+  @@check(expression: "phone ~ '^[+][1-9][0-9]{6,14}$'", name: "candidates_phone_format")
   @@map("candidates")
 }
 
@@ -173,6 +174,10 @@ model Application {
   companyId           Uuid                       @map("company_id")
   jobId               Uuid                       @map("job_id")
   candidateId         Uuid                       @map("candidate_id")
+  /// The contact details this application was submitted with (the candidate row keeps the latest).
+  email               String
+  /// E.164, normalised by phoneSchema in @repo/shared, so the same number is always the same text.
+  phone               String
   formVersionId       Uuid                       @map("form_version_id")
   stageId             Uuid                       @map("stage_id")
   status              ApplicationStatus          @default(Active)
@@ -189,6 +194,11 @@ model Application {
   stage       Stage       @relation(fields: [stageId], references: [id], onDelete: NoAction)
 
   @@unique([jobId, candidateId])
+  // One application per job per email, and per phone: a second email can't get a second application in.
+  @@unique([jobId, email])
+  @@unique([jobId, phone])
+  @@check(expression: "email = lower(email)", name: "applications_email_lowercase")
+  @@check(expression: "phone ~ '^[+][1-9][0-9]{6,14}$'", name: "applications_phone_format")
   @@index([jobId, stageId])
   @@index([candidateId])
   @@map("applications")

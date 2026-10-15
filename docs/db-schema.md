@@ -112,7 +112,7 @@ Links a user to a company with a role.
 | `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
 | `updated_at` | `updatedAt` | `timestamptz` | NOT NULL, set by the ORM |
 
-- UNIQUE (`company_id`, `slug`). The public apply URL is `/{company.slug}/{job.slug}`.
+- UNIQUE (`company_id`, `slug`). The public apply URL is `/{company.slug}/{job.slug}`. Company slugs never take a name in `RESERVED_COMPANY_SLUGS` (`packages/shared/src/companies.ts`), because the web app's own top-level routes would hide those pages.
 - INDEX (`company_id`), INDEX (`company_id`, `status`), INDEX (`created_by`)
 - CHECK `jobs_slug_format`: `slug ~ '^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$'`
 - There is no pointer to the published form. A job's published form is its `form_versions` row with the highest `version` where `published_at IS NOT NULL`. The application refuses to open a job that has no published version.
@@ -178,13 +178,14 @@ A company's own record of a person: what was submitted to that company. It is wr
 | `company_id` | `companyId` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
 | `email` | `email` | `text` | NOT NULL |
 | `name` | `name` | `text` | NOT NULL |
-| `phone` | `phone` | `text` | NOT NULL (validated in the application: `^\+?[0-9 ()-]{7,20}$`) |
+| `phone` | `phone` | `text` | NOT NULL, E.164 (`+201001234567`); see CHECK below |
 | `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
 | `updated_at` | `updatedAt` | `timestamptz` | NOT NULL, set by the ORM |
 
 - UNIQUE (`company_id`, `email`)
 - INDEX (`company_id`)
 - CHECK `candidates_email_lowercase`: `email = lower(email)`
+- CHECK `candidates_phone_format`: `phone ~ '^[+][1-9][0-9]{6,14}$'` (E.164). The app normalises numbers with `phoneSchema` (`packages/shared/src/phone.ts`, libphonenumber-js; numbers without a country code are read as Egyptian).
 
 ### 3.9 `applications` (model `Application`)
 
@@ -194,6 +195,8 @@ A company's own record of a person: what was submitted to that company. It is wr
 | `company_id` | `companyId` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
 | `job_id` | `jobId` | `uuid` | NOT NULL, FK → `jobs.id` ON DELETE NO ACTION |
 | `candidate_id` | `candidateId` | `uuid` | NOT NULL, FK → `candidates.id` ON DELETE CASCADE |
+| `email` | `email` | `text` | NOT NULL, lowercase: the email this application was submitted with |
+| `phone` | `phone` | `text` | NOT NULL, E.164: the phone this application was submitted with |
 | `form_version_id` | `formVersionId` | `uuid` | NOT NULL, FK → `form_versions.id` ON DELETE NO ACTION |
 | `stage_id` | `stageId` | `uuid` | NOT NULL, FK → `stages.id` ON DELETE NO ACTION |
 | `status` | `status` | `text` (`ApplicationStatus`) | NOT NULL, DEFAULT `'active'` |
@@ -203,7 +206,10 @@ A company's own record of a person: what was submitted to that company. It is wr
 | `submitted_at` | `submittedAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
 | `updated_at` | `updatedAt` | `timestamptz` | NOT NULL, set by the ORM |
 
-- UNIQUE (`job_id`, `candidate_id`): one application per person per job. A duplicate submission returns 409.
+- UNIQUE (`job_id`, `candidate_id`): one application per person per job.
+- UNIQUE (`job_id`, `email`) and UNIQUE (`job_id`, `phone`): one application per job per email and per phone, so a second email can't get the same person (phone) a second application. Any of these returns 409 ("You've already applied for this job.").
+- CHECK `applications_email_lowercase`: `email = lower(email)`; CHECK `applications_phone_format`: E.164, as on `candidates`.
+- `email`/`phone` are copied from the submission, unlike `candidates`, which keeps only the latest; the pipeline views show these.
 - INDEX (`job_id`, `stage_id`) for the pipeline board
 - INDEX (`candidate_id`), INDEX (`company_id`), INDEX (`job_id`), INDEX (`form_version_id`), INDEX (`stage_id`)
 - A job with applications cannot be deleted; close it instead. Deleting a candidate removes their applications, which is what a data-erasure request needs.
@@ -278,7 +284,7 @@ An array of at most 50 field objects (`formFieldsSchema` in `form-fields.ts`, ch
 | `single_select` | `{ "options": [{ "id": "uuid", "label": "..." }], "rejectOptionIds": ["uuid"] }` | option id (string) |
 | `multi_select` | `{ "options": [...], "maxSelections": 3 }` (`maxSelections` ≥ 1, or `null` for no limit) | array of distinct option ids |
 | `yes_no` | `{ "rejectWhen": false }` (`true`, `false`, or `null` for no knockout) | boolean |
-| `file` | `{ "allowedTypes": ["pdf", "image", "document"], "maxSizeMb": 10 }` (at least one type; 1–25 MB) | file id (uuid string). Only the format is checked until `files` exists (§8). |
+| `file` | `{ "allowedTypes": ["pdf", "image", "document"], "maxSizeMb": 10 }` (at least one type; 1–25 MB) | file id (uuid string). Only the format is checked until `files` exists (§8). Until then `parseFormFields` refuses file questions and the API won't publish a draft that has one, so no new form can contain them. |
 
 Rules across properties:
 

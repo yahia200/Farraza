@@ -34,7 +34,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'d856d1d6f27ff79b239521e46046f1dd5b69025fbdec368106a28b757f48c6ac'>;
+  StorageHashBase<'2087fdf542a4d13c1e168e5178548535357534c7ddc9ff9a2da740c9c66da498'>;
 export type ExecutionHash =
   ExecutionHashBase<'c19b53563967fe1cdc97d45552456039c34d42f7b292484a823348d6f653f142'>;
 export type ProfileHash =
@@ -254,9 +254,11 @@ export type FieldOutputTypes = {
       readonly answers: CodecTypes['pg/jsonb@1']['output'];
       readonly candidateId: CodecTypes['pg/uuid@1']['output'];
       readonly companyId: CodecTypes['pg/uuid@1']['output'];
+      readonly email: CodecTypes['pg/text@1']['output'];
       readonly formVersionId: CodecTypes['pg/uuid@1']['output'];
       readonly id: CodecTypes['pg/uuid@1']['output'];
       readonly jobId: CodecTypes['pg/uuid@1']['output'];
+      readonly phone: CodecTypes['pg/text@1']['output'];
       readonly rejectionNotifiedAt: CodecTypes['pg/timestamptz-date@1']['output'] | null;
       readonly source: CodecTypes['pg/text@1']['output'] | null;
       readonly stageId: CodecTypes['pg/uuid@1']['output'];
@@ -377,9 +379,11 @@ export type FieldInputTypes = {
       readonly answers: CodecTypes['pg/jsonb@1']['input'];
       readonly candidateId: CodecTypes['pg/uuid@1']['input'];
       readonly companyId: CodecTypes['pg/uuid@1']['input'];
+      readonly email: CodecTypes['pg/text@1']['input'];
       readonly formVersionId: CodecTypes['pg/uuid@1']['input'];
       readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly jobId: CodecTypes['pg/uuid@1']['input'];
+      readonly phone: CodecTypes['pg/text@1']['input'];
       readonly rejectionNotifiedAt: CodecTypes['pg/timestamptz-date@1']['input'] | null;
       readonly source: CodecTypes['pg/text@1']['input'] | null;
       readonly stageId: CodecTypes['pg/uuid@1']['input'];
@@ -518,9 +522,11 @@ export type StorageColumnTypes = {
       readonly answers: CodecTypes['pg/jsonb@1']['output'];
       readonly candidate_id: CodecTypes['pg/uuid@1']['output'];
       readonly company_id: CodecTypes['pg/uuid@1']['output'];
+      readonly email: CodecTypes['pg/text@1']['output'];
       readonly form_version_id: CodecTypes['pg/uuid@1']['output'];
       readonly id: CodecTypes['pg/uuid@1']['output'];
       readonly job_id: CodecTypes['pg/uuid@1']['output'];
+      readonly phone: CodecTypes['pg/text@1']['output'];
       readonly rejection_notified_at: CodecTypes['pg/timestamptz-date@1']['output'] | null;
       readonly source: CodecTypes['pg/text@1']['output'] | null;
       readonly stage_id: CodecTypes['pg/uuid@1']['output'];
@@ -641,9 +647,11 @@ export type StorageColumnInputTypes = {
       readonly answers: CodecTypes['pg/jsonb@1']['input'];
       readonly candidate_id: CodecTypes['pg/uuid@1']['input'];
       readonly company_id: CodecTypes['pg/uuid@1']['input'];
+      readonly email: CodecTypes['pg/text@1']['input'];
       readonly form_version_id: CodecTypes['pg/uuid@1']['input'];
       readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly job_id: CodecTypes['pg/uuid@1']['input'];
+      readonly phone: CodecTypes['pg/text@1']['input'];
       readonly rejection_notified_at: CodecTypes['pg/timestamptz-date@1']['input'] | null;
       readonly source: CodecTypes['pg/text@1']['input'] | null;
       readonly stage_id: CodecTypes['pg/uuid@1']['input'];
@@ -746,9 +754,11 @@ export namespace Models {
     answers: CodecTypes['pg/jsonb@1']['output'];
     candidateId: CodecTypes['pg/uuid@1']['output'];
     companyId: CodecTypes['pg/uuid@1']['output'];
+    email: CodecTypes['pg/text@1']['output'];
     formVersionId: CodecTypes['pg/uuid@1']['output'];
     id: CodecTypes['pg/uuid@1']['output'];
     jobId: CodecTypes['pg/uuid@1']['output'];
+    phone: CodecTypes['pg/text@1']['output'];
     rejectionNotifiedAt: CodecTypes['pg/timestamptz-date@1']['output'] | null;
     source: CodecTypes['pg/text@1']['output'] | null;
     stageId: CodecTypes['pg/uuid@1']['output'];
@@ -1038,6 +1048,11 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/uuid@1';
                   readonly nullable: false;
                 };
+                readonly email: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
                 readonly form_version_id: {
                   readonly nativeType: 'uuid';
                   readonly codecId: 'pg/uuid@1';
@@ -1055,6 +1070,11 @@ type ContractBase = Omit<
                 readonly job_id: {
                   readonly nativeType: 'uuid';
                   readonly codecId: 'pg/uuid@1';
+                  readonly nullable: false;
+                };
+                readonly phone: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
                   readonly nullable: false;
                 };
                 readonly rejection_notified_at: {
@@ -1094,7 +1114,11 @@ type ContractBase = Omit<
                 };
               };
               primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [{ readonly columns: readonly ['job_id', 'candidate_id'] }];
+              uniques: readonly [
+                { readonly columns: readonly ['job_id', 'candidate_id'] },
+                { readonly columns: readonly ['job_id', 'email'] },
+                { readonly columns: readonly ['job_id', 'phone'] },
+              ];
               indexes: readonly [
                 {
                   readonly name: 'applications_candidate_id_idx_2164cd9a';
@@ -2019,6 +2043,10 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
               };
+              readonly email: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
               readonly formVersionId: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
@@ -2030,6 +2058,10 @@ type ContractBase = Omit<
               readonly jobId: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
+              };
+              readonly phone: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly rejectionNotifiedAt: {
                 readonly nullable: true;
@@ -2131,9 +2163,11 @@ type ContractBase = Omit<
                 readonly answers: { readonly column: 'answers' };
                 readonly candidateId: { readonly column: 'candidate_id' };
                 readonly companyId: { readonly column: 'company_id' };
+                readonly email: { readonly column: 'email' };
                 readonly formVersionId: { readonly column: 'form_version_id' };
                 readonly id: { readonly column: 'id' };
                 readonly jobId: { readonly column: 'job_id' };
+                readonly phone: { readonly column: 'phone' };
                 readonly rejectionNotifiedAt: { readonly column: 'rejection_notified_at' };
                 readonly source: { readonly column: 'source' };
                 readonly stageId: { readonly column: 'stage_id' };
