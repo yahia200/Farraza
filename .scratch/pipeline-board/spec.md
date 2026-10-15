@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: resolved
 
 # Complete the candidate pipeline feature (web)
 
