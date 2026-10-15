@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { createJobSchema, updateJobSchema, type CreateJobInput, type UpdateJobInput } from '@repo/shared';
 import type { ActionFailure } from '@/lib/action-failure';
 import { apiFetch, failureFromResponse } from '@/lib/api';
+import { expirePublicJob } from '@/lib/public-jobs';
 
 /**
  * Jobs Server Actions, calling apps/api/src/jobs. Each re-validates with the
@@ -71,6 +72,8 @@ export async function updateJob(companySlug: string, jobSlug: string, input: Upd
   }
 
   revalidatePath('/', 'layout');
+  // The public apply page shows the title and description.
+  expirePublicJob(companySlug, jobSlug);
   return { saved: true };
 }
 
@@ -95,5 +98,7 @@ async function changeStatus(companySlug: string, jobSlug: string, action: 'open'
     return failureFromResponse(response, [], { ...NO_PERMISSION, 409: (message) => ({ formError: message }) });
   }
   revalidatePath('/', 'layout');
+  // Opening or closing decides whether the public apply page exists.
+  expirePublicJob(companySlug, jobSlug);
   return { ok: true };
 }

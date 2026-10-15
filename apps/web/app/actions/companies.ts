@@ -11,6 +11,7 @@ import {
 } from '@repo/shared';
 import type { ActionFailure } from '@/lib/action-failure';
 import { apiFetch, failureFromResponse } from '@/lib/api';
+import { expirePublicJob } from '@/lib/public-jobs';
 
 /** Company Server Actions: onboarding and the dashboard's settings page. */
 
@@ -110,5 +111,7 @@ export async function updateCompanySettings(
 
   // The sidebar's company list (lib/dal.ts) shows the name, logo and color.
   revalidatePath('/', 'layout');
+  // So does every public apply page of this company.
+  expirePublicJob(slug);
   return { saved: true };
 }

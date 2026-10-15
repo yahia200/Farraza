@@ -118,6 +118,8 @@ export function QuestionCard({
       <CollapsibleContent className="h-(--collapsible-panel-height) overflow-hidden transition-[height] duration-200 ease-out data-starting-style:h-0 data-ending-style:h-0 motion-reduce:transition-none">
         <div className="border-t p-4">
           <FieldGroup>
+            {/* A question-level problem with no input of its own (file questions, FILE_UNSUPPORTED). */}
+            {errorAt(errors, `fields.${index}.type`) && <FieldError>{errorAt(errors, `fields.${index}.type`)}</FieldError>}
             <Controller
               name={`fields.${index}.label`}
               control={form.control}

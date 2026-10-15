@@ -1,6 +1,6 @@
 import 'server-only';
 import { notFound, redirect } from 'next/navigation';
-import type { FormFields } from '@repo/shared';
+import type { Answers, FormFields } from '@repo/shared';
 import { apiFetch } from './api';
 
 /**
@@ -230,4 +230,104 @@ function toCompanyJob({ id, title, slug, description, status, openedAt, closedAt
 /** Expose only what the UI needs. */
 function toMyCompany({ id, name, slug, logoUrl, brandColor, role }: MyCompany): MyCompany {
   return { id, name, slug, logoUrl, brandColor, role };
+}
+
+// --- Applications (apps/api/src/pipeline) ------------------------------------
+
+/** Mirrors ApplicationStatus in apps/api/src/pipeline/pipeline.ts. */
+export type ApplicationStatus = 'active' | 'rejected' | 'hired' | 'withdrawn';
+
+/** One application in a job's list, with the stage it's in. */
+export interface ApplicationSummary {
+  id: string;
+  status: ApplicationStatus;
+  submittedAt: string;
+  candidate: { name: string; email: string };
+  stage: JobStage;
+}
+
+/**
+ * A job's applications. The API answers with its pipeline board (stages, each
+ * with its applications); the list view only needs one row per application.
+ */
+export async function getApplications(companySlug: string, jobSlug: string): Promise<ApplicationSummary[]> {
+  'use cache: private';
+
+  const response = await apiFetch(`${jobsPath(companySlug, jobSlug)}/applications`);
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (response.status === 404) {
+    notFound();
+  }
+  if (!response.ok) {
+    throw new Error(`Could not load the applications (HTTP ${response.status}).`);
+  }
+  const board = (await response.json()) as {
+    columns: (JobStage & {
+      applications: { id: string; status: ApplicationStatus; submittedAt: string; candidate: ApplicationSummary['candidate'] }[];
+    })[];
+  };
+  return board.columns.flatMap(({ id, name, position, kind, applications }) =>
+    applications.map(({ id: applicationId, status, submittedAt, candidate }) => ({
+      id: applicationId,
+      status,
+      submittedAt,
+      candidate: { name: candidate.name, email: candidate.email },
+      stage: { id, name, position, kind },
+    })),
+  );
+}
+
+/** Mirrors ApplicationDetail in apps/api/src/pipeline/pipeline.ts (dates as ISO strings). */
+export interface ApplicationDetailView {
+  id: string;
+  status: ApplicationStatus;
+  submittedAt: string;
+  source: string | null;
+  stage: Pick<JobStage, 'id' | 'name' | 'kind'>;
+  candidate: { name: string; email: string; phone: string };
+  /** The form version the candidate answered (with knockout rules: members only). */
+  fields: FormFields;
+  answers: Answers;
+  /** Set when an auto-reject rule moved the application to Rejected. */
+  autoRejectedBy: { fieldKey: string; fieldLabel: string } | null;
+}
+
+/** One application in full, or null if it isn't in this job (the sheet says so). */
+export async function getApplication(
+  companySlug: string,
+  jobSlug: string,
+  applicationId: string,
+): Promise<ApplicationDetailView | null> {
+  'use cache: private';
+
+  const response = await apiFetch(
+    `${jobsPath(companySlug, jobSlug)}/applications/${encodeURIComponent(applicationId)}`,
+  );
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  // 404: not in this job; 400: the id in the URL isn't a UUID (ParseUUIDPipe).
+  if (response.status === 404 || response.status === 400) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(`Could not load the application (HTTP ${response.status}).`);
+  }
+  const detail = (await response.json()) as Omit<ApplicationDetailView, 'autoRejectedBy'> & {
+    events: { type: string; data: unknown }[];
+  };
+  const autoRejected = detail.events.find((event) => event.type === 'auto_rejected');
+  return {
+    id: detail.id,
+    status: detail.status,
+    submittedAt: detail.submittedAt,
+    source: detail.source,
+    stage: { id: detail.stage.id, name: detail.stage.name, kind: detail.stage.kind },
+    candidate: { name: detail.candidate.name, email: detail.candidate.email, phone: detail.candidate.phone },
+    fields: detail.fields,
+    answers: detail.answers,
+    autoRejectedBy: autoRejected ? (autoRejected.data as { fieldKey: string; fieldLabel: string }) : null,
+  };
 }

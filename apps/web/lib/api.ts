@@ -1,5 +1,5 @@
 import 'server-only';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import type { FieldError } from '@repo/shared';
 import { fromValidationErrors, type ActionFailure } from './action-failure';
 
@@ -34,17 +34,32 @@ export function apiUrl(path: string): string {
 /**
  * Calls the API with the browser's session cookie attached, if there is one.
  * `cache: 'no-store'` because every response here depends on who is asking.
+ *
+ * It also tells the API who the visitor is, so rate limits count each visitor
+ * rather than this server: their address in `x-client-ip`, plus the shared
+ * INTERNAL_API_SECRET that makes the API trust it
+ * (apps/api/src/common/trusted-client-throttler.guard.ts).
+ * The address comes from X-Forwarded-For, which Vercel overwrites with the
+ * real client address (https://vercel.com/docs/headers/request-headers) and
+ * `next dev` fills from the connection. Elsewhere, only trust it behind a proxy
+ * that sets it.
  */
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const session = (await cookies()).get(SESSION_COOKIE)?.value;
-  const headers = new Headers(init.headers);
+  const clientIp = (await headers()).get('x-forwarded-for')?.split(',')[0]?.trim();
+  const secret = process.env.INTERNAL_API_SECRET;
+  const requestHeaders = new Headers(init.headers);
   if (session) {
-    headers.set('cookie', `${SESSION_COOKIE}=${session}`);
+    requestHeaders.set('cookie', `${SESSION_COOKIE}=${session}`);
   }
-  if (init.body && !headers.has('content-type')) {
-    headers.set('content-type', 'application/json');
+  if (clientIp && secret) {
+    requestHeaders.set('x-client-ip', clientIp);
+    requestHeaders.set('x-internal-secret', secret);
   }
-  return fetch(apiUrl(path), { ...init, headers, cache: 'no-store' });
+  if (init.body && !requestHeaders.has('content-type')) {
+    requestHeaders.set('content-type', 'application/json');
+  }
+  return fetch(apiUrl(path), { ...init, headers: requestHeaders, cache: 'no-store' });
 }
 
 export async function readApiError(response: Response): Promise<ApiErrorBody> {

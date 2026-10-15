@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { parseFormFields, type FieldError, type FormFields } from '@repo/shared';
 import { apiFetch, readApiError } from '@/lib/api';
+import { expirePublicJob } from '@/lib/public-jobs';
 
 /**
  * Application form Server Actions, calling apps/api/src/forms.
@@ -70,6 +71,8 @@ export async function publishForm(
 
   // The job header's "Open job" depends on having a published form (lib/dal.ts hasPublishedForm).
   revalidatePath('/', 'layout');
+  // Applicants see the new version on the public page.
+  expirePublicJob(companySlug, jobSlug);
   return { ok: true };
 }
 
