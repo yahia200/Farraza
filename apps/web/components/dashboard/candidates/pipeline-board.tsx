@@ -132,7 +132,7 @@ export function PipelineBoard({
         {announcement}
       </p>
       {/* `w-0 min-w-full`: the row scrolls inside the page instead of its width (5+ columns) widening the whole layout. */}
-      <div className="hidden w-0 min-w-full auto-cols-[minmax(15rem,1fr)] grid-flow-col gap-3 overflow-x-auto md:grid">
+      <div className="hidden p-4 w-0 min-w-full gap-3 overflow-x-auto md:flex flex-wrap justify-around">
         {optimisticColumns.map((column) => (
           <StageColumn key={column.id} column={column} acceptsDrops={canDrag}>
             <StageCards
@@ -149,7 +149,7 @@ export function PipelineBoard({
 
       <Tabs defaultValue={optimisticColumns[0]?.id} className="md:hidden">
         {/* Six stages don't fit a phone: the list scrolls sideways (the cards below never do). */}
-        <TabsList className="w-full justify-start overflow-x-auto">
+        <TabsList className="w-full justify-around overflow-x-auto">
           {optimisticColumns.map((column) => (
             <TabsTrigger key={column.id} value={column.id} className="flex-none">
               {column.name}
@@ -192,7 +192,7 @@ function StageCards({
 }) {
   if (column.applications.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed p-4 text-center text-xs text-muted-foreground">
+      <p className="rounded-xl border border-dashed p-4 py-8 text-center text-xs text-muted-foreground">
         No candidates in this stage.
       </p>
     );

@@ -55,7 +55,7 @@ export function CandidatesTable({
         </SelectTrigger>
         <SelectContent>
           {items.map((item) => (
-            <SelectItem key={item.value} value={item.value}>
+            <SelectItem key={item.value} value={item.value} className="">
               {item.label}
             </SelectItem>
           ))}

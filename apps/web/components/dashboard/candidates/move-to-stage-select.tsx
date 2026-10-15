@@ -52,7 +52,7 @@ export function MoveToStageSelect({
       </SelectTrigger>
       <SelectContent>
         {items.map((item) => (
-          <SelectItem key={item.value} value={item.value}>
+          <SelectItem key={item.value} value={item.value} className={className}>
             {item.label}
           </SelectItem>
         ))}

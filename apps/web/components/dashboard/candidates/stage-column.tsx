@@ -46,7 +46,7 @@ export function StageColumn({
       ref={ref}
       aria-labelledby={`stage-${column.id}`}
       data-over={isOver || undefined}
-      className="flex min-w-0 flex-col gap-3 rounded-2xl bg-muted/50 p-3 ring-2 ring-transparent transition-shadow data-over:bg-muted data-over:ring-ring"
+      className="flex w-full min-w-[20ch] max-w-[49%] lg:max-w-[32%] xl:max-w-[24%] 2xl:max-w-[15.75%] flex-col gap-3 rounded-2xl bg-muted/50 p-3 ring-2 ring-transparent transition-shadow data-over:bg-muted data-over:ring-ring"
     >
       <header className="flex items-center justify-between gap-2">
         <h2 id={`stage-${column.id}`} className="truncate text-sm font-medium">
