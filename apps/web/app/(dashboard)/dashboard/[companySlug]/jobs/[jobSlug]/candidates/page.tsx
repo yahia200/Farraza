@@ -1,3 +1,4 @@
+import { canMoveApplications } from '@repo/shared';
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { CandidateDetail, CandidateDetailSkeleton } from '@/components/dashboard/candidates/candidate-detail';
@@ -49,7 +50,13 @@ async function Candidates({
         {selected && (
           // Keyed by id, so opening another candidate shows the skeleton again.
           <Suspense key={selected} fallback={<CandidateDetailSkeleton />}>
-            <CandidateDetail companySlug={company.slug} jobSlug={job.slug} applicationId={selected} />
+            <CandidateDetail
+              companySlug={company.slug}
+              jobSlug={job.slug}
+              applicationId={selected}
+              stages={job.stages}
+              canMove={canMoveApplications(company.role)}
+            />
           </Suspense>
         )}
       </CandidateSheet>
