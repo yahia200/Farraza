@@ -9,5 +9,40 @@ services:
       POSTGRES_DB: hiring
     volumes:
       - pgdata:/var/lib/postgresql/data
+
+  # Local S3-compatible object storage for development.
+  # S3 API: http://localhost:9000  |  Console UI: http://localhost:9001
+  # Credentials are dev-only, mirroring the hard-coded db creds above.
+  rustfs:
+    image: rustfs/rustfs:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      RUSTFS_ACCESS_KEY: khatwateen-dev
+      RUSTFS_SECRET_KEY: khatwateen-dev-secret
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
+      RUSTFS_CONSOLE_ENABLE: "true"
+    volumes:
+      - rustfs-data:/data
+    command: ["/data"]
+
+  # One-shot: waits for RustFS, then creates the dev bucket, then exits.
+  createbuckets:
+    image: amazon/aws-cli:latest
+    depends_on:
+      - rustfs
+    environment:
+      AWS_ACCESS_KEY_ID: khatwateen-dev
+      AWS_SECRET_ACCESS_KEY: khatwateen-dev-secret
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "until aws --endpoint-url http://rustfs:9000 s3 ls; do echo 'Waiting for RustFS...'; sleep 2; done; \
+         aws --endpoint-url http://rustfs:9000 s3 mb s3://khatwateen-dev-bucket || true; \
+         echo 'Bucket created.'"
+
 volumes:
   pgdata:
+  rustfs-data:
