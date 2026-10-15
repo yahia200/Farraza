@@ -1,5 +1,6 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
+import { RESERVED_COMPANY_SLUGS } from '@repo/shared';
 import { isUniqueViolation } from '../common/db-errors.js';
 import { slugify } from '../common/slugify.js';
 import { CompaniesRepository } from './companies.repository.js';
@@ -55,7 +56,8 @@ export class CompaniesService {
     // 30 + "-xxxx" stays within the 40-character limit of companies_slug_format.
     const base = slugify(name, 30, 'company');
 
-    return (await this.companies.slugExists(base))
+    // Reserved slugs would clash with the web app's own routes (see RESERVED_COMPANY_SLUGS).
+    return RESERVED_COMPANY_SLUGS.has(base) || (await this.companies.slugExists(base))
       ? `${base}-${randomBytes(2).toString('hex')}`
       : base;
   }

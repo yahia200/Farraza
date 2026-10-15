@@ -33,7 +33,8 @@ export class PipelineRepository {
       stageId: row.stageId,
       status: row.status,
       submittedAt: row.submittedAt,
-      candidate: { name: row.candidate.name, email: row.candidate.email },
+      // The email this application was sent with (the candidate row keeps the latest).
+      candidate: { name: row.candidate.name, email: row.email },
     }));
   }
 
@@ -77,8 +78,9 @@ export class PipelineRepository {
       candidate: {
         id: row.candidate.id,
         name: row.candidate.name,
-        email: row.candidate.email,
-        phone: row.candidate.phone,
+        // The contact details this application was sent with.
+        email: row.email,
+        phone: row.phone,
       },
       fields: row.formVersion.fields as FormFields,
       answers: row.answers as Answers,

@@ -72,6 +72,9 @@ export class ApplicationsRepository {
           companyId: input.companyId,
           jobId: input.jobId,
           candidateId: candidate.id,
+          // Copied per application: UNIQUE (job_id, email) and (job_id, phone) reject a repeat.
+          email: input.candidate.email,
+          phone: input.candidate.phone,
           formVersionId: input.formVersionId,
           stageId: input.stageId,
           status: input.status,

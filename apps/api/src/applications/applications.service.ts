@@ -73,7 +73,7 @@ export class ApplicationsService {
     });
 
     if (result === 'duplicate') {
-      throw new ConflictException('You have already applied for this job.');
+      throw new ConflictException("You've already applied for this job.");
     }
     return { received: true };
   }

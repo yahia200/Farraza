@@ -9,7 +9,8 @@ async function bootstrap() {
   const config = app.get(ConfigService);
 
   app.setGlobalPrefix('api');
-  app.enableCors({ origin: 'http://localhost:3000', credentials: true });
+  // The web app's origin (APP_URL in .env), the only one allowed to call with cookies.
+  app.enableCors({ origin: config.getOrThrow<string>('APP_URL'), credentials: true });
   // Validates every @Body/@Query/@Param that declares `{ schema }` (Zod schemas
   // from @repo/shared); parameters without one pass through untouched.
   app.useGlobalPipes(new StandardSchemaValidationPipe({ exceptionFactory: toValidationException }));
