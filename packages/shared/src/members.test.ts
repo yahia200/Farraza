@@ -3,6 +3,7 @@ import {
   assignableRoles,
   canAddMember,
   canManageJobs,
+  canMoveApplications,
   canChangeRole,
   canRemoveMember,
   compareRoles,
@@ -51,5 +52,12 @@ describe('job permissions', () => {
       true,
       false,
     ]);
+  });
+});
+
+describe('application permissions', () => {
+  it('lets everyone except interviewers move applications', () => {
+    const roles: MemberRole[] = ['owner', 'admin', 'recruiter', 'interviewer'];
+    expect(roles.map((role) => canMoveApplications(role))).toEqual([true, true, true, false]);
   });
 });

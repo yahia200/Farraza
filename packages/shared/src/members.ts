@@ -56,6 +56,15 @@ export function canRemoveMember(input: {
   return input.actorId === input.targetId || outranks(input.actorRole, input.targetRole);
 }
 
+/**
+ * Moving an application between stages: everyone except interviewers. Mirrors
+ * ApplicationPolicy.move (apps/api/src/pipeline/application.policy.ts). Adding
+ * a note needs no check here: every member may (ApplicationPolicy.addNote).
+ */
+export function canMoveApplications(role: MemberRole): boolean {
+  return role !== 'interviewer';
+}
+
 /** Creating, editing, opening and closing jobs: everyone except interviewers. */
 export function canManageJobs(role: MemberRole): boolean {
   return role === 'owner' || role === 'admin' || role === 'recruiter';
