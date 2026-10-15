@@ -4,11 +4,17 @@
 
 **Blocked by:** 01 (`buildActivityTimeline`).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `getApplication` in the web DAL returns the Application's `events` and `notes` (it currently drops them, keeping only the auto-reject hint).
-- [ ] An `addApplicationNote(companySlug, jobSlug, applicationId, body)` Server Action calls the API, validates the body with the shared `createNoteSchema`, and `revalidatePath`s the candidates route; API errors surface via `failureFromResponse`.
-- [ ] The detail sheet renders an Activity section built with `buildActivityTimeline(events, notes)`: chronological, note entries show body + author + time, stage-change entries show what and when (not who).
-- [ ] The detail sheet has a note composer; a posted note appears in the timeline without a full-page reload feeling broken.
-- [ ] Every role (including interviewer) can add a note.
-- [ ] Verified in the browser preview: open a candidate, see history, add a note, see it appear.
+- [x] `getApplication` in the web DAL returns the Application's `events` and `notes` (it currently drops them, keeping only the auto-reject hint).
+- [x] An `addApplicationNote(companySlug, jobSlug, applicationId, body)` Server Action calls the API, validates the body with the shared `createNoteSchema`, and `revalidatePath`s the candidates route; API errors surface via `failureFromResponse`.
+- [x] The detail sheet renders an Activity section built with `buildActivityTimeline(events, notes)`: chronological, note entries show body + author + time, stage-change entries show what and when (not who).
+- [x] The detail sheet has a note composer; a posted note appears in the timeline without a full-page reload feeling broken.
+- [x] Every role (including interviewer) can add a note.
+- [x] Verified in the browser preview: open a candidate, see history, add a note, see it appear.
+
+## Comments
+
+Resolved on integration branch `feat/pipeline-board`: merge 6374da5 (feat 8850b4f, dce82f7). Follow-up review fixes: merge 766f0b7.
+
+Not verified in browser: rejected-automatically / rejected timeline entries, real API 404/400 on a note, phone viewport.

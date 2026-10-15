@@ -4,10 +4,16 @@
 
 **Blocked by:** 01 (`canMoveApplications`, `statusForStageKind`).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] A `moveApplication(companySlug, jobSlug, applicationId, stageId)` Server Action calls the API move endpoint and `revalidatePath`s the candidates route.
-- [ ] The API's `409` (stale move / already in that stage) is mapped through `failureFromResponse` to a toast + refresh, not a form-field error.
-- [ ] The detail sheet shows a "Move to stage" `Select` (Base UI) listing the Job's Stages; choosing one moves the candidate and the sheet reflects the new Stage and status.
-- [ ] The control is hidden when `canMoveApplications(role)` is false (interviewers).
-- [ ] Verified in the browser preview: move a candidate between stages as a recruiter; confirm a hired/rejected stage updates the status; confirm an interviewer sees no control.
+- [x] A `moveApplication(companySlug, jobSlug, applicationId, stageId)` Server Action calls the API move endpoint and `revalidatePath`s the candidates route.
+- [x] The API's `409` (stale move / already in that stage) is mapped through `failureFromResponse` to a toast + refresh, not a form-field error.
+- [x] The detail sheet shows a "Move to stage" `Select` (Base UI) listing the Job's Stages; choosing one moves the candidate and the sheet reflects the new Stage and status.
+- [x] The control is hidden when `canMoveApplications(role)` is false (interviewers).
+- [x] Verified in the browser preview: move a candidate between stages as a recruiter; confirm a hired/rejected stage updates the status; confirm an interviewer sees no control.
+
+## Comments
+
+Resolved on integration branch `feat/pipeline-board`: merge 393f349 (feat f4b8eb5). Follow-up review fixes: merge 766f0b7.
+
+Verified: move, hired/rejected status, 'already in that stage' 409, interviewer sees no control. Not verified: the 'someone else just moved' 409 race, mobile viewport.

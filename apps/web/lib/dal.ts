@@ -1,7 +1,8 @@
 import 'server-only';
 import { notFound, redirect } from 'next/navigation';
-import type { Answers, FormFields } from '@repo/shared';
+import type { ActivityEvent, ActivityNote, Answers, ApplicationStatus, FormFields } from '@repo/shared';
 import { apiFetch } from './api';
+import { formatDate } from './format';
 
 /**
  * Data Access Layer: the one place that resolves "who is signed in".
@@ -234,9 +235,6 @@ function toMyCompany({ id, name, slug, logoUrl, brandColor, role }: MyCompany): 
 
 // --- Applications (apps/api/src/pipeline) ------------------------------------
 
-/** Mirrors ApplicationStatus in apps/api/src/pipeline/pipeline.ts. */
-export type ApplicationStatus = 'active' | 'rejected' | 'hired' | 'withdrawn';
-
 /** One application in a job's list, with the stage it's in. */
 export interface ApplicationSummary {
   id: string;
@@ -247,10 +245,24 @@ export interface ApplicationSummary {
 }
 
 /**
- * A job's applications. The API answers with its pipeline board (stages, each
- * with its applications); the list view only needs one row per application.
+ * One card on the pipeline board: an application without its stage (the column
+ * is the stage), plus the applied date already formatted on the server
+ * (lib/format.ts). The card is a client component, so it renders this string
+ * rather than formatting `submittedAt` itself.
  */
-export async function getApplications(companySlug: string, jobSlug: string): Promise<ApplicationSummary[]> {
+export type PipelineCard = Omit<ApplicationSummary, 'stage'> & { appliedLabel: string };
+
+/** Mirrors BoardColumn in apps/api/src/pipeline/pipeline.ts: a stage and the applications in it. */
+export interface PipelineColumn extends JobStage {
+  applications: PipelineCard[];
+}
+
+/**
+ * A job's pipeline board: its stages in order, each with its applications.
+ * The API answers with this shape; the table and the board views both render
+ * from this one fetch (the table flattens it with `flattenBoard`).
+ */
+export async function getPipelineBoard(companySlug: string, jobSlug: string): Promise<PipelineColumn[]> {
   'use cache: private';
 
   const response = await apiFetch(`${jobsPath(companySlug, jobSlug)}/applications`);
@@ -263,20 +275,28 @@ export async function getApplications(companySlug: string, jobSlug: string): Pro
   if (!response.ok) {
     throw new Error(`Could not load the applications (HTTP ${response.status}).`);
   }
-  const board = (await response.json()) as {
-    columns: (JobStage & {
-      applications: { id: string; status: ApplicationStatus; submittedAt: string; candidate: ApplicationSummary['candidate'] }[];
-    })[];
-  };
-  return board.columns.flatMap(({ id, name, position, kind, applications }) =>
-    applications.map(({ id: applicationId, status, submittedAt, candidate }) => ({
-      id: applicationId,
-      status,
-      submittedAt,
-      candidate: { name: candidate.name, email: candidate.email },
-      stage: { id, name, position, kind },
-    })),
-  );
+  const board = (await response.json()) as { columns: PipelineColumn[] };
+  // Expose only what the UI needs.
+  return board.columns
+    .map(({ id, name, position, kind, applications }) => ({
+      id,
+      name,
+      position,
+      kind,
+      applications: applications.map(({ id: applicationId, status, submittedAt, candidate }) => ({
+        id: applicationId,
+        status,
+        submittedAt,
+        appliedLabel: formatDate(submittedAt),
+        candidate: { name: candidate.name, email: candidate.email },
+      })),
+    }))
+    .sort((a, b) => a.position - b.position);
+}
+
+/** The board as one row per application, for the table view. */
+export function flattenBoard(columns: PipelineColumn[]): (ApplicationSummary & { appliedLabel: string })[] {
+  return columns.flatMap(({ applications, ...stage }) => applications.map((card) => ({ ...card, stage })));
 }
 
 /** Mirrors ApplicationDetail in apps/api/src/pipeline/pipeline.ts (dates as ISO strings). */
@@ -292,6 +312,9 @@ export interface ApplicationDetailView {
   answers: Answers;
   /** Set when an auto-reject rule moved the application to Rejected. */
   autoRejectedBy: { fieldKey: string; fieldLabel: string } | null;
+  /** The application's history and its notes, oldest first; `buildActivityTimeline` joins them. */
+  events: ActivityEvent[];
+  notes: ActivityNote[];
 }
 
 /** One application in full, or null if it isn't in this job (the sheet says so). */
@@ -315,9 +338,7 @@ export async function getApplication(
   if (!response.ok) {
     throw new Error(`Could not load the application (HTTP ${response.status}).`);
   }
-  const detail = (await response.json()) as Omit<ApplicationDetailView, 'autoRejectedBy'> & {
-    events: { type: string; data: unknown }[];
-  };
+  const detail = (await response.json()) as Omit<ApplicationDetailView, 'autoRejectedBy'>;
   const autoRejected = detail.events.find((event) => event.type === 'auto_rejected');
   return {
     id: detail.id,
@@ -329,5 +350,21 @@ export async function getApplication(
     fields: detail.fields,
     answers: detail.answers,
     autoRejectedBy: autoRejected ? (autoRejected.data as { fieldKey: string; fieldLabel: string }) : null,
+    events: detail.events.map(({ id, type, fromStageId, toStageId, actorId, data, createdAt }) => ({
+      id,
+      type,
+      fromStageId,
+      toStageId,
+      actorId,
+      data,
+      createdAt,
+    })),
+    notes: detail.notes.map(({ id, body, authorId, authorName, createdAt }) => ({
+      id,
+      body,
+      authorId,
+      authorName,
+      createdAt,
+    })),
   };
 }

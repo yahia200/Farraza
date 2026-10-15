@@ -1,7 +1,17 @@
 'use server';
 
-import { submitApplicationSchema, type FieldError, type SubmitApplicationInput } from '@repo/shared';
-import { apiFetch, readApiError } from '@/lib/api';
+import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
+import { z } from 'zod';
+import {
+  createNoteSchema,
+  moveApplicationSchema,
+  submitApplicationSchema,
+  type FieldError,
+  type SubmitApplicationInput,
+} from '@repo/shared';
+import type { ActionFailure } from '@/lib/action-failure';
+import { apiFetch, failureFromResponse, readApiError } from '@/lib/api';
 
 /**
  * The public apply form's Server Action, calling
@@ -58,4 +68,92 @@ export async function submitApplication(
     default:
       return { formError: 'Something went wrong. Please try again.' };
   }
+}
+
+// --- Employee actions on an application (apps/api/src/pipeline) ---------------
+
+const applicationPath = (companySlug: string, jobSlug: string, applicationId: string) =>
+  `/api/companies/${encodeURIComponent(companySlug)}/jobs/${encodeURIComponent(jobSlug)}` +
+  `/applications/${encodeURIComponent(applicationId)}`;
+
+export type AddNoteResult = ActionFailure<'body'> & { ok?: boolean };
+
+/**
+ * Adds a note to an application (POST .../applications/:id/notes). Every role
+ * may, interviewers included. Notes are append-only, so there is nothing to edit
+ * or delete. The detail is cached (lib/dal.ts), so success refreshes the
+ * candidates page the sheet is open on.
+ */
+export async function addApplicationNote(
+  companySlug: string,
+  jobSlug: string,
+  applicationId: string,
+  body: string,
+): Promise<AddNoteResult> {
+  const parsed = createNoteSchema.safeParse({ body });
+  if (!parsed.success) {
+    return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
+  }
+
+  const response = await apiFetch(`${applicationPath(companySlug, jobSlug, applicationId)}/notes`, {
+    method: 'POST',
+    body: JSON.stringify(parsed.data),
+  });
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (!response.ok) {
+    return failureFromResponse(response, ['body'], {
+      404: () => ({ formError: 'This candidate is no longer part of this job. Reload the page.' }),
+    });
+  }
+
+  revalidatePath(`/dashboard/${companySlug}/jobs/${jobSlug}/candidates`);
+  return { ok: true };
+}
+
+/**
+ * Employees' pipeline action: moves an application to another stage, calling
+ * POST /api/companies/:c/jobs/:j/applications/:id/move (apps/api/src/pipeline).
+ * Like the other employee actions it re-validates, returns failures rather
+ * than throwing, and revalidates so the private-cached DAL (lib/dal.ts) refetches.
+ */
+
+export type MoveApplicationResult = ActionFailure<never> & { ok?: boolean };
+
+export async function moveApplication(
+  companySlug: string,
+  jobSlug: string,
+  applicationId: string,
+  stageId: string,
+): Promise<MoveApplicationResult> {
+  const parsed = moveApplicationSchema.safeParse({ stageId });
+  if (!parsed.success) {
+    return { formError: 'Choose a stage from this job.' };
+  }
+
+  const candidatesPath = `/dashboard/${companySlug}/jobs/${jobSlug}/candidates`;
+  const response = await apiFetch(`${applicationPath(companySlug, jobSlug, applicationId)}/move`, {
+    method: 'POST',
+    body: JSON.stringify(parsed.data),
+  });
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (!response.ok) {
+    const failure = await failureFromResponse(response, [], {
+      403: () => ({ formError: "You don't have permission to move candidates." }),
+      404: () => ({ formError: 'That candidate is no longer part of this job. Reload the page.' }),
+      // "Already in that stage" or "Someone else just moved this candidate": our view is stale.
+      409: (message) => ({ formError: message }),
+    });
+    if (response.status === 404 || response.status === 409) {
+      // Refresh what the user sees: the page then shows where the candidate really is.
+      revalidatePath(candidatesPath);
+    }
+    return failure;
+  }
+
+  revalidatePath(candidatesPath);
+  return { ok: true };
 }

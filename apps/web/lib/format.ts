@@ -14,3 +14,18 @@ const dateFormat = new Intl.DateTimeFormat('en-GB', {
 export function formatDate(iso: string): string {
   return dateFormat.format(new Date(iso));
 }
+
+const dateTimeFormat = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+  timeZone: 'UTC',
+});
+
+/** "13 Oct 2026, 14:05 UTC": the zone is spelled out because it is not the reader's own. */
+export function formatDateTime(iso: string): string {
+  return `${dateTimeFormat.format(new Date(iso))} UTC`;
+}

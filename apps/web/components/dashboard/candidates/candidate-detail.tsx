@@ -1,3 +1,4 @@
+import type { StageKind } from '@repo/shared';
 import { BanIcon } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -5,22 +6,31 @@ import { SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet
 import { Skeleton } from '@/components/ui/skeleton';
 import { getApplication } from '@/lib/dal';
 import { formatDate } from '@/lib/format';
-import { ApplicationStatusBadge } from './application-status-badge';
+import { toActivityItems } from './activity-items';
+import { CandidateActivity } from './candidate-activity';
+import { CandidateMove } from './candidate-move';
+import { CandidateStageBadges } from './candidate-stage-badges';
 import { formatAnswer } from './format-answer';
 
 /**
- * One candidate's application, read-only: contact details, stage, and the
- * answers to the form version they saw. A Server Component, rendered inside
- * the sheet when the URL has ?application=<id>.
+ * One candidate's application: contact details, stage, the answers to the
+ * form version they saw, and the activity timeline with a note composer. A
+ * Server Component, rendered inside the sheet when the URL has ?application=<id>.
  */
 export async function CandidateDetail({
   companySlug,
   jobSlug,
   applicationId,
+  stages,
+  canMove,
 }: {
   companySlug: string;
   jobSlug: string;
   applicationId: string;
+  /** The job's stages, for the "Move to stage" control (and the status a move gives). */
+  stages: { id: string; name: string; kind: StageKind }[];
+  /** canMoveApplications(role): interviewers get no move control. */
+  canMove: boolean;
 }) {
   const application = await getApplication(companySlug, jobSlug, applicationId);
 
@@ -45,10 +55,19 @@ export async function CandidateDetail({
             {application.source && <> via {application.source}</>}
           </SheetDescription>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline">{stage.name}</Badge>
-          <ApplicationStatusBadge status={application.status} />
-        </div>
+        {canMove ? (
+          // Renders the badges too, so they follow the optimistic stage.
+          <CandidateMove
+            companySlug={companySlug}
+            jobSlug={jobSlug}
+            applicationId={application.id}
+            stageId={stage.id}
+            status={application.status}
+            stages={stages}
+          />
+        ) : (
+          <CandidateStageBadges stageName={stage.name} status={application.status} />
+        )}
       </SheetHeader>
 
       <div className="flex flex-col gap-6 p-4">
@@ -117,6 +136,13 @@ export async function CandidateDetail({
             </dl>
           )}
         </section>
+
+        <CandidateActivity
+          companySlug={companySlug}
+          jobSlug={jobSlug}
+          applicationId={application.id}
+          items={toActivityItems(application.events, application.notes)}
+        />
       </div>
     </>
   );
