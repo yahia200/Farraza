@@ -133,10 +133,10 @@ export async function moveApplication(
   }
 
   const candidatesPath = `/dashboard/${companySlug}/jobs/${jobSlug}/candidates`;
-  const response = await apiFetch(
-    `/api/companies/${encodeURIComponent(companySlug)}/jobs/${encodeURIComponent(jobSlug)}/applications/${encodeURIComponent(applicationId)}/move`,
-    { method: 'POST', body: JSON.stringify(parsed.data) },
-  );
+  const response = await apiFetch(`${applicationPath(companySlug, jobSlug, applicationId)}/move`, {
+    method: 'POST',
+    body: JSON.stringify(parsed.data),
+  });
   if (response.status === 401) {
     redirect('/sign-in');
   }
