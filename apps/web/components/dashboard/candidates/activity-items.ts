@@ -40,9 +40,9 @@ function describeEvent({ type, data }: ActivityEntry): string {
     case 'stage_changed':
       return `Moved ${fromTo(data)}`;
     case 'hired':
-      return `Hired (moved ${fromTo(data)})`;
+      return `Hired${fromStage(data)}`;
     case 'rejected':
-      return `Rejected (moved ${fromTo(data)})`;
+      return `Rejected${fromStage(data)}`;
     case 'withdrawn':
       return 'Withdrew their application';
     default:
@@ -55,6 +55,12 @@ function fromTo(data: unknown): string {
   const from = stringField(data, 'fromStageName');
   const to = stringField(data, 'toStageName');
   return from && to ? `from ${from} to ${to}` : to ? `to ${to}` : 'to another stage';
+}
+
+/** " (from Interview)", or nothing: the stage a hire or rejection came from. */
+function fromStage(data: unknown): string {
+  const from = stringField(data, 'fromStageName');
+  return from ? ` (from ${from})` : '';
 }
 
 /** `data[key]` if `data` is an object and the value is a non-empty string. `data` is JSONB, so it is not trusted. */
