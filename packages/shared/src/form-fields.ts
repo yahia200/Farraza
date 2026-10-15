@@ -9,6 +9,9 @@ export const MAX_FIELDS = 50;
  */
 const RELOAD = 'Something went wrong with this form. Reload the page and try again.';
 
+/** Shown for file questions until uploads exist (also used by the API when publishing). */
+export const FILE_UNSUPPORTED = "File upload questions aren't supported yet. Delete this question.";
+
 /** A whole number from `min` to `max`, with one message for every way it can fail. */
 function wholeNumber(min: number, max: number, error: string) {
   return z.number({ error }).int({ error }).min(min, { error }).max(max, { error });
@@ -126,6 +129,13 @@ export const formFieldsSchema = z
         ctx.addIssue({ code: 'custom', message: RELOAD, path: [index, 'key'] });
       }
       keys.add(field.key);
+
+      // The schema can describe file questions, but there is no upload endpoint
+      // yet, so a form with one could never be completed by an applicant.
+      if (field.type === 'file') {
+        ctx.addIssue({ code: 'custom', message: FILE_UNSUPPORTED, path: [index, 'type'] });
+        return;
+      }
 
       if (field.type !== 'single_select' && field.type !== 'multi_select') {
         return;

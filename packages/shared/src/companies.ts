@@ -13,6 +13,21 @@ const companyName = z
   .min(2,{ error: 'Company name must be at least 2 characters.' })
   .max(100, { error: 'Company name must be 100 characters or fewer.' });
 
+/**
+ * Company slugs the API never hands out. Public apply pages live at
+ * /{companySlug}/{jobSlug}, and a fixed path segment wins over a dynamic one,
+ * so a company named after a top-level web route (apps/web/app) would have
+ * unreachable job pages. Add new top-level routes here.
+ */
+export const RESERVED_COMPANY_SLUGS: ReadonlySet<string> = new Set([
+  'api',
+  'companies',
+  'dashboard',
+  'onboarding',
+  'sign-in',
+  'sign-up',
+]);
+
 export const createCompanySchema = z.strictObject({ name: companyName });
 export type CreateCompanyInput = z.infer<typeof createCompanySchema>;
 

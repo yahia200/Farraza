@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { phoneSchema } from './phone.js';
 
 /** Request bodies for applications: the public apply form and the pipeline. */
 
@@ -14,9 +15,8 @@ export const submitApplicationSchema = z.strictObject({
     .normalize('NFC')
     .toLowerCase()
     .pipe(z.email({ error: 'Enter a valid email address.' })),
-  phone: z.string().regex(/^\+?[0-9 ()-]{7,20}$/, {
-    error: 'Enter a valid phone number, for example +20 100 123 4567.',
-  }),
+  /** Any common format in, E.164 out ("+201001234567"); see phone.ts. */
+  phone: phoneSchema,
   /** Checked against the form's fields by `parseAnswers()` in the service. */
   answers: z.record(z.string(), z.unknown(), {
     error: 'Something went wrong sending your answers. Reload the page and try again.',
