@@ -2,7 +2,9 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { z } from 'zod';
 import {
+  createNoteSchema,
   moveApplicationSchema,
   submitApplicationSchema,
   type FieldError,
@@ -66,6 +68,48 @@ export async function submitApplication(
     default:
       return { formError: 'Something went wrong. Please try again.' };
   }
+}
+
+// --- Employee actions on an application (apps/api/src/pipeline) ---------------
+
+const applicationPath = (companySlug: string, jobSlug: string, applicationId: string) =>
+  `/api/companies/${encodeURIComponent(companySlug)}/jobs/${encodeURIComponent(jobSlug)}` +
+  `/applications/${encodeURIComponent(applicationId)}`;
+
+export type AddNoteResult = ActionFailure<'body'> & { ok?: boolean };
+
+/**
+ * Adds a note to an application (POST .../applications/:id/notes). Every role
+ * may, interviewers included. Notes are append-only, so there is nothing to edit
+ * or delete. The detail is cached (lib/dal.ts), so success refreshes the
+ * candidates page the sheet is open on.
+ */
+export async function addApplicationNote(
+  companySlug: string,
+  jobSlug: string,
+  applicationId: string,
+  body: string,
+): Promise<AddNoteResult> {
+  const parsed = createNoteSchema.safeParse({ body });
+  if (!parsed.success) {
+    return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
+  }
+
+  const response = await apiFetch(`${applicationPath(companySlug, jobSlug, applicationId)}/notes`, {
+    method: 'POST',
+    body: JSON.stringify(parsed.data),
+  });
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (!response.ok) {
+    return failureFromResponse(response, ['body'], {
+      404: () => ({ formError: 'This candidate is no longer part of this job. Reload the page.' }),
+    });
+  }
+
+  revalidatePath(`/dashboard/${companySlug}/jobs/${jobSlug}/candidates`);
+  return { ok: true };
 }
 
 /**
