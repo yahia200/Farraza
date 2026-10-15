@@ -24,6 +24,8 @@
     "contract:emit": "prisma contract emit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1151.0",
+    "@aws-sdk/s3-request-presigner": "^3.1151.0",
     "@nestjs/authentication": "^0.0.1",
     "@nestjs/authorization": "^0.0.1",
     "@nestjs/common": "^12.0.1",

@@ -14,6 +14,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, minutes } from '@nestjs/throttler';
 import { TrustedClientThrottlerGuard } from './common/trusted-client-throttler.guard.js';
 import { PipelineModule } from './pipeline/pipeline.module.js';
+import { StorageModule } from './storage/storage.module.js';
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true }),
   // forRootAsync to read the web app's URL from config (APP_URL in .env).
@@ -25,7 +26,7 @@ import { PipelineModule } from './pipeline/pipeline.module.js';
   }),
   AuthorizationModule.forRoot(),
   ThrottlerModule.forRoot([{ ttl: minutes(1), limit: 100 }]),
-    HealthModule, PrismaModule, UsersModule, AuthModule, CompaniesModule, JobsModule, FormsModule, ApplicationsModule, PipelineModule],
+    HealthModule, PrismaModule, UsersModule, AuthModule, CompaniesModule, JobsModule, FormsModule, ApplicationsModule, PipelineModule, StorageModule],
   // Counts each visitor (see TrustedClientThrottlerGuard), not the web server.
   providers: [{ provide: APP_GUARD, useClass: TrustedClientThrottlerGuard }]
 })
