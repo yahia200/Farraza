@@ -1,6 +1,6 @@
 import 'server-only';
 import { notFound, redirect } from 'next/navigation';
-import type { Answers, FormFields } from '@repo/shared';
+import type { ActivityEvent, ActivityNote, Answers, FormFields } from '@repo/shared';
 import { apiFetch } from './api';
 
 /**
@@ -308,6 +308,9 @@ export interface ApplicationDetailView {
   answers: Answers;
   /** Set when an auto-reject rule moved the application to Rejected. */
   autoRejectedBy: { fieldKey: string; fieldLabel: string } | null;
+  /** The application's history and its notes, oldest first; `buildActivityTimeline` joins them. */
+  events: ActivityEvent[];
+  notes: ActivityNote[];
 }
 
 /** One application in full, or null if it isn't in this job (the sheet says so). */
@@ -331,9 +334,7 @@ export async function getApplication(
   if (!response.ok) {
     throw new Error(`Could not load the application (HTTP ${response.status}).`);
   }
-  const detail = (await response.json()) as Omit<ApplicationDetailView, 'autoRejectedBy'> & {
-    events: { type: string; data: unknown }[];
-  };
+  const detail = (await response.json()) as Omit<ApplicationDetailView, 'autoRejectedBy'>;
   const autoRejected = detail.events.find((event) => event.type === 'auto_rejected');
   return {
     id: detail.id,
@@ -345,5 +346,21 @@ export async function getApplication(
     fields: detail.fields,
     answers: detail.answers,
     autoRejectedBy: autoRejected ? (autoRejected.data as { fieldKey: string; fieldLabel: string }) : null,
+    events: detail.events.map(({ id, type, fromStageId, toStageId, actorId, data, createdAt }) => ({
+      id,
+      type,
+      fromStageId,
+      toStageId,
+      actorId,
+      data,
+      createdAt,
+    })),
+    notes: detail.notes.map(({ id, body, authorId, authorName, createdAt }) => ({
+      id,
+      body,
+      authorId,
+      authorName,
+      createdAt,
+    })),
   };
 }
