@@ -6,12 +6,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getApplication } from '@/lib/dal';
 import { formatDate } from '@/lib/format';
 import { ApplicationStatusBadge } from './application-status-badge';
+import { toActivityItems } from './activity-items';
+import { CandidateActivity } from './candidate-activity';
 import { formatAnswer } from './format-answer';
 
 /**
- * One candidate's application, read-only: contact details, stage, and the
- * answers to the form version they saw. A Server Component, rendered inside
- * the sheet when the URL has ?application=<id>.
+ * One candidate's application: contact details, stage, the answers to the
+ * form version they saw, and the activity timeline with a note composer. A
+ * Server Component, rendered inside the sheet when the URL has ?application=<id>.
  */
 export async function CandidateDetail({
   companySlug,
@@ -117,6 +119,13 @@ export async function CandidateDetail({
             </dl>
           )}
         </section>
+
+        <CandidateActivity
+          companySlug={companySlug}
+          jobSlug={jobSlug}
+          applicationId={application.id}
+          items={toActivityItems(application.events, application.notes)}
+        />
       </div>
     </>
   );
