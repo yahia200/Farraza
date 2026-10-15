@@ -1,0 +1,97 @@
+---
+description: apps/web (Next.js 16) architecture and gotchas
+paths:
+  - "apps/web/**"
+---
+
+# Web architecture
+
+Loaded when you work in `apps/web`. The shared facts, docs table, and commands are in the root `CLAUDE.md`. Read `apps/web/AGENTS.md` (the Next.js 16 block) and the version-matched docs in `apps/web/node_modules/next/dist/docs/` before writing web code.
+
+- **Reach for shadcn first when building UI.** Before hand-rolling any UI primitive (button, dialog, table, select, toast, form field, dropdown, etc.), check `components/ui/` for one that already exists, then the shadcn registry (`shadcn` 4.21.3 CLI, `@shadcn/react` on `@base-ui/react`; https://ui.shadcn.com/docs). Add a missing one with `pnpm --filter web exec shadcn add <name>` rather than writing it from scratch. Build a custom component **only when no shadcn component fits** — and when you do, say why none fit. Don't bend the UI to fit a component, and don't fork a component's internals when a prop or composition would do. Before re-adding with `shadcn add --overwrite`, check the "Generated shadcn files we changed" list below so local edits aren't lost.
+- **Next.js is a backend for the frontend.** The browser never calls the API. Server Actions (`app/actions/`) and the DAL (`lib/dal.ts`) call it from the server through `lib/api.ts`, which reads `API_URL` from `apps/web/.env.local` and forwards the session cookie.
+  - The API's `__Host-sid` cookie is relayed onto the web origin with `relaySessionCookie()`.
+  - Docs: `02-guides/backend-for-frontend.md`, `03-api-reference/04-functions/cookies.md`.
+- **The DAL is the only place that reads "who is signed in".** `getCurrentUser()` and `getMyCompanies()` use `'use cache: private'` and redirect to `/sign-in` on 401. Any component that calls them must render inside `<Suspense>` (`cacheComponents` is on).
+  - Any action that changes the session or memberships must call `revalidatePath('/', 'layout')` before redirecting, or the private cache serves stale data.
+  - Docs: `02-guides/authentication-with-cache-components.md`.
+- **Route groups:**
+  - `(marketing)`: the landing page, and the only place with the floating `NavBar`.
+  - `(auth)`: sign-in and sign-up.
+  - `(onboarding)`: `/onboarding`.
+  - `(dashboard)`: the shadcn sidebar layout. Besides `/dashboard/…` it holds `/companies/new`, the two-step "Add company" page (name, then optional logo and color), which is linked from the company switcher. It isn't at `/dashboard/new` because "new" is a valid company slug.
+- **Company pages** live at `/dashboard/[companySlug]/…`, because top-level `/{company}/{job}` is reserved for public apply pages (`docs/db-schema.md`). Every company page wraps its content in `CompanyPage` (`components/dashboard/company-page.tsx`).
+  - `CompanyPage` awaits `params` inside `<Suspense>` and calls `getCompany(slug)`.
+  - That call doubles as the membership check: the API answers 404 to non-members, so they get `notFound()`. The status stays 200 after streaming, with `noindex` (`03-api-reference/04-functions/not-found.md`).
+- **Gating:** there is no `proxy.ts`. Pages enforce routing themselves:
+  - Signed-out users are redirected to `/sign-in` by the DAL.
+  - `/dashboard` redirects to your first company, or to `/onboarding` if you have none. `/onboarding` sends users who have a company back to `/dashboard`.
+  - Sign-up goes to `/onboarding`. Creating a company redirects to that company's dashboard.
+- **Pitfalls hit while building the dashboard:**
+  - **Keep the sidebar frame (`AppSidebar`) out of `<Suspense>`.** On phones the provider switches to the mobile sheet right after hydrating, and a boundary that hydrates later no longer matches the server's desktop HTML. Pass the data parts in as async Server Component slots, each in its own boundary (see `app/(dashboard)/layout.tsx`).
+  - **A Server Component can't use a non-component value exported from a `'use client'` module.** It gets a client reference, not the value. Put shared constants in plain modules, like `components/dashboard/nav-items.ts`.
+  - **Under `cacheComponents`, `useParams()` suspends for dynamic segments**, so wrap components that use it in `<Suspense>` (`03-api-reference/04-functions/use-params.md`).
+  - **No `Math.random()` in anything prerendered**, including Suspense fallbacks. That's why we don't use shadcn's `SidebarMenuSkeleton`.
+- **Sidebar open/collapsed state is restored from shadcn's `sidebar_state` cookie without reading it on the server** (that would push the sidebar behind `<Suspense>`). See `components/dashboard/persistent-sidebar.tsx`:
+  - An inline script fixes the DOM before first paint.
+  - A lazy `useState` reads the same cookie, so hydration matches.
+  - Pattern: `02-guides/preventing-flash-before-hydration.md`, "Syncing with React state".
+  - If you change `collapsible` on `<Sidebar>`, use `SIDEBAR_COLLAPSIBLE` so the script stays in sync.
+- **Members (`/dashboard/[companySlug]/members`):** a data table following shadcn's data-table guide (https://ui.shadcn.com/docs/components/base/data-table), built on **TanStack Table v9**. v9's API differs from v8:
+  - `useTable` instead of `useReactTable`.
+  - Features and row models are registered with `tableFeatures({...})`.
+  - Columns use `createColumnHelper<Features, Row>()`, and cells render with `<table.FlexRender>`.
+  - `Column<Features, Row, Value>` needs its value type.
+  - Read the `.d.ts` files in `node_modules/@tanstack/table-core` before changing it.
+  - The table's typed `meta` (the `tableMeta` slot) tells the cells who is viewing.
+- **Member and job permissions live in `packages/shared/src/members.ts`** (`canManageJobs` included). The API's `MemberPolicy` and `JobPolicy` and the web UI all use them, so change the rules there.
+- **Data tables:** `components/data-table/data-table.tsx` (`DataTable`, `DataTableSortButton`, `DataTableColumnMeta`) only renders a table instance. Each feature keeps its own `data-table-features.ts` (v9 `tableFeatures`), `columns.tsx` and a `useTable` call; see members and jobs.
+- **Jobs:**
+  - The list at `/dashboard/[companySlug]/jobs` has a status filter (`ToggleGroup`, whose Base UI value is an array).
+  - Each job lives at `/dashboard/[companySlug]/jobs/[jobSlug]`. Its `layout.tsx` holds the header (status and open/close) and link-tabs (`JobTabs`) to Overview, `/form` and `/candidates`. The pipeline (`/candidates`) is still a placeholder.
+  - Pages use `JobPage` (like `CompanyPage`) to await params and load the company and job.
+- **Form builder (`/jobs/[jobSlug]/form`, `components/dashboard/jobs/form-builder/`):**
+  - One React Hook Form for the whole list: `useFieldArray({ name: 'fields' })`, validated by `zodResolver(z.object({ fields: formFieldsSchema }))`, the same schema the API uses.
+  - "Save draft" PUTs the draft and "Publish" POSTs publish, saving unsaved changes first (`app/actions/forms.ts`). API errors have paths relative to the list (`"2.config.options"`), so they're applied as `fields.${path}`.
+  - The page keys `FormBuilder` on the draft's `updatedAt` and the published version, so a save remounts it with fresh default values.
+  - The "file" type is hidden (there's no upload endpoint yet); `field-types.ts` lists the builder types. `parseFormFields` also refuses file questions (`FILE_UNSUPPORTED`, shown on the card at `fields.N.type`), and the API won't publish a draft that has one.
+  - Choice options are a controlled list (`OptionsEditor`), not a nested `useFieldArray`: RHF writes its own `id` on rows, and options already have a real `id` that auto-reject rules point at.
+  - Unsaved changes are backed up to localStorage (`use-form-backup.ts`, read with `useSyncExternalStore`). If the backup differs from the saved form on load, editing is locked until the user restores or discards it.
+  - Paths into type-specific config go through `at(index, 'config.x')` in `question-card.tsx`, cast once, because the question types are a union.
+  - A question with an error opens itself by adjusting state during render (`if (hasError && !open) setOpen(true)`), so it stays open once the error is fixed (https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes).
+  - New questions open by comparing `row.key` from `useFieldArray`; `useWatch` values lag one render behind `append`.
+  - People who can't manage jobs (interviewers) see the builder **read-only**: cards still open, controls get `readOnly` (full contrast, focusable), and the move/delete/add buttons are hidden. `disabled` is only for the temporary lock while the restore-backup banner shows. Both are set on each control, because Base UI's Switch, Checkbox and Select ignore a native `<fieldset disabled>`, and a disabled fieldset also disables the cards' expand buttons. Controllers don't get RHF's `disabled`, which would also drop the field from validation and submitted data.
+  - Cards animate open and closed with the height transition from Base UI's Collapsible docs (`docs/react/components/collapsible.md`). The panel's padding and border sit on an inner div, because they would still show at `height: 0`. Base UI resets the height to `auto` after opening, so content that grows later isn't clipped; in the hidden browser pane that only happens once frames are drawn.
+- **`html` has `scrollbar-gutter: stable`** (`globals.css`), so the page doesn't shift when popups lock scrolling. Base UI's scroll lock keeps that value instead of adding padding.
+- **Reset dialogs and forms before navigating away from them with `router.push`.** Next.js keeps the previous page mounted with its React state (Activity), so pressing Back otherwise reopens the dialog with the old values (`02-guides/preserving-ui-state.md`).
+  - Reset in the submit handler, as in `NewJobDialog`.
+  - Or, to avoid a flash, reset in a `useLayoutEffect` cleanup, which runs as the page is hidden (as in `AddCompanyWizard`).
+- **Keep element `id`s unique across the app.** Next.js 16 keeps recently visited routes mounted but hidden, so the same id on two pages, such as a dialog and a form, can break `<label for>`.
+- Dates shown in the UI are formatted on the server with `formatDate` (`lib/format.ts`).
+- **Toasts:** shadcn's `toast` (Base UI Toast, no extra package). Call `toast.add({ type, title, description })` from client code; the `<Toaster />` is in the dashboard layout.
+- **Base UI gotchas:**
+  - `DropdownMenuLabel` (`Menu.GroupLabel`) must sit inside a `DropdownMenuGroup`, or opening the menu crashes.
+  - `AlertDialogAction` is a plain Button and doesn't close the dialog; that's on purpose, so a pending action can keep it open.
+  - Radio menu items stay open unless given `closeOnClick`.
+  - `<Select>` needs `items` to show labels instead of raw values.
+- **Generated shadcn files we changed** (check these before running `shadcn add --overwrite`):
+  - `components/ui/dropdown-menu.tsx` gained `DropdownMenuLinkItem`, which wraps Base UI's `Menu.LinkItem`.
+  - `hooks/use-mobile.ts` uses `useSyncExternalStore` instead of calling `setState` in an effect.
+- **Testing in the hidden browser pane:** React's streamed reveals are scheduled with `requestAnimationFrame`, which doesn't run while the page isn't drawn. If Suspense content looks stuck, take a screenshot (which forces a draw) before concluding it's a bug.
+- **Forms:** React Hook Form with `zodResolver(<schema from @repo/shared>)` and shadcn `Field`/`FieldError` (https://ui.shadcn.com/docs/forms/react-hook-form).
+  - `onSubmit` calls a Server Action, which re-validates and returns `ActionFailure<Field>` on failure or redirects on success.
+  - `applyActionFailure()` puts server errors into the form.
+  - `failureFromResponse()` maps API errors (400 `errors[]` to fields, 429, and per-action overrides such as 409).
+- **Public apply page (`app/(public)/[companySlug]/[jobSlug]`, `components/apply/`):**
+  - Fixed routes win over this one, so company slugs in `RESERVED_COMPANY_SLUGS` (`@repo/shared`) are never handed out. Add new top-level routes there.
+  - Data comes from `getPublicJob` (`lib/public-jobs.ts`): `'use cache: remote'` shared by all visitors (plain `'use cache'` lives in memory, which serverless instances don't share; on Vercel the remote cache is its Runtime Cache), without the session cookie, tagged per job and per company, with `cacheLife('minutes')` as a fallback. Actions that change what applicants see call `expirePublicJob` (`updateTag`): form publish, job edit/open/close, company settings.
+  - The form uses React Hook Form with a custom resolver (`apply-values.ts`) that runs `submitApplicationSchema` (contact) and `parseAnswers` (answers), the API's own checks. Unanswered questions are left out of `answers`.
+  - It's shown with shadcn's **Questionnaire** (`components/ui/questionnaire.tsx`, on `@shadcn/react`; https://ui.shadcn.com/docs/components/base/questionnaire, API https://ui.shadcn.com/docs/react/questionnaire): one question per step, name/email/phone first, letter shortcuts for choices.
+    - RHF owns the values; every choice and input is controlled, and all changes go through `answer()` in `apply-form.tsx`.
+    - The questionnaire is controlled (`item`/`onItemChange`): moving forward runs `form.trigger()` on the current step; failed submits and server errors jump to the first step with an error.
+    - Its built-in check only knows "answered or not" and its default message talks about choosing, so text steps pass their own `QuestionnaireError` text.
+    - Long answers use `QuestionnaireInput` with `render={<textarea />}`; its `type` has no `file`, so uploads would need a custom control inside a step.
+    - The `items` list given to the root must match what the steps render, including disabled choices (multiple-choice limit). Locked options are tracked as a string in `answer()`; watching all answers from `ApplyForm` caused a render loop, and so did listing `disabled: false` on options (@shadcn/react 0.3.1).
+  - `utm_source` from the link is sent as `source` only if it's 1–100 characters (`app/actions/applications.ts`). The `website` honeypot is an off-screen, `aria-hidden` input; the API fakes success when it's filled.
+  - Applicants' answers aren't saved locally (personal data on possibly shared devices).
+- **Onboarding:** there are no invitations yet. Employees are told to ask an admin to add them by email (`POST /api/companies/:slug/members`). "Check again" asks the API directly, bypassing the cache.

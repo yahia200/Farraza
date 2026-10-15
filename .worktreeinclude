@@ -1,0 +1,5 @@
+# Gitignored files copied into each new worktree Claude Code creates.
+# .gitignore syntax; only files that are BOTH matched here AND gitignored are copied.
+# Docs: https://code.claude.com/docs/en/worktrees#copy-gitignored-files-into-worktrees
+apps/api/.env
+apps/web/.env.local
