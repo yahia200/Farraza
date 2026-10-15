@@ -8,6 +8,7 @@ import { formatDate } from '@/lib/format';
 import { ApplicationStatusBadge } from './application-status-badge';
 import { toActivityItems } from './activity-items';
 import { CandidateActivity } from './candidate-activity';
+import { CandidateMove } from './candidate-move';
 import { formatAnswer } from './format-answer';
 
 /**
@@ -19,10 +20,16 @@ export async function CandidateDetail({
   companySlug,
   jobSlug,
   applicationId,
+  stages,
+  canMove,
 }: {
   companySlug: string;
   jobSlug: string;
   applicationId: string;
+  /** The job's stages, for the "Move to stage" control. */
+  stages: { id: string; name: string }[];
+  /** canMoveApplications(role): interviewers get no move control. */
+  canMove: boolean;
 }) {
   const application = await getApplication(companySlug, jobSlug, applicationId);
 
@@ -51,6 +58,15 @@ export async function CandidateDetail({
           <Badge variant="outline">{stage.name}</Badge>
           <ApplicationStatusBadge status={application.status} />
         </div>
+        {canMove && (
+          <CandidateMove
+            companySlug={companySlug}
+            jobSlug={jobSlug}
+            applicationId={application.id}
+            stageId={stage.id}
+            stages={stages}
+          />
+        )}
       </SheetHeader>
 
       <div className="flex flex-col gap-6 p-4">

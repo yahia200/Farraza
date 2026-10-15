@@ -3,7 +3,13 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { createNoteSchema, submitApplicationSchema, type FieldError, type SubmitApplicationInput } from '@repo/shared';
+import {
+  createNoteSchema,
+  moveApplicationSchema,
+  submitApplicationSchema,
+  type FieldError,
+  type SubmitApplicationInput,
+} from '@repo/shared';
 import type { ActionFailure } from '@/lib/action-failure';
 import { apiFetch, failureFromResponse, readApiError } from '@/lib/api';
 
@@ -103,5 +109,51 @@ export async function addApplicationNote(
   }
 
   revalidatePath(`/dashboard/${companySlug}/jobs/${jobSlug}/candidates`);
+  return { ok: true };
+}
+
+/**
+ * Employees' pipeline action: moves an application to another stage, calling
+ * POST /api/companies/:c/jobs/:j/applications/:id/move (apps/api/src/pipeline).
+ * Like the other employee actions it re-validates, returns failures rather
+ * than throwing, and revalidates so the private-cached DAL (lib/dal.ts) refetches.
+ */
+
+export type MoveApplicationResult = ActionFailure<never> & { ok?: boolean };
+
+export async function moveApplication(
+  companySlug: string,
+  jobSlug: string,
+  applicationId: string,
+  stageId: string,
+): Promise<MoveApplicationResult> {
+  const parsed = moveApplicationSchema.safeParse({ stageId });
+  if (!parsed.success) {
+    return { formError: 'Choose a stage from this job.' };
+  }
+
+  const candidatesPath = `/dashboard/${companySlug}/jobs/${jobSlug}/candidates`;
+  const response = await apiFetch(
+    `/api/companies/${encodeURIComponent(companySlug)}/jobs/${encodeURIComponent(jobSlug)}/applications/${encodeURIComponent(applicationId)}/move`,
+    { method: 'POST', body: JSON.stringify(parsed.data) },
+  );
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (!response.ok) {
+    const failure = await failureFromResponse(response, [], {
+      403: () => ({ formError: "You don't have permission to move candidates." }),
+      404: () => ({ formError: 'That candidate is no longer part of this job. Reload the page.' }),
+      // "Already in that stage" or "Someone else just moved this candidate": our view is stale.
+      409: (message) => ({ formError: message }),
+    });
+    if (response.status === 404 || response.status === 409) {
+      // Refresh what the user sees: the page then shows where the candidate really is.
+      revalidatePath(candidatesPath);
+    }
+    return failure;
+  }
+
+  revalidatePath(candidatesPath);
   return { ok: true };
 }
