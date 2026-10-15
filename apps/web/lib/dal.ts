@@ -1,7 +1,8 @@
 import 'server-only';
 import { notFound, redirect } from 'next/navigation';
-import type { ActivityEvent, ActivityNote, Answers, FormFields } from '@repo/shared';
+import type { ActivityEvent, ActivityNote, Answers, ApplicationStatus, FormFields } from '@repo/shared';
 import { apiFetch } from './api';
+import { formatDate } from './format';
 
 /**
  * Data Access Layer: the one place that resolves "who is signed in".
@@ -234,9 +235,6 @@ function toMyCompany({ id, name, slug, logoUrl, brandColor, role }: MyCompany): 
 
 // --- Applications (apps/api/src/pipeline) ------------------------------------
 
-/** Mirrors ApplicationStatus in apps/api/src/pipeline/pipeline.ts. */
-export type ApplicationStatus = 'active' | 'rejected' | 'hired' | 'withdrawn';
-
 /** One application in a job's list, with the stage it's in. */
 export interface ApplicationSummary {
   id: string;
@@ -246,8 +244,13 @@ export interface ApplicationSummary {
   stage: JobStage;
 }
 
-/** One card on the pipeline board: an application without its stage (the column is the stage). */
-export type PipelineCard = Omit<ApplicationSummary, 'stage'>;
+/**
+ * One card on the pipeline board: an application without its stage (the column
+ * is the stage), plus the applied date already formatted on the server
+ * (lib/format.ts). The card is a client component, so it renders this string
+ * rather than formatting `submittedAt` itself.
+ */
+export type PipelineCard = Omit<ApplicationSummary, 'stage'> & { appliedLabel: string };
 
 /** Mirrors BoardColumn in apps/api/src/pipeline/pipeline.ts: a stage and the applications in it. */
 export interface PipelineColumn extends JobStage {
@@ -284,6 +287,7 @@ export async function getPipelineBoard(companySlug: string, jobSlug: string): Pr
         id: applicationId,
         status,
         submittedAt,
+        appliedLabel: formatDate(submittedAt),
         candidate: { name: candidate.name, email: candidate.email },
       })),
     }))
@@ -291,7 +295,7 @@ export async function getPipelineBoard(companySlug: string, jobSlug: string): Pr
 }
 
 /** The board as one row per application, for the table view. */
-export function flattenBoard(columns: PipelineColumn[]): ApplicationSummary[] {
+export function flattenBoard(columns: PipelineColumn[]): (ApplicationSummary & { appliedLabel: string })[] {
   return columns.flatMap(({ applications, ...stage }) => applications.map((card) => ({ ...card, stage })));
 }
 

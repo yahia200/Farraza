@@ -14,6 +14,9 @@ import { toast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
 import type { ActivityItem } from './activity-items';
 
+/** Source of a unique id per pending note, made when a note is submitted: the optimistic reducer must stay pure. */
+let pendingNotes = 0;
+
 /**
  * The activity timeline and the note composer. A client component because a
  * posted note is shown in the timeline straight away (`useOptimistic`, shown
@@ -32,10 +35,13 @@ export function CandidateActivity({
   items: ActivityItem[];
 }) {
   const [pending, startTransition] = useTransition();
-  const [optimisticItems, addOptimisticNote] = useOptimistic(items, (state, body: string): ActivityItem[] => [
-    ...state,
-    { kind: 'note', id: `pending-${state.length}`, body, author: 'You', at: 'Sending…', pending: true },
-  ]);
+  const [optimisticItems, addOptimisticNote] = useOptimistic(
+    items,
+    (state, note: { id: string; body: string }): ActivityItem[] => [
+      ...state,
+      { kind: 'note', id: note.id, body: note.body, author: 'You', at: 'Sending…', pending: true },
+    ],
+  );
   const form = useForm<CreateNoteInput>({
     resolver: zodResolver(createNoteSchema),
     defaultValues: { body: '' },
@@ -43,7 +49,7 @@ export function CandidateActivity({
 
   function onSubmit({ body }: CreateNoteInput) {
     startTransition(async () => {
-      addOptimisticNote(body);
+      addOptimisticNote({ id: `pending-${pendingNotes++}`, body });
       // Clear the box now that the note is in the list; put the text back if it fails.
       form.reset({ body: '' });
       let result: AddNoteResult;
