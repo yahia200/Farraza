@@ -1,6 +1,8 @@
 'use client';
 
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/adapter/element-adapter';
+import { setCustomNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview';
+import { preserveOffsetOnSource } from '@atlaskit/pragmatic-drag-and-drop/utils/preserve-offset-on-source';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import type { PipelineCard } from '@/lib/dal';
@@ -61,6 +63,24 @@ export function CandidateCard({
       // Only the link area starts a drag, so pressing the Select never does.
       dragHandle,
       getInitialData: () => applicationDragData(card.id, stageId),
+      // Draw our own drag preview instead of the browser's native snapshot.
+      // Chromium snapshots the dragged node within its stacking/paint context,
+      // which here sweeps in the title, tabs and view toggle above the board.
+      // A custom preview is rendered into a fresh container on <body>, so it's
+      // only ever the card. `preserveOffsetOnSource` keeps the preview pinned
+      // to the exact point on the card where the pointer grabbed it.
+      onGenerateDragPreview: ({ location, source, nativeSetDragImage }) => {
+        setCustomNativeDragPreview({
+          nativeSetDragImage,
+          getOffset: preserveOffsetOnSource({ element: source.element, input: location.current.input }),
+          render: ({ container }) => {
+            // Match the card's on-board width; the column no longer constrains it.
+            container.style.width = `${source.element.getBoundingClientRect().width}px`;
+            // TODO(human): render the drag preview into `container` and return a
+            // cleanup that removes what you added (or return nothing).
+          },
+        });
+      },
       onDragStart: () => setDragging(true),
       onDrop: () => setDragging(false),
     });
@@ -71,7 +91,7 @@ export function CandidateCard({
       ref={cardRef}
       data-dragging={dragging || undefined}
       className={cn(
-        'flex flex-col rounded-xl border bg-card text-sm text-card-foreground shadow-xs transition-opacity has-[a:focus-visible]:border-ring has-[a:focus-visible]:ring-3 has-[a:focus-visible]:ring-ring/30 data-dragging:opacity-40',
+        'flex flex-col rounded-xl border bg-card text-sm text-card-foreground shadow-xs transition-opacity has-[a:focus-visible]:border-ring has-[a:focus-visible]:ring-3 has-[a:focus-visible]:ring-ring/30 data-dragging:opacity-40 hover:bg-muted/25',
         canDrag && 'cursor-grab',
       )}
     >
@@ -80,15 +100,10 @@ export function CandidateCard({
         href={candidatesHref(basePath, { view: 'board', application: card.id })}
         scroll={false}
         draggable={false}
-        className="flex flex-col gap-1 rounded-xl p-3 outline-none transition-colors hover:bg-muted/50"
+        className="flex flex-col gap-1 rounded-xl p-3 outline-none transition-colors"
       >
         <span className="truncate font-medium">{card.candidate.name}</span>
-        <span className="truncate text-xs text-muted-foreground">{card.candidate.email}</span>
-        <span className="mt-1 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-          {card.appliedLabel}
-          {/* Every card in an in-progress stage would carry the same badge: only the outcomes are worth showing. */}
-          {card.status !== 'active' && <ApplicationStatusBadge status={card.status} />}
-        </span>
+       
       </Link>
       {canMove && (
         <div className="px-3 pb-3">
@@ -97,7 +112,7 @@ export function CandidateCard({
             currentStageId={stageId}
             label={`Move ${card.candidate.name} to stage`}
             size="sm"
-            className="w-full"
+            className="w-full text-xs h-auto! py-1 px-2 font-medium"
             onMove={(toStageId) => onMove(card.id, toStageId)}
           />
         </div>
