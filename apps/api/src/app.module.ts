@@ -20,7 +20,7 @@ import { PipelineModule } from './pipeline/pipeline.module.js';
   AuthenticationModule.forRootAsync({
     inject: [ConfigService],
     useFactory: (config: ConfigService) => ({
-      session: { absoluteTtl: '14d', idleTtl: '3d', trustedOrigins: [config.getOrThrow<string>('APP_URL')] },
+      session: { absoluteTtl: '14d', idleTtl: '3d', trustedOrigins: [config.getOrThrow<string>('APP_URL'), "http://192.168.1.100:3000"] },
     }),
   }),
   AuthorizationModule.forRoot(),
