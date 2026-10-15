@@ -7,7 +7,7 @@ import {
 import { applyMove } from '@repo/shared';
 import { InboxIcon } from 'lucide-react';
 import { startTransition, useEffect, useEffectEvent, useOptimistic, useState } from 'react';
-import { moveApplication } from '@/app/actions/applications';
+import { moveApplication, type MoveApplicationResult } from '@/app/actions/applications';
 import { Badge } from '@/components/ui/badge';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -73,11 +73,20 @@ export function PipelineBoard({
     // Same stage (or something that isn't on the board): no API call, no optimistic update.
     if (!from || !card || !to || from.id === toStageId) return;
 
-    setAnnouncement(`Moved ${card.candidate.name} to ${to.name}.`);
     startTransition(async () => {
       addMove({ applicationId, toStageId });
-      const result = await moveApplication(companySlug, jobSlug, applicationId, toStageId);
-      if (!result.ok) {
+      let result: MoveApplicationResult;
+      try {
+        result = await moveApplication(companySlug, jobSlug, applicationId, toStageId);
+      } catch {
+        // The request itself failed (offline, server down). The card snaps back when the transition ends; no error boundary.
+        result = { formError: 'Check your connection and try again.' };
+      }
+      // Announced only once the server has answered, so a screen reader never hears "Moved" for a card that snaps back.
+      if (result.ok) {
+        setAnnouncement(`Moved ${card.candidate.name} to ${to.name}.`);
+      } else {
+        setAnnouncement(`Couldn't move ${card.candidate.name} to ${to.name}.`);
         toast.add({ type: 'error', title: "Couldn't move the candidate", description: result.formError });
       }
     });
