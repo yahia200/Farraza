@@ -1,5 +1,5 @@
+import type { ApplicationStatus } from '@repo/shared';
 import { Badge } from '@/components/ui/badge';
-import type { ApplicationStatus } from '@/lib/dal';
 
 export const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {
   active: 'In progress',

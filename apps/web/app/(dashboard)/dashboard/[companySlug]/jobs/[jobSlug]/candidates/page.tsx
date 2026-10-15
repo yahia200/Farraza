@@ -11,7 +11,6 @@ import { PipelineBoard } from '@/components/dashboard/candidates/pipeline-board'
 import { JobPage, type LoadedJob } from '@/components/dashboard/jobs/job-page';
 import { Skeleton } from '@/components/ui/skeleton';
 import { flattenBoard, getPipelineBoard, type MyCompany, type PipelineColumn } from '@/lib/dal';
-import { formatDate } from '@/lib/format';
 
 export const metadata: Metadata = { title: 'Candidates · Khatwateen' };
 
@@ -92,10 +91,7 @@ function TableView({
   stages: LoadedJob['stages'];
   basePath: string;
 }) {
-  // Formatted on the server (lib/format.ts) so it can't differ from the browser's.
-  const rows: CandidateRow[] = flattenBoard(columns).map((row) => ({
-    ...row,
-    appliedLabel: formatDate(row.submittedAt),
-  }));
+  // `appliedLabel` was formatted on the server by the DAL (lib/format.ts), so it can't differ from the browser's.
+  const rows: CandidateRow[] = flattenBoard(columns);
   return <CandidatesTable data={rows} stages={stages} meta={{ basePath }} />;
 }

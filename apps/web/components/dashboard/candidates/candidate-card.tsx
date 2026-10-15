@@ -4,7 +4,6 @@ import { draggable } from '@atlaskit/pragmatic-drag-and-drop/adapter/element-ada
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import type { PipelineCard } from '@/lib/dal';
-import { formatDate } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { ApplicationStatusBadge } from './application-status-badge';
 import { candidatesHref } from './candidates-href';
@@ -86,7 +85,7 @@ export function CandidateCard({
         <span className="truncate font-medium">{card.candidate.name}</span>
         <span className="truncate text-xs text-muted-foreground">{card.candidate.email}</span>
         <span className="mt-1 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-          {formatDate(card.submittedAt)}
+          {card.appliedLabel}
           {/* Every card in an in-progress stage would carry the same badge: only the outcomes are worth showing. */}
           {card.status !== 'active' && <ApplicationStatusBadge status={card.status} />}
         </span>
