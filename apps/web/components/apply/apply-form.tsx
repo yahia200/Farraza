@@ -1,13 +1,34 @@
-'use client';
+"use client";
 
-import { useId, useMemo, useState, useTransition } from 'react';
-import { Controller, useForm, type FieldErrors, type Path } from 'react-hook-form';
-import { CircleCheckIcon } from 'lucide-react';
-import type { FieldError, PublicFormField } from '@repo/shared';
-import type { QuestionnaireItemDefinition } from '@shadcn/react/questionnaire';
-import { submitApplication } from '@/app/actions/applications';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { useId, useMemo, useState, useTransition } from "react";
+import {
+  Controller,
+  useForm,
+  type FieldErrors,
+  type Path,
+} from "react-hook-form";
+import { ArrowRightIcon, CircleCheckIcon } from "lucide-react";
+import type { FieldError, PublicFormField } from "@repo/shared";
+import type { QuestionnaireItemDefinition } from "@shadcn/react/questionnaire";
+import { submitApplication } from "@/app/actions/applications";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Questionnaire,
   QuestionnaireActions,
@@ -21,8 +42,8 @@ import {
   QuestionnaireSkip,
   QuestionnaireSubmit,
   QuestionnaireTitle,
-} from '@/components/ui/questionnaire';
-import { Spinner } from '@/components/ui/spinner';
+} from "@/components/ui/questionnaire";
+import { Spinner } from "@/components/ui/spinner";
 import {
   applyResolver,
   compactAnswers,
@@ -30,40 +51,55 @@ import {
   isLockedOption,
   type AnswerInput,
   type ApplyValues,
-} from './apply-values';
-import { QuestionStep } from './question-step';
+} from "./apply-values";
+import { QuestionStep } from "./question-step";
+import type { PublicJob } from "@/lib/public-jobs";
+import { initials } from "@/components/dashboard/initials";
 
 /** The applicant's details, asked first, one per step. */
 const CONTACT_STEPS = [
-  { name: 'name', title: "What's your full name?", empty: 'Enter your full name.', type: 'text', autoComplete: 'name' },
   {
-    name: 'email',
-    title: "What's your email address?",
-    description: "We'll use it to contact you about this job.",
-    empty: 'Enter your email address.',
-    type: 'email',
-    autoComplete: 'email',
+    name: "name",
+    title: "What's your full name?",
+    empty: "Enter your full name.",
+    type: "text",
+    autoComplete: "name",
   },
   {
-    name: 'phone',
+    name: "email",
+    title: "What's your email address?",
+    description: "We'll use it to contact you about this job.",
+    empty: "Enter your email address.",
+    type: "email",
+    autoComplete: "email",
+  },
+  {
+    name: "phone",
     title: "What's your phone number?",
     // Numbers without a country code are read as Egyptian (DEFAULT_PHONE_COUNTRY in @repo/shared).
-    description: 'For example 0100 123 4567, or +20 100 123 4567 from outside Egypt.',
-    empty: 'Enter your phone number.',
-    type: 'tel',
-    autoComplete: 'tel',
+    description:
+      "For example 0100 123 4567, or +20 100 123 4567 from outside Egypt.",
+    empty: "Enter your phone number.",
+    type: "tel",
+    autoComplete: "tel",
   },
 ] as const;
 
-type ContactName = (typeof CONTACT_STEPS)[number]['name'];
+type ContactName = (typeof CONTACT_STEPS)[number]["name"];
 const CONTACT_NAMES: readonly string[] = CONTACT_STEPS.map((step) => step.name);
 
 /** A step's name is a contact field or a question key; this is where its value lives in the form. */
 const pathFor = (step: string) =>
-  (CONTACT_NAMES.includes(step) ? step : `answers.${step}`) as Path<ApplyValues>;
+  (CONTACT_NAMES.includes(step)
+    ? step
+    : `answers.${step}`) as Path<ApplyValues>;
 
 const hasError = (errors: FieldErrors<ApplyValues>, step: string) =>
-  Boolean(CONTACT_NAMES.includes(step) ? errors[step as ContactName] : errors.answers?.[step]);
+  Boolean(
+    CONTACT_NAMES.includes(step)
+      ? errors[step as ContactName]
+      : errors.answers?.[step],
+  );
 
 /** A callback ref defined once, so React calls it only when the element mounts. */
 const focusOnMount = (element: HTMLElement | null) => element?.focus();
@@ -79,17 +115,17 @@ const focusOnMount = (element: HTMLElement | null) => element?.focus();
  * send the applicant back to the step that needs fixing.
  */
 export function ApplyForm({
-  companySlug,
+  company,
   jobSlug,
-  companyName,
   jobTitle,
+  jobDescription,
   fields,
   source,
 }: {
-  companySlug: string;
+  company: PublicJob["company"];
   jobSlug: string;
-  companyName: string;
   jobTitle: string;
+  jobDescription?: string | null;
   fields: PublicFormField[];
   /** utm_source from the link; sent only if it's usable (see the Server Action). */
   source?: string;
@@ -97,17 +133,21 @@ export function ApplyForm({
   // Unique ids even if two apply pages stay mounted (Next keeps recent pages alive).
   const idPrefix = useId();
   const resolver = useMemo(() => applyResolver(fields), [fields]);
-  const form = useForm<ApplyValues>({ resolver, defaultValues: emptyValues(fields) });
+  const form = useForm<ApplyValues>({
+    resolver,
+    defaultValues: emptyValues(fields),
+  });
   const [pending, startTransition] = useTransition();
   const [formError, setFormError] = useState<string>();
   const [sent, setSent] = useState(false);
+  const [started, setStarted] = useState(false);
 
   // Multiple-choice options locked at their question's limit, as a string of ids.
   // Updated in answer() (every change goes through it) rather than by watching all
   // answers here: a watch re-renders the whole questionnaire on every keystroke,
   // which made it re-register its steps in a loop. A string state only re-renders
   // when the locks actually change.
-  const [lockedOptions, setLockedOptions] = useState('');
+  const [lockedOptions, setLockedOptions] = useState("");
 
   // Step order and what the questionnaire needs to know about each step
   // (server rendering, progress, and letter shortcuts for the choices). It must
@@ -119,15 +159,17 @@ export function ApplyForm({
         name: field.key,
         required: field.required,
         choices:
-          field.type === 'single_select' || field.type === 'multi_select'
+          field.type === "single_select" || field.type === "multi_select"
             ? field.config.options.map((option) =>
                 // Only add `disabled` when true: with @shadcn/react 0.3.1, listing
                 // `disabled: false` on every option made the page loop on load
                 // ("Maximum update depth exceeded"), seen in the browser.
-                lockedOptions.split(',').includes(option.id) ? { value: option.id, disabled: true } : { value: option.id },
+                lockedOptions.split(",").includes(option.id)
+                  ? { value: option.id, disabled: true }
+                  : { value: option.id },
               )
-            : field.type === 'yes_no'
-              ? [{ value: 'true' }, { value: 'false' }]
+            : field.type === "yes_no"
+              ? [{ value: "true" }, { value: "false" }]
               : undefined,
       })),
     ],
@@ -138,7 +180,10 @@ export function ApplyForm({
 
   /** Moving forward checks the current step with our rules; moving back is always allowed. */
   async function changeStep(next: string) {
-    if (order.indexOf(next) > order.indexOf(item) && !(await form.trigger(pathFor(item)))) {
+    if (
+      order.indexOf(next) > order.indexOf(item) &&
+      !(await form.trigger(pathFor(item)))
+    ) {
       return;
     }
     setItem(next);
@@ -147,16 +192,18 @@ export function ApplyForm({
   /** Every answer goes through here, so a step showing an error re-checks as it's fixed. */
   function answer(path: Path<ApplyValues>, value: AnswerInput) {
     form.setValue(path, value, { shouldDirty: true });
-    const answers = form.getValues('answers');
+    const answers = form.getValues("answers");
     setLockedOptions(
       fields
         .flatMap((field) =>
-          field.type === 'multi_select'
-            ? field.config.options.filter((option) => isLockedOption(field, answers[field.key], option.id))
+          field.type === "multi_select"
+            ? field.config.options.filter((option) =>
+                isLockedOption(field, answers[field.key], option.id),
+              )
             : [],
         )
         .map((option) => option.id)
-        .join(','),
+        .join(","),
     );
     if (form.getFieldState(path).invalid) {
       void form.trigger(path);
@@ -175,13 +222,15 @@ export function ApplyForm({
   function applyServerErrors(errors: FieldError[]) {
     for (const { path, message } of errors) {
       if (order.includes(path)) {
-        form.setError(pathFor(path), { type: 'server', message });
+        form.setError(pathFor(path), { type: "server", message });
       } else {
         // For example a question that was removed while they were filling the form in.
         setFormError(message);
       }
     }
-    const first = order.find((step) => errors.some((error) => error.path === step));
+    const first = order.find((step) =>
+      errors.some((error) => error.path === step),
+    );
     if (first) {
       setItem(first);
     }
@@ -191,7 +240,7 @@ export function ApplyForm({
     (values) =>
       startTransition(async () => {
         setFormError(undefined);
-        const result = await submitApplication(companySlug, jobSlug, {
+        const result = await submitApplication(company.slug, jobSlug, {
           name: values.name,
           email: values.email,
           phone: values.phone,
@@ -215,106 +264,184 @@ export function ApplyForm({
 
   if (sent) {
     return (
-      <Empty className="border">
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <CircleCheckIcon />
-          </EmptyMedia>
-          {/* Focused when it appears, so it's in view and screen readers announce it. */}
-          <EmptyTitle ref={focusOnMount} tabIndex={-1} className="outline-none">
-            Application sent
-          </EmptyTitle>
-          <EmptyDescription>
-            Thanks, {companyName} received your application for {jobTitle}. They&apos;ll contact you by email.
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <Card>
+        {cardHeader()}
+        <CardContent>
+          <Empty className="border">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <CircleCheckIcon />
+              </EmptyMedia>
+              {/* Focused when it appears, so it's in view and screen readers announce it. */}
+              <EmptyTitle
+                ref={focusOnMount}
+                tabIndex={-1}
+                className="outline-none"
+              >
+                Application sent
+              </EmptyTitle>
+              <EmptyDescription>
+                Thanks, {company.name} received your application for {jobTitle}.
+                They&apos;ll contact you by email.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  function cardHeader() {
+    return (
+      <CardHeader>
+        <CardDescription className="flex items-center gap-2 text-xl text-primary">
+          <Avatar className="size-8 rounded-xl">
+            {company.logoUrl && <AvatarImage src={company.logoUrl} alt="" />}
+            <AvatarFallback
+              className="rounded-[inherit] bg-primary text-sm text-primary-foreground"
+              style={
+                company.brandColor
+                  ? { backgroundColor: company.brandColor, color: "white" }
+                  : undefined
+              }
+            >
+              {initials(company.name)}
+            </AvatarFallback>
+          </Avatar>
+          {company.name}
+        </CardDescription>
+        <CardTitle className="text-2xl">{jobTitle}</CardTitle>
+        {jobDescription && (
+          <CardDescription className="whitespace-pre-line">
+            {jobDescription}
+          </CardDescription>
+        )}
+      </CardHeader>
+    );
+  }
+
+  if (!started) {
+    return (
+      <Card>
+        {cardHeader()}
+        <CardFooter>
+          <Button type="button" size="lg" onClick={() => setStarted(true)}>
+            Apply now
+            <ArrowRightIcon data-icon="inline-end" />
+          </Button>
+        </CardFooter>
+      </Card>
     );
   }
 
   return (
-    <Questionnaire
-      items={steps}
-      item={item}
-      onItemChange={(next) => void changeStep(next)}
-      shortcuts="letters"
-      onSubmit={(event) => void onSubmit(event)}
-      // If someone submits before the JavaScript has loaded, the browser's
-      // default GET would put their name, email and phone in the URL.
-      method="post"
-    >
-      <QuestionnaireProgress />
+    <Card>
+      {cardHeader()}
+      <CardContent className="pt-(--card-spacing)">
+        <Questionnaire
+          items={steps}
+          item={item}
+          onItemChange={(next) => void changeStep(next)}
+          shortcuts="letters"
+          onSubmit={(event) => void onSubmit(event)}
+          // If someone submits before the JavaScript has loaded, the browser's
+          // default GET would put their name, email and phone in the URL.
+          method="post"
+        >
+          <QuestionnaireProgress />
 
-      {CONTACT_STEPS.map((step) => (
-        <Controller
-          key={step.name}
-          name={step.name}
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <QuestionnaireItem name={step.name} required invalid={fieldState.invalid}>
-              <QuestionnaireTitle>{step.title}</QuestionnaireTitle>
-              {'description' in step && <QuestionnaireDescription>{step.description}</QuestionnaireDescription>}
-              <QuestionnaireInput
-                ref={field.ref}
-                type={step.type}
-                autoComplete={step.autoComplete}
-                aria-label={step.title}
-                value={field.value}
-                onChange={(event) => answer(step.name, event.target.value)}
-                onBlur={field.onBlur}
-              />
-              {/* The questionnaire's own "required" message talks about choosing, so text
+          {CONTACT_STEPS.map((step) => (
+            <Controller
+              key={step.name}
+              name={step.name}
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <QuestionnaireItem
+                  name={step.name}
+                  required
+                  invalid={fieldState.invalid}
+                >
+                  <QuestionnaireTitle>{step.title}</QuestionnaireTitle>
+                  {"description" in step && (
+                    <QuestionnaireDescription>
+                      {step.description}
+                    </QuestionnaireDescription>
+                  )}
+                  <QuestionnaireInput
+                    ref={field.ref}
+                    type={step.type}
+                    autoComplete={step.autoComplete}
+                    aria-label={step.title}
+                    value={field.value}
+                    onChange={(event) => answer(step.name, event.target.value)}
+                    onBlur={field.onBlur}
+                  />
+                  {/* The questionnaire's own "required" message talks about choosing, so text
                   steps bring their own; our rules' messages take over once they run. */}
-              <QuestionnaireError>{fieldState.error?.message ?? step.empty}</QuestionnaireError>
-            </QuestionnaireItem>
-          )}
-        />
-      ))}
+                  <QuestionnaireError>
+                    {fieldState.error?.message ?? step.empty}
+                  </QuestionnaireError>
+                </QuestionnaireItem>
+              )}
+            />
+          ))}
 
-      {fields.map((field) => (
-        <QuestionStep key={field.key} form={form} field={field} onAnswer={answer} />
-      ))}
+          {fields.map((field) => (
+            <QuestionStep
+              key={field.key}
+              form={form}
+              field={field}
+              onAnswer={answer}
+            />
+          ))}
 
-      {/* Honeypot. People never see it, so it stays empty; bots that fill in every
+          {/* Honeypot. People never see it, so it stays empty; bots that fill in every
           input give themselves away, and the API quietly drops their application.
           Off-screen rather than type="hidden" (which bots skip), hidden from screen
           readers and the Tab key, and named so autofill is unlikely to touch it. */}
-      <div aria-hidden="true" className="absolute -left-[10000px] size-px overflow-hidden">
-        <Controller
-          name="website"
-          control={form.control}
-          render={({ field }) => (
-            <>
-              <label htmlFor={`${idPrefix}-hp`}>Leave this field empty</label>
-              <input
-                id={`${idPrefix}-hp`}
-                name="khatwateen-hp"
-                type="text"
-                tabIndex={-1}
-                autoComplete="off"
-                value={field.value}
-                onChange={field.onChange}
-              />
-            </>
+          <div
+            aria-hidden="true"
+            className="absolute left-[-10000px] size-px overflow-hidden"
+          >
+            <Controller
+              name="website"
+              control={form.control}
+              render={({ field }) => (
+                <>
+                  <label htmlFor={`${idPrefix}-hp`}>
+                    Leave this field empty
+                  </label>
+                  <input
+                    id={`${idPrefix}-hp`}
+                    name="khatwateen-hp"
+                    type="text"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                </>
+              )}
+            />
+          </div>
+
+          {formError && (
+            <Alert variant="destructive">
+              <AlertDescription>{formError}</AlertDescription>
+            </Alert>
           )}
-        />
-      </div>
 
-      {formError && (
-        <Alert variant="destructive">
-          <AlertDescription>{formError}</AlertDescription>
-        </Alert>
-      )}
-
-      <QuestionnaireActions>
-        <QuestionnairePrevious />
-        <QuestionnaireSkip />
-        <QuestionnaireNext />
-        <QuestionnaireSubmit disabled={pending}>
-          {pending && <Spinner data-icon="inline-start" />}
-          Send application
-        </QuestionnaireSubmit>
-      </QuestionnaireActions>
-    </Questionnaire>
+          <QuestionnaireActions>
+            <QuestionnairePrevious />
+            <QuestionnaireSkip />
+            <QuestionnaireNext />
+            <QuestionnaireSubmit disabled={pending}>
+              {pending && <Spinner data-icon="inline-start" />}
+              Send application
+            </QuestionnaireSubmit>
+          </QuestionnaireActions>
+        </Questionnaire>
+      </CardContent>
+    </Card>
   );
 }

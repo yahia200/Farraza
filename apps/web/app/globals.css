@@ -177,4 +177,11 @@
        or when a popup locks scrolling (Base UI's scroll lock keeps this value). */
     @apply font-sans scrollbar-gutter-stable;
   }
+  html:has([data-public-job-layout]) {
+    scrollbar-gutter: auto;
+  }
+  body:has([data-public-job-layout]) {
+    overflow: hidden;
+    background: transparent;
+  }
 }

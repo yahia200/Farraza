@@ -1,9 +1,9 @@
+export const instant = false;
+
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { ApplyForm } from '@/components/apply/apply-form';
-import { initials } from '@/components/dashboard/initials';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getPublicJob } from '@/lib/public-jobs';
 
@@ -59,35 +59,13 @@ async function Apply({ params, searchParams }: PageProps<'/[companySlug]/[jobSlu
 
   return (
     <>
-      {/* The company's color as an accent only, so text contrast never depends on it. */}
-      <div className="h-1.5 bg-primary" style={company.brandColor ? { backgroundColor: company.brandColor } : undefined} />
-      <main className="mx-auto flex w-full max-w-2xl flex-col gap-10 px-4 py-10 sm:py-14">
-        <header className="flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            <Avatar className="size-10 rounded-xl">
-              {company.logoUrl && <AvatarImage src={company.logoUrl} alt="" />}
-              <AvatarFallback
-                className="rounded-[inherit] bg-primary text-sm text-primary-foreground"
-                style={company.brandColor ? { backgroundColor: company.brandColor, color: 'white' } : undefined}
-              >
-                {initials(company.name)}
-              </AvatarFallback>
-            </Avatar>
-            <p className="font-medium">{company.name}</p>
-          </div>
-          <h1 className="text-3xl font-semibold tracking-tight">{job.title}</h1>
-          {job.description && <p className="whitespace-pre-line text-muted-foreground">{job.description}</p>}
-        </header>
-
-        <section aria-labelledby="apply-heading" className="flex flex-col gap-6 rounded-3xl border bg-card p-5 sm:p-8">
-          <h2 id="apply-heading" className="text-xl font-semibold">
-            Apply for this job
-          </h2>
+      <main className="mx-auto flex-1 w-screen py-10 sm:py-14">
+        <section className="flex flex-col gap-6 w-full max-w-2xl mx-auto">
           <ApplyForm
-            companySlug={companySlug}
+            company={company}
             jobSlug={jobSlug}
-            companyName={company.name}
             jobTitle={job.title}
+            jobDescription={job.description}
             fields={fields}
             source={typeof utm_source === 'string' ? utm_source : undefined}
           />
