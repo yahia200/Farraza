@@ -26,22 +26,65 @@ export const FILE_KINDS = ['document', 'image', 'video', 'audio'] as const;
 export type FileKind = (typeof FILE_KINDS)[number];
 
 /**
- * The formats each kind means, as the content types an upload may declare and the bytes may turn
- * out to be. Only kinds listed here can be used so far: a form with a kind that has no formats
- * would ask for files nobody can send, so `formFieldsSchema` refuses it. Adding a kind's formats
- * here is what switches it on (video and audio arrive with ticket 09).
+ * The formats each kind means, as the content types an upload is declared and stored as. The
+ * browser and `file-type` may name the same format differently (`audio/x-m4a`, `audio/ogg;
+ * codecs=opus`); `matchAllowedType` below maps those onto these.
+ *
+ * Video is MP4, MOV and WebM; audio is MP3, M4A, WAV, OGG and WebM audio (spec, Domain model). MP4
+ * and WebM appear under both kinds' names because those containers hold sound alone just as well.
  *
  * SVG is deliberately absent: it is a document that can carry script, and `file-type` would not
  * recognise it anyway, so it could never pass the check at submit.
  */
-export const FILE_KIND_TYPES: Partial<Record<FileKind, readonly string[]>> = {
+export const FILE_KIND_TYPES: Record<FileKind, readonly string[]> = {
   document: CV_CONTENT_TYPES,
   image: ['image/jpeg', 'image/png', 'image/webp'],
+  video: ['video/mp4', 'video/quicktime', 'video/webm'],
+  audio: ['audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/ogg', 'audio/webm'],
 };
 
-/** Whether a kind can be asked for yet, i.e. whether its formats are known. */
-export function isFileKindAvailable(kind: FileKind): boolean {
-  return FILE_KIND_TYPES[kind] !== undefined;
+/** Other names for the formats above: what browsers report and what `file-type` returns. */
+const TYPE_ALIASES: Record<string, string> = {
+  'audio/x-m4a': 'audio/mp4', // file-type's name for the M4A brand
+  'audio/m4a': 'audio/mp4',
+  'audio/x-wav': 'audio/wav',
+  'audio/wave': 'audio/wav',
+  'audio/vnd.wave': 'audio/wav',
+  'audio/mp3': 'audio/mpeg',
+};
+
+/**
+ * A video type that may really be sound only: neither the browser (by extension) nor `file-type`
+ * (by magic number) can tell a WebM or MP4 with pictures from one without, so where a question
+ * allows audio but not video, these stand for their audio type.
+ */
+const AUDIO_ONLY_CONTAINER: Record<string, string> = {
+  'video/mp4': 'audio/mp4',
+  'video/webm': 'audio/webm',
+};
+
+/**
+ * The allowed type that `type` stands for, or null when it is none of them. Ignores case and
+ * parameters ("audio/ogg; codecs=opus" is `audio/ogg`), maps aliases, and lets an MP4 or WebM stand
+ * for the audio type of the same container (`AUDIO_ONLY_CONTAINER`). Used on the type the browser
+ * declares and on the type found in the bytes, so both mean the same by "allowed".
+ */
+export function matchAllowedType(allowed: readonly string[], type: string): string | null {
+  const base = (type.split(';')[0] ?? '').trim().toLowerCase();
+  const canonical = TYPE_ALIASES[base] ?? base;
+  if (allowed.includes(canonical)) return canonical;
+  const audio = AUDIO_ONLY_CONTAINER[canonical];
+  return audio !== undefined && allowed.includes(audio) ? audio : null;
+}
+
+/** Whether a content type (under any of its names) is a video or audio format, i.e. one whose files have a duration. */
+export function isMediaContentType(type: string): boolean {
+  return matchAllowedType([...FILE_KIND_TYPES.video, ...FILE_KIND_TYPES.audio], type) !== null;
+}
+
+/** Whether a question accepting these kinds needs a duration limit. */
+export function kindsNeedDuration(kinds: readonly FileKind[]): boolean {
+  return kinds.includes('video') || kinds.includes('audio');
 }
 
 /** Limits on a question's size setting, in MB. */
@@ -65,13 +108,15 @@ export function suggestedMaxSizeMb(kinds: readonly FileKind[]): number {
 
 /** The content types a question accepting `kinds` allows, in kind order. */
 export function allowedContentTypes(kinds: readonly FileKind[]): string[] {
-  return kinds.flatMap((kind) => FILE_KIND_TYPES[kind] ?? []);
+  return kinds.flatMap((kind) => FILE_KIND_TYPES[kind]);
 }
 
 /** The part of a file question's config that decides which files are acceptable. */
 export interface AttachmentRules {
   kinds: readonly FileKind[];
   maxSizeMb: number;
+  /** Seconds; non-null when video or audio is allowed, null otherwise (the form rejects anything else). */
+  maxDurationSeconds: number | null;
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -80,6 +125,14 @@ const TYPE_LABELS: Record<string, string> = {
   'image/jpeg': 'JPEG',
   'image/png': 'PNG',
   'image/webp': 'WebP',
+  'video/mp4': 'MP4',
+  'video/quicktime': 'MOV',
+  'video/webm': 'WebM',
+  'audio/mpeg': 'MP3',
+  'audio/mp4': 'M4A',
+  'audio/wav': 'WAV',
+  'audio/ogg': 'OGG',
+  'audio/webm': 'WebM',
 };
 
 /** "A", "A or B", "A, B or C". */
@@ -88,26 +141,81 @@ function listWithOr(items: readonly string[]): string {
   return `${items.slice(0, -1).join(', ')} or ${items.at(-1)}`;
 }
 
-/** The formats a question accepting `kinds` means, for messages: "PDF, DOCX, JPEG, PNG or WebP". */
+/**
+ * The formats a question accepting `kinds` means, for messages: "PDF, DOCX, JPEG, PNG or WebP". A
+ * format with two types (WebM video and WebM audio) is named once.
+ */
 export function fileFormatNames(kinds: readonly FileKind[]): string {
-  return listWithOr(allowedContentTypes(kinds).map((type) => TYPE_LABELS[type] ?? type));
+  const names = allowedContentTypes(kinds).map((type) => TYPE_LABELS[type] ?? type);
+  return listWithOr([...new Set(names)]);
+}
+
+/**
+ * The formats as a noun phrase for a sentence: "a PDF or DOCX file", "an MP4, MOV or WebM file". The
+ * article follows how the first name is said aloud ("em-pee-four", "oh-gee-gee"), so M and O take "an".
+ */
+export function fileFormatPhrase(kinds: readonly FileKind[]): string {
+  const names = fileFormatNames(kinds);
+  return `${/^[MO]/.test(names) ? 'an' : 'a'} ${names} file`;
 }
 
 /** Shown before the applicant picks a file, like `CV_ACCEPT_HINT`. */
 export function attachmentHint(rules: AttachmentRules): string {
-  return `${fileFormatNames(rules.kinds)}, up to ${rules.maxSizeMb} MB`;
+  const length =
+    kindsNeedDuration(rules.kinds) && rules.maxDurationSeconds !== null
+      ? ` and ${formatDurationInWords(rules.maxDurationSeconds)}`
+      : '';
+  return `${fileFormatNames(rules.kinds)}, up to ${rules.maxSizeMb} MB${length}`;
+}
+
+// --- Lengths of video and audio ------------------------------------------------------------------
+
+/** A length for a sentence: "45 seconds", "1 minute", "1 minute 30 seconds". */
+export function formatDurationInWords(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  const part = (count: number, unit: string) => `${count} ${unit}${count === 1 ? '' : 's'}`;
+  return [minutes > 0 ? part(minutes, 'minute') : '', seconds > 0 || minutes === 0 ? part(seconds, 'second') : '']
+    .filter(Boolean)
+    .join(' ');
+}
+
+/**
+ * The length to declare for a file whose metadata says `seconds`: whole seconds, rounded up so a
+ * file is never declared shorter than it is, and at least 1 (the column's CHECK and the schema's
+ * minimum). Null when the browser could not tell (NaN, Infinity) or reports nothing positive.
+ */
+export function declaredDuration(seconds: number): number | null {
+  if (!Number.isFinite(seconds) || seconds <= 0) return null;
+  return Math.max(1, Math.ceil(seconds));
 }
 
 /** The first problem with a file for this question, or null. `path` names the request property. */
 export function checkAttachmentFile(rules: AttachmentRules, file: DeclaredFile): FieldError | null {
-  if (!allowedContentTypes(rules.kinds).includes(file.contentType)) {
-    return { path: 'contentType', message: `Upload a ${fileFormatNames(rules.kinds)} file.` };
+  const type = matchAllowedType(allowedContentTypes(rules.kinds), file.contentType);
+  if (type === null) {
+    return { path: 'contentType', message: `Upload ${fileFormatPhrase(rules.kinds)}.` };
   }
   if (file.sizeBytes <= 0) {
     return { path: 'sizeBytes', message: 'That file is empty. Choose another one.' };
   }
   if (file.sizeBytes > rules.maxSizeMb * 1024 * 1024) {
     return { path: 'sizeBytes', message: `This file must be ${rules.maxSizeMb} MB or smaller.` };
+  }
+  // The length is the browser's word (the server does not re-measure it), but it must be given.
+  if (isMediaContentType(type)) {
+    if (file.durationSeconds === undefined) {
+      return {
+        path: 'durationSeconds',
+        message: "We couldn't read how long this file is. Choose another file.",
+      };
+    }
+    if (rules.maxDurationSeconds !== null && file.durationSeconds > rules.maxDurationSeconds) {
+      return {
+        path: 'durationSeconds',
+        message: `This file must be ${formatDurationInWords(rules.maxDurationSeconds)} or shorter.`,
+      };
+    }
   }
   return null;
 }
@@ -119,6 +227,14 @@ const TYPE_BY_EXTENSION: Record<string, string> = {
   jpeg: 'image/jpeg',
   png: 'image/png',
   webp: 'image/webp',
+  mp4: 'video/mp4',
+  mov: 'video/quicktime',
+  webm: 'video/webm',
+  weba: 'audio/webm',
+  mp3: 'audio/mpeg',
+  m4a: 'audio/mp4',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
 };
 
 /**
@@ -139,7 +255,7 @@ export function contentTypeOf(file: { name: string; type: string }): string {
 export function fileAccept(kinds: readonly FileKind[]): string {
   const types = allowedContentTypes(kinds);
   const extensions = Object.entries(TYPE_BY_EXTENSION)
-    .filter(([, type]) => types.includes(type))
+    .filter(([, type]) => matchAllowedType(types, type) !== null)
     .map(([extension]) => `.${extension}`);
   return [...extensions, ...types].join(',');
 }
@@ -148,6 +264,8 @@ export function fileAccept(kinds: readonly FileKind[]): string {
 export interface DeclaredFile {
   contentType: string;
   sizeBytes: number;
+  /** Video and audio only: whole seconds, read from the file's metadata by the browser. */
+  durationSeconds?: number;
 }
 
 /** The first problem with a CV, or null. `path` names the request property so it maps to an error. */
@@ -190,6 +308,12 @@ export const createUploadSchema = z.discriminatedUnion(
       /** The file question's key, as in `answers`. Whether it is a file question is the service's call. */
       fieldKey: z.uuid({ error: 'Something went wrong. Reload the page and try again.' }),
       ...uploadFile,
+      /** Video and audio only: the length in whole seconds, as the browser read it from the file. */
+      durationSeconds: z
+        .number({ error: 'Choose your file again.' })
+        .int({ error: 'Choose your file again.' })
+        .min(1, { error: 'Choose your file again.' })
+        .optional(),
     }),
   ],
   { error: 'Something went wrong. Reload the page and try again.' },

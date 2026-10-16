@@ -128,8 +128,8 @@ describe('createUploadSchema for an Attachment', () => {
 });
 
 describe('Attachment rules', () => {
-  const documents = { kinds: ['document'] as FileKind[], maxSizeMb: 10 };
-  const both = { kinds: ['document', 'image'] as FileKind[], maxSizeMb: 10 };
+  const documents = { kinds: ['document'] as FileKind[], maxSizeMb: 10, maxDurationSeconds: null };
+  const both = { kinds: ['document', 'image'] as FileKind[], maxSizeMb: 10, maxDurationSeconds: null };
 
   describe('allowedContentTypes', () => {
     it('maps document to PDF and DOCX and image to JPEG, PNG and WebP, never SVG', () => {
@@ -194,7 +194,9 @@ describe('Attachment rules', () => {
   describe('attachmentHint', () => {
     it('tells the applicant what is accepted before they pick a file', () => {
       expect(attachmentHint(both)).toBe('PDF, DOCX, JPEG, PNG or WebP, up to 10 MB');
-      expect(attachmentHint({ kinds: ['image'], maxSizeMb: 2 })).toBe('JPEG, PNG or WebP, up to 2 MB');
+      expect(attachmentHint({ kinds: ['image'], maxSizeMb: 2, maxDurationSeconds: null })).toBe(
+        'JPEG, PNG or WebP, up to 2 MB',
+      );
     });
   });
 

@@ -46,7 +46,7 @@ export function newField(type: FormFieldType): FormField {
     case 'yes_no':
       return { ...base, type, config: { rejectWhen: null } };
     case 'file':
-      // Documents, with the size the builder suggests for them (spec: 10 MB); the length limit is for video and audio.
+      // Documents, with the size the builder suggests for them (spec: 10 MB); the length limit is only for video and audio, so it starts empty.
       return { ...base, type, config: { kinds: ['document'], maxSizeMb: suggestedMaxSizeMb(['document']), maxDurationSeconds: null } };
   }
 }

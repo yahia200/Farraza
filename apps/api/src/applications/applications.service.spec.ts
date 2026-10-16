@@ -16,9 +16,17 @@ import {
   sampleDocx,
   sampleJpeg,
   sampleLinuxExecutable,
+  sampleM4a,
+  sampleM4aWithMp4Brand,
+  sampleMov,
+  sampleMp3,
+  sampleMp4,
+  sampleOgg,
   samplePdf,
   samplePng,
   sampleSvg,
+  sampleWav,
+  sampleWebm,
   sampleWebp,
   sampleWindowsExecutable,
   sampleZip,
@@ -1279,6 +1287,273 @@ describe('ApplicationsService', () => {
           { key: SAMPLE, config: { kinds: ['document', 'image'], maxSizeMb: 2, maxDurationSeconds: null } },
           { key: PHOTO, config: { kinds: ['image'], maxSizeMb: 1, maxDurationSeconds: null } },
         ]);
+      });
+    });
+  });
+
+  // Video and audio Attachments (ticket 09): the browser declares the length it read from the file,
+  // the server checks it against the question and stores it (it does not re-measure it), and the
+  // bytes must be one of the formats the question allows.
+  describe('video and audio Attachments', () => {
+    const CLIP = 'a7777777-7777-4777-8777-777777777777'; // video, 100 MB, 60 s
+    const VOICE = 'b8888888-8888-4888-8888-888888888888'; // audio, 25 MB, 90 s
+    const SAMPLE = 'c9999999-9999-4999-8999-999999999999'; // documents and video, 100 MB, 30 s
+    const fields: FormFields = [
+      {
+        key: CLIP,
+        type: 'file',
+        label: 'Intro video',
+        helpText: null,
+        required: false,
+        config: { kinds: ['video'], maxSizeMb: 100, maxDurationSeconds: 60 },
+      },
+      {
+        key: VOICE,
+        type: 'file',
+        label: 'Voice note',
+        helpText: null,
+        required: false,
+        config: { kinds: ['audio'], maxSizeMb: 25, maxDurationSeconds: 90 },
+      },
+      {
+        key: SAMPLE,
+        type: 'file',
+        label: 'Sample',
+        helpText: null,
+        required: false,
+        config: { kinds: ['document', 'video'], maxSizeMb: 100, maxDurationSeconds: 30 },
+      },
+    ];
+
+    const request = (fieldKey: string, overrides: Record<string, unknown> = {}) =>
+      ({
+        purpose: 'answer',
+        fieldKey,
+        originalName: 'intro.mp4',
+        contentType: 'video/mp4',
+        sizeBytes: 5 * MB,
+        durationSeconds: 45,
+        ...overrides,
+      }) as Parameters<ApplicationsService['createUpload']>[2];
+
+    async function upload(fieldKey: string, bytes: Uint8Array, overrides: Record<string, unknown> = {}) {
+      const { fileId } = await service.createUpload(
+        'acme',
+        'backend',
+        request(fieldKey, { sizeBytes: bytes.length, ...overrides }),
+      );
+      storage.put(repository.file(fileId)!.storageKey, bytes);
+      return fileId;
+    }
+
+    async function refusedUpload(dto: Parameters<ApplicationsService['createUpload']>[2]) {
+      const error = await service.createUpload('acme', 'backend', dto).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect(storage.requests).toEqual([]);
+      return (error as BadRequestException).getResponse() as {
+        errors: Array<{ path: string; message: string }>;
+      };
+    }
+
+    beforeEach(() => {
+      repository.seedJob({ slug: 'backend', cvMode: 'off', fields });
+    });
+
+    describe('createUpload', () => {
+      it('stores the declared length on the pending file', async () => {
+        const upload = await service.createUpload('acme', 'backend', request(CLIP, { durationSeconds: 42 }));
+
+        expect(repository.file(upload.fileId)).toMatchObject({
+          fieldKey: CLIP,
+          mimeType: 'video/mp4',
+          durationSeconds: 42,
+          status: 'pending',
+        });
+        expect(storage.requests[0]!.declared).toEqual({ contentType: 'video/mp4', sizeBytes: 5 * MB });
+      });
+
+      it('accepts a file of exactly the length limit', async () => {
+        await expect(service.createUpload('acme', 'backend', request(CLIP, { durationSeconds: 60 }))).resolves.toBeDefined();
+      });
+
+      it('refuses a file longer than the question allows, saying the allowed length', async () => {
+        const { errors } = await refusedUpload(request(CLIP, { durationSeconds: 61 }));
+
+        expect(errors).toEqual([{ path: 'durationSeconds', message: 'This file must be 1 minute or shorter.' }]);
+      });
+
+      it("uses the length limit of the question the file is for", async () => {
+        const { errors } = await refusedUpload(
+          request(VOICE, { contentType: 'audio/mpeg', durationSeconds: 91 }),
+        );
+
+        expect(errors).toEqual([
+          { path: 'durationSeconds', message: 'This file must be 1 minute 30 seconds or shorter.' },
+        ]);
+      });
+
+      it('refuses video or audio declared without a length', async () => {
+        const { errors } = await refusedUpload(request(CLIP, { durationSeconds: undefined }));
+
+        expect(errors).toMatchObject([{ path: 'durationSeconds' }]);
+      });
+
+      it.each([
+        ['video/mp4', CLIP, 'video/mp4'],
+        ['video/quicktime', CLIP, 'video/quicktime'],
+        ['video/webm', CLIP, 'video/webm'],
+        ['audio/mpeg', VOICE, 'audio/mpeg'],
+        ['audio/mp4', VOICE, 'audio/mp4'],
+        ['audio/wav', VOICE, 'audio/wav'],
+        ['audio/ogg', VOICE, 'audio/ogg'],
+        ['audio/webm', VOICE, 'audio/webm'],
+        // Other names the browser may use for the same formats.
+        ['audio/x-m4a', VOICE, 'audio/mp4'],
+        ['audio/x-wav', VOICE, 'audio/wav'],
+        ['audio/mp3', VOICE, 'audio/mpeg'],
+        // A WebM or MP4 recording may be sound only; an audio question takes it under its audio type.
+        ['video/webm', VOICE, 'audio/webm'],
+        ['video/mp4', VOICE, 'audio/mp4'],
+      ])('accepts the declared type %s for %j, pinning %s on the upload', async (declared, fieldKey, pinned) => {
+        const upload = await service.createUpload('acme', 'backend', request(fieldKey, { contentType: declared }));
+
+        expect(upload.contentType).toBe(pinned);
+        expect(storage.requests[0]!.declared.contentType).toBe(pinned);
+        expect(repository.file(upload.fileId)?.mimeType).toBe(pinned);
+      });
+
+      it.each([
+        ['audio/mpeg', CLIP],
+        ['audio/webm', CLIP],
+        ['video/quicktime', VOICE],
+        ['video/x-matroska', CLIP],
+        ['video/3gpp', CLIP],
+        ['audio/flac', VOICE],
+        ['application/pdf', CLIP],
+      ])('refuses the declared type %s for %j', async (contentType, fieldKey) => {
+        const { errors } = await refusedUpload(request(fieldKey, { contentType }));
+
+        expect(errors).toMatchObject([{ path: 'contentType' }]);
+      });
+
+      it('names the video formats the question accepts when refusing a type', async () => {
+        const { errors } = await refusedUpload(request(CLIP, { contentType: 'audio/mpeg' }));
+
+        expect(errors[0]!.message).toBe('Upload an MP4, MOV or WebM file.');
+      });
+
+      it('refuses a video over the size limit before looking at its length', async () => {
+        const { errors } = await refusedUpload(request(CLIP, { sizeBytes: 100 * MB + 1, durationSeconds: 5000 }));
+
+        expect(errors).toMatchObject([{ path: 'sizeBytes' }]);
+      });
+
+      it('keeps no length on a document in a question that also takes video', async () => {
+        const upload = await service.createUpload(
+          'acme',
+          'backend',
+          request(SAMPLE, { contentType: 'application/pdf', originalName: 'cv.pdf', durationSeconds: undefined }),
+        );
+
+        expect(repository.file(upload.fileId)?.durationSeconds ?? null).toBeNull();
+      });
+
+      it('ignores a length sent with a document rather than storing it', async () => {
+        const upload = await service.createUpload(
+          'acme',
+          'backend',
+          request(SAMPLE, { contentType: 'application/pdf', originalName: 'cv.pdf', durationSeconds: 999 }),
+        );
+
+        expect(repository.file(upload.fileId)?.durationSeconds ?? null).toBeNull();
+      });
+    });
+
+    describe('submit: the bytes must be one of the question\'s formats', () => {
+      const submitAnswer = (fieldKey: string, fileId: string) =>
+        service.submit('acme', 'backend', applicant({ answers: { [fieldKey]: fileId } }));
+
+      it.each([
+        ['an MP4', CLIP, sampleMp4, 'video/mp4', 'video/mp4'],
+        ['a MOV', CLIP, sampleMov, 'video/quicktime', 'video/quicktime'],
+        ['a WebM video', CLIP, () => sampleWebm('video'), 'video/webm', 'video/webm'],
+        ['an MP3', VOICE, sampleMp3, 'audio/mpeg', 'audio/mpeg'],
+        ['an M4A', VOICE, sampleM4a, 'audio/mp4', 'audio/mp4'],
+        ['a WAV', VOICE, () => sampleWav(), 'audio/wav', 'audio/wav'],
+        ['an OGG (Vorbis)', VOICE, () => sampleOgg('vorbis'), 'audio/ogg', 'audio/ogg'],
+        ['an OGG (Opus)', VOICE, () => sampleOgg('opus'), 'audio/ogg', 'audio/ogg'],
+        // file-type calls these video/*, but the question asked for sound, so that is how they are stored.
+        ['a WebM with only audio', VOICE, () => sampleWebm('audio'), 'audio/webm', 'audio/webm'],
+        ['an audio-only MP4 (brand mp42)', VOICE, sampleM4aWithMp4Brand, 'audio/mp4', 'audio/mp4'],
+      ])('accepts %s and stores the type that fits the question', async (_name, fieldKey, make, declared, stored) => {
+        const fileId = await upload(fieldKey, make(), { contentType: declared, durationSeconds: 30 });
+
+        await submitAnswer(fieldKey, fileId);
+
+        expect(repository.file(fileId)).toMatchObject({ status: 'uploaded', mimeType: stored, durationSeconds: 30 });
+      });
+
+      it('stores a WebM as video where the question takes video as well as documents', async () => {
+        const fileId = await upload(SAMPLE, sampleWebm('video'), { contentType: 'video/webm', durationSeconds: 20 });
+
+        await submitAnswer(SAMPLE, fileId);
+
+        expect(repository.file(fileId)?.mimeType).toBe('video/webm');
+      });
+
+      it('records the type found in the bytes, whatever the browser declared', async () => {
+        // Declared as an MP4, but the bytes are a QuickTime movie.
+        const fileId = await upload(CLIP, sampleMov(), { contentType: 'video/mp4' });
+
+        await submitAnswer(CLIP, fileId);
+
+        expect(repository.file(fileId)?.mimeType).toBe('video/quicktime');
+      });
+
+      it('accepts a big MP4 from only its first bytes', async () => {
+        const big = sampleMp4({ extraBytes: 2 * SNIFF_BYTES });
+        const fileId = await upload(CLIP, big);
+
+        await submitAnswer(CLIP, fileId);
+
+        expect(repository.file(fileId)?.status).toBe('uploaded');
+        expect(storage.reads.at(-1)).toEqual({ key: repository.file(fileId)!.storageKey, length: SNIFF_BYTES });
+      });
+
+      describe('a file that is not what it says', () => {
+        async function refused(fieldKey: string, fileId: string) {
+          const error = await submitAnswer(fieldKey, fileId).catch((e: unknown) => e);
+          expect(error).toBeInstanceOf(BadRequestException);
+          expect(repository.file(fileId)).toBeUndefined();
+          expect(repository.applications).toHaveLength(0);
+          return (error as BadRequestException).getResponse() as { errors: Array<{ path: string; message: string }> };
+        }
+
+        it.each([
+          ['a zip', CLIP, sampleZip, 'video/mp4'],
+          ['a Windows program', CLIP, sampleWindowsExecutable, 'video/mp4'],
+          ['a PDF', VOICE, samplePdf, 'audio/mpeg'],
+          ['an M4A sent as a video', CLIP, sampleM4a, 'video/mp4'],
+          ['a MOV sent as audio', VOICE, sampleMov, 'audio/mp4'],
+        ])('refuses %s, with a field error on the question and the object deleted', async (_name, fieldKey, make, declared) => {
+          const fileId = await upload(fieldKey, make(), { contentType: declared });
+          const storageKey = repository.file(fileId)!.storageKey;
+
+          const { errors } = await refused(fieldKey, fileId);
+
+          expect(errors).toEqual([{ path: fieldKey, message: expect.stringContaining('really') }]);
+          expect(storage.deleted).toEqual([storageKey]);
+        });
+
+        it('names the formats the question accepts', async () => {
+          const fileId = await upload(CLIP, sampleZip(), { contentType: 'video/mp4' });
+
+          const { errors } = await refused(CLIP, fileId);
+
+          expect(errors[0]!.message).toBe(
+            "That file isn't really the kind it claims to be. Upload an MP4, MOV or WebM file.",
+          );
+        });
       });
     });
   });

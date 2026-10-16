@@ -44,6 +44,8 @@ export interface NewPendingFile {
   /** What the browser declared; a later check replaces it with the type found in the bytes. */
   mimeType: string;
   sizeBytes: number;
+  /** Video and audio only: the length in whole seconds the browser declared; the server does not re-measure it. */
+  durationSeconds?: number | null;
 }
 
 /**

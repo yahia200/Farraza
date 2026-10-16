@@ -6,7 +6,7 @@ import type { PreviewKind } from '@repo/shared';
 import { Button } from '@/components/ui/button';
 import { usePdfPreviewSupported } from '@/hooks/use-pdf-preview-supported';
 import { DownloadFileButton } from './download-file-button';
-import { DocxViewer, ImageViewer, PdfViewer, type ViewerFile } from './file-viewers';
+import { DocxViewer, ImageViewer, MediaViewer, PdfViewer, type ViewerFile } from './file-viewers';
 
 /**
  * One file's card: the row the server renders (`children`: icon, name, details), a Download button
@@ -14,7 +14,7 @@ import { DocxViewer, ImageViewer, PdfViewer, type ViewerFile } from './file-view
  * viewer under the row.
  *
  * The viewer opens on request, not with the sheet: the link is minted and the bytes are fetched only
- * for a CV someone actually wants to read. To teach it a new kind (video, audio), add the
+ * for a CV someone actually wants to read. To teach it a new kind, add the
  * kind to `previewKindOf` in @repo/shared and a case in `Viewer` below.
  */
 export function FileCard({
@@ -33,7 +33,8 @@ export function FileCard({
   const panelId = useId();
   const pdfSupported = usePdfPreviewSupported();
   // Where the browser can't show PDFs, Download is the only action (and the visible fallback).
-  const canPreview = kind === 'docx' || kind === 'image' || (kind === 'pdf' && pdfSupported);
+  const canPreview =
+    kind === 'docx' || kind === 'image' || kind === 'video' || kind === 'audio' || (kind === 'pdf' && pdfSupported);
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl border p-3">
@@ -81,6 +82,9 @@ function Viewer({ kind, file }: { kind: PreviewKind | null; file: ViewerFile }) 
       return <DocxViewer file={file} />;
     case 'image':
       return <ImageViewer file={file} />;
+    case 'video':
+    case 'audio':
+      return <MediaViewer file={file} kind={kind} />;
     default:
       return null;
   }

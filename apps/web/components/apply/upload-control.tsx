@@ -2,7 +2,13 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { FileTextIcon, RotateCcwIcon, UploadIcon, XIcon } from 'lucide-react';
-import { contentTypeOf, shouldCompressImage, type DeclaredFile, type FieldError } from '@repo/shared';
+import {
+  contentTypeOf,
+  declaredDuration,
+  shouldCompressImage,
+  type DeclaredFile,
+  type FieldError,
+} from '@repo/shared';
 import { createUpload } from '@/app/actions/applications';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Progress, ProgressValue } from '@/components/ui/progress';
@@ -10,6 +16,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { QuestionnaireChoices, QuestionnaireInput } from '@/components/ui/questionnaire';
 import { compressImageForUpload } from '@/lib/compress-image';
 import { formatFileSize } from '@/lib/format';
+import { readMediaDuration } from '@/lib/media-duration';
 import { putFile } from '@/lib/put-file';
 import { cn } from '@/lib/utils';
 
@@ -63,6 +70,8 @@ export function UploadControl({
   const [upload, setUpload] = useState<Upload | null>(null);
   /** Why a chosen file was turned away before any request. */
   const [rejection, setRejection] = useState<string>();
+  /** True while the length of a video or audio file is being read. */
+  const [measuring, setMeasuring] = useState(false);
   const current = useRef<AbortController | null>(null);
 
   // Leaving the page (or this step being unmounted) stops a transfer in progress.
@@ -70,7 +79,7 @@ export function UploadControl({
 
   // The form can clear the id (the server refused it): then there is nothing uploaded any more.
   const shown = upload?.status === 'sent' && value === null ? null : upload;
-  const sending = shown?.status === 'sending' || shown?.status === 'compressing';
+  const sending = shown?.status === 'sending' || shown?.status === 'compressing' || measuring;
 
   function stop() {
     current.current?.abort();
@@ -83,6 +92,7 @@ export function UploadControl({
    */
   async function send(picked: File, { reduce = true, reducedFrom }: { reduce?: boolean; reducedFrom?: number } = {}) {
     stop();
+    setMeasuring(false);
     setRejection(undefined);
     onChange(null);
 
@@ -111,6 +121,25 @@ export function UploadControl({
       problem = check({ contentType, sizeBytes: file.size });
     }
 
+    // Videos and audio (ticket 09): type and size passed and only the length is missing, so read
+    // it from the file actually being sent (`lib/media-duration.ts`) and check again with it.
+    let durationSeconds: number | undefined;
+    if (problem?.path === 'durationSeconds') {
+      setMeasuring(true);
+      onBusyChange(true);
+      const seconds = await readMediaDuration(
+        file,
+        contentType.startsWith('audio/') ? 'audio' : 'video',
+        controller.signal,
+      );
+      if (controller.signal.aborted) return; // replaced or removed meanwhile
+      setMeasuring(false);
+      // Unreadable (an unsupported codec, a broken file) is refused: the server cannot re-measure
+      // the length, so without it the question's limit could not be applied at all.
+      durationSeconds = (seconds !== null ? declaredDuration(seconds) : null) ?? undefined;
+      problem = check({ contentType, sizeBytes: file.size, durationSeconds });
+    }
+
     if (problem) {
       setUpload(null);
       onBusyChange(false);
@@ -127,6 +156,7 @@ export function UploadControl({
         originalName: file.name,
         contentType,
         sizeBytes: file.size,
+        ...(durationSeconds !== undefined && { durationSeconds }),
       });
       if (controller.signal.aborted) return;
       if (!created.upload) {
@@ -156,6 +186,7 @@ export function UploadControl({
 
   function remove() {
     stop();
+    setMeasuring(false);
     setUpload(null);
     setRejection(undefined);
     onChange(null);
@@ -193,6 +224,7 @@ export function UploadControl({
       </label>
 
       <div id={`${inputId}-status`} aria-live="polite" className="flex flex-col gap-2">
+        {measuring && <p className="text-sm text-muted-foreground">Checking the length of your file…</p>}
         {rejection && <p className="text-sm text-destructive">{rejection}</p>}
 
         {shown && (

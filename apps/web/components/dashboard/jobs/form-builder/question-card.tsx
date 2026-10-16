@@ -268,10 +268,8 @@ export function QuestionCard({
                 idPrefix={idPrefix}
                 kinds={field.config.kinds}
                 maxSizeMb={field.config.maxSizeMb}
-                kindsError={
-                  errorAt(errors, `fields.${index}.config.kinds`) ??
-                  errorAt(errors, `fields.${index}.config.maxDurationSeconds`)
-                }
+                maxDurationSeconds={field.config.maxDurationSeconds}
+                kindsError={errorAt(errors, `fields.${index}.config.kinds`)}
                 readOnly={readOnly}
                 disabled={disabled}
               />

@@ -72,18 +72,51 @@ describe('parseFormFields', () => {
       expect(result.ok).toBe(false);
     });
 
-    it('carries the video and audio kinds, which are not accepted yet', () => {
-      // The config model already knows all four kinds (spec); only document and image have formats so far.
-      for (const kind of ['video', 'audio']) {
-        const result = parseFormFields([fileQuestion({ ...validFileConfig, kinds: [kind] })]);
-        expect(result).toMatchObject({ ok: false, errors: [{ path: '0.config.kinds' }] });
-      }
+    it('allows a duration limit only with video or audio', () => {
+      expect(parseFormFields([fileQuestion({ ...validFileConfig, maxDurationSeconds: 60 })])).toEqual({
+        ok: false,
+        errors: [
+          { path: '0.config.maxDurationSeconds', message: 'A length limit only applies to video and audio.' },
+        ],
+      });
     });
 
-    it('allows a duration limit only with video or audio', () => {
-      expect(parseFormFields([fileQuestion({ ...validFileConfig, maxDurationSeconds: 60 })])).toMatchObject({
-        ok: false,
-        errors: [{ path: '0.config.maxDurationSeconds' }],
+    describe('video and audio', () => {
+      it.each([
+        [['video']],
+        [['audio']],
+        [['video', 'audio']],
+        [['document', 'image', 'video', 'audio']],
+      ])('accepts %j with a length limit', (kinds) => {
+        const config = { kinds, maxSizeMb: 100, maxDurationSeconds: 90 };
+        expect(parseFormFields([fileQuestion(config)])).toMatchObject({ ok: true });
+      });
+
+      it.each([['video'], ['audio'], ['document', 'audio']])(
+        'needs a length limit when %j is allowed, pointing at the limit',
+        (...kinds) => {
+          const config = { kinds, maxSizeMb: 100, maxDurationSeconds: null };
+          expect(parseFormFields([fileQuestion(config)])).toEqual({
+            ok: false,
+            errors: [
+              {
+                path: '0.config.maxDurationSeconds',
+                message: 'Set a length limit for video and audio files.',
+              },
+            ],
+          });
+        },
+      );
+
+      it.each([0, -5, 1.5, Number.NaN])('refuses the length limit %s', (maxDurationSeconds) => {
+        const config = { kinds: ['video'], maxSizeMb: 100, maxDurationSeconds };
+        const result = parseFormFields([fileQuestion(config)]);
+        expect(result).toMatchObject({ ok: false, errors: [{ path: '0.config.maxDurationSeconds' }] });
+      });
+
+      it('accepts a one-second limit', () => {
+        const config = { kinds: ['audio'], maxSizeMb: 25, maxDurationSeconds: 1 };
+        expect(parseFormFields([fileQuestion(config)])).toMatchObject({ ok: true });
       });
     });
   });

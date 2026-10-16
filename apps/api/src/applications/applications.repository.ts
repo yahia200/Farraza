@@ -94,7 +94,11 @@ export class ApplicationsRepository {
 
   /** Records an upload that has been started: pending, and attached to no Application yet. */
   async createPendingFile(input: NewPendingFile): Promise<void> {
-    await this.files.create({ ...input, fieldKey: input.fieldKey ?? null });
+    await this.files.create({
+      ...input,
+      fieldKey: input.fieldKey ?? null,
+      durationSeconds: input.durationSeconds ?? null,
+    });
   }
 
   /**
