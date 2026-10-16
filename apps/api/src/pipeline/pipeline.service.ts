@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { AuthorizationService } from '@nestjs/authorization';
+import { previewKindOf } from '@repo/shared';
 import type { Membership } from '../companies/company.js';
 import { JobsService } from '../jobs/jobs.service.js';
 import type { User } from '../users/user.js';
@@ -69,6 +70,30 @@ export class PipelineService {
     if (!file) throw new NotFoundException();
 
     const url = await this.storage.createDownloadUrl(file.storageKey, file.originalName);
+    return { url, expiresInSeconds: DOWNLOAD_URL_TTL_SECONDS };
+  }
+
+  /**
+   * A short-lived link that shows one file in place (inline disposition, the stored content type
+   * pinned). Same access and isolation as `downloadLink`, and likewise never cached. Only types the
+   * candidate sheet renders get one (`previewKindOf`): an inline link for anything else could make
+   * the bucket's origin render a hostile file as a page, so those answer 400 and the sheet offers
+   * the download instead.
+   */
+  async viewLink(
+    membership: Membership,
+    jobSlug: string,
+    applicationId: string,
+    fileId: string,
+  ): Promise<FileLink> {
+    const job = await this.jobs.get(membership, jobSlug);
+    const file = await this.pipeline.findFile(membership.company.id, job.id, applicationId, fileId);
+    if (!file) throw new NotFoundException();
+    if (!previewKindOf(file.mimeType)) {
+      throw new BadRequestException('This file cannot be previewed. Download it instead.');
+    }
+
+    const url = await this.storage.createViewUrl(file.storageKey, file.originalName, file.mimeType);
     return { url, expiresInSeconds: DOWNLOAD_URL_TTL_SECONDS };
   }
 
