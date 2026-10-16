@@ -1,13 +1,15 @@
 import type { StageKind } from '@repo/shared';
+import { unstable_rethrow } from 'next/navigation';
 import { BanIcon } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getApplication } from '@/lib/dal';
+import { getApplication, getApplicationFiles } from '@/lib/dal';
 import { formatDate } from '@/lib/format';
 import { toActivityItems } from './activity-items';
 import { CandidateActivity } from './candidate-activity';
+import { CandidateFile } from './candidate-file';
 import { CandidateMove } from './candidate-move';
 import { CandidateStageBadges } from './candidate-stage-badges';
 import { formatAnswer } from './format-answer';
@@ -32,7 +34,15 @@ export async function CandidateDetail({
   /** canMoveApplications(role): interviewers get no move control. */
   canMove: boolean;
 }) {
-  const application = await getApplication(companySlug, jobSlug, applicationId);
+  // Together, as they don't depend on each other. If the files can't be loaded, `files` is null
+  // and the sheet says so instead of claiming the candidate sent none.
+  const [application, files] = await Promise.all([
+    getApplication(companySlug, jobSlug, applicationId),
+    getApplicationFiles(companySlug, jobSlug, applicationId).catch((error: unknown) => {
+      unstable_rethrow(error); // a redirect to sign-in must not be swallowed
+      return null;
+    }),
+  ]);
 
   if (!application) {
     return (
@@ -44,6 +54,7 @@ export async function CandidateDetail({
   }
 
   const { candidate, stage, fields, answers, autoRejectedBy } = application;
+  const cv = files?.find((file) => file.purpose === 'cv');
 
   return (
     <>
@@ -101,6 +112,19 @@ export async function CandidateDetail({
           </dl>
         </section>
 
+        <section aria-labelledby="candidate-cv" className="flex flex-col gap-3">
+          <h3 id="candidate-cv" className="text-sm font-medium">
+            CV
+          </h3>
+          {files === null ? (
+            <p className="text-muted-foreground">Couldn&apos;t load the files. Reload the page to try again.</p>
+          ) : cv ? (
+            <CandidateFile file={cv} companySlug={companySlug} jobSlug={jobSlug} applicationId={application.id} />
+          ) : (
+            <p className="text-muted-foreground italic">No CV attached.</p>
+          )}
+        </section>
+
         <section aria-labelledby="candidate-answers" className="flex flex-col gap-3">
           <h3 id="candidate-answers" className="text-sm font-medium">
             Answers
@@ -111,6 +135,12 @@ export async function CandidateDetail({
             <dl className="flex flex-col gap-4">
               {fields.map((field) => {
                 const answer = formatAnswer(field, answers[field.key]);
+                // A file question's answer is the id of a file, shown as the file itself.
+                const fileId = field.type === 'file' ? answers[field.key] : undefined;
+                const file =
+                  typeof fileId === 'string'
+                    ? files?.find((f) => f.id === fileId && f.purpose === 'answer' && f.fieldKey === field.key)
+                    : undefined;
                 return (
                   <div key={field.key} className="flex flex-col gap-1">
                     <dt className="flex flex-wrap items-center gap-2 font-medium">
@@ -118,7 +148,22 @@ export async function CandidateDetail({
                       {autoRejectedBy?.fieldKey === field.key && <Badge variant="destructive">Auto-reject</Badge>}
                     </dt>
                     <dd className="text-muted-foreground">
-                      {answer === null ? (
+                      {field.type === 'file' ? (
+                        file ? (
+                          <CandidateFile
+                            file={file}
+                            companySlug={companySlug}
+                            jobSlug={jobSlug}
+                            applicationId={application.id}
+                          />
+                        ) : typeof fileId !== 'string' ? (
+                          <span className="italic">No answer</span>
+                        ) : (
+                          <span className="italic">
+                            {files === null ? "Couldn't load the files." : 'This file is no longer available.'}
+                          </span>
+                        )
+                      ) : answer === null ? (
                         <span className="italic">No answer</span>
                       ) : Array.isArray(answer) ? (
                         <ul className="list-inside list-disc">

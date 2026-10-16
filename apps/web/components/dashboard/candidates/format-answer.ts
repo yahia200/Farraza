@@ -23,7 +23,8 @@ export function formatAnswer(field: FormField, value: AnswerValue | undefined): 
         ? value.map((id) => field.config.options.find((option) => option.id === id)?.label ?? 'Unknown option')
         : null;
     case 'file':
-      // Uploads don't exist yet; the answer would be a file id.
-      return 'File (uploads are not available yet)';
+      // The answer is a file id, which text can't show: the sheet renders the file itself
+      // (candidate-file.tsx) and never asks for this.
+      return null;
   }
 }
