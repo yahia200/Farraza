@@ -8,10 +8,14 @@ import {
 } from '@nestjs/common';
 import {
   CV_CONTENT_TYPES,
+  allowedContentTypes,
+  checkAttachmentFile,
   checkCvFile,
+  fileFormatNames,
   findKnockout,
   parseAnswers,
   toPublicFields,
+  type Answers,
   type FieldError,
 } from '@repo/shared';
 import { SNIFF_BYTES, sniffFileType } from '../storage/file-sniff.js';
@@ -59,14 +63,31 @@ export class ApplicationsService {
       throw new NotFoundException();
     }
 
-    if (found.form.cvMode === 'off') {
-      throw fieldErrors([
-        { path: 'purpose', message: "This job doesn't ask for a CV." },
-      ]);
-    }
-    const problem = checkCvFile(dto);
-    if (problem) {
-      throw fieldErrors([problem]);
+    if (dto.purpose === 'cv') {
+      if (found.form.cvMode === 'off') {
+        throw fieldErrors([
+          { path: 'purpose', message: "This job doesn't ask for a CV." },
+        ]);
+      }
+      const problem = checkCvFile(dto);
+      if (problem) {
+        throw fieldErrors([problem]);
+      }
+    } else {
+      // The question's own limits decide, from the form version applicants are looking at.
+      const question = found.form.fields.find((field) => field.key === dto.fieldKey);
+      if (question?.type !== 'file') {
+        throw fieldErrors([
+          {
+            path: 'fieldKey',
+            message: 'This question is no longer on the form. Reload the page and try again.',
+          },
+        ]);
+      }
+      const problem = checkAttachmentFile(question.config, dto);
+      if (problem) {
+        throw fieldErrors([problem]);
+      }
     }
 
     const fileId = randomUUID();
@@ -79,7 +100,8 @@ export class ApplicationsService {
       id: fileId,
       companyId: found.company.id,
       jobId: found.job.id,
-      purpose: 'cv',
+      purpose: dto.purpose,
+      fieldKey: dto.purpose === 'answer' ? dto.fieldKey : null,
       storageKey: key,
       originalName: dto.originalName,
       mimeType: dto.contentType,
@@ -113,10 +135,8 @@ export class ApplicationsService {
     }
 
     // The cheap checks passed; now look at the uploaded objects themselves, before the transaction.
-    const files = await this.verifyFiles(
-      found,
-      dto.cvFileId ? [{ id: dto.cvFileId, purpose: 'cv', fieldKey: null }] : [],
-    );
+    const wanted = wantedFiles(found, dto, parsed.answers);
+    const files = await this.verifyFiles(found, wanted);
 
     const knockout = findKnockout(found.form.fields, parsed.answers);
     const source = dto.source ?? null;
@@ -149,8 +169,8 @@ export class ApplicationsService {
     if (result === 'duplicate') {
       throw new ConflictException("You've already applied for this job.");
     }
-    if (result === 'file_conflict') {
-      throw fileConflict();
+    if (typeof result === 'object') {
+      throw fileConflict(wanted.find((file) => file.id === result.fileId));
     }
     return { received: true };
   }
@@ -165,10 +185,7 @@ export class ApplicationsService {
    * the applicant gets a 400 field error. Only failures of these checks delete anything: a
    * duplicate Application or invalid answers never reach here, so those files stay pending.
    */
-  private async verifyFiles(
-    found: OpenJob,
-    wanted: Array<Omit<FileToAttach, 'mimeType'>>,
-  ): Promise<FileToAttach[]> {
+  private async verifyFiles(found: OpenJob, wanted: WantedFile[]): Promise<FileToAttach[]> {
     if (wanted.length === 0) return [];
     const rows = await this.applications.findFilesToVerify(
       found.company.id,
@@ -179,22 +196,28 @@ export class ApplicationsService {
     const verified: FileToAttach[] = [];
     const errors: FieldError[] = [];
     for (const file of wanted) {
+      // The row must have been uploaded for exactly this slot: the CV, or this very question. This is
+      // what stops a file uploaded for one question (or as the CV) being used as another's answer.
       const row = rows.find(
         (candidate) =>
           candidate.id === file.id &&
           candidate.purpose === file.purpose &&
           candidate.fieldKey === file.fieldKey,
       );
-      if (!row) throw fileConflict();
+      if (!row) throw fileConflict(file);
 
-      // Only the CV can be submitted today; a file question brings its own list of allowed types.
-      const outcome = await this.checkObject(row, CV_CONTENT_TYPES);
+      const outcome = await this.checkObject(row, file);
       if ('mimeType' in outcome) {
-        verified.push({ ...file, mimeType: outcome.mimeType });
+        verified.push({
+          id: file.id,
+          purpose: file.purpose,
+          fieldKey: file.fieldKey,
+          mimeType: outcome.mimeType,
+        });
         continue;
       }
       await this.discard(found, row);
-      errors.push({ path: file.fieldKey ?? 'cvFileId', message: outcome.message });
+      errors.push({ path: pathOf(file), message: outcome.message });
     }
 
     if (errors.length > 0) {
@@ -210,16 +233,26 @@ export class ApplicationsService {
    */
   private async checkObject(
     row: FileToVerify,
-    allowedTypes: readonly string[],
+    wanted: WantedFile,
   ): Promise<{ mimeType: string } | { message: string }> {
     const head = await this.storage.headObject(row.storageKey);
     if (!head || head.sizeBytes !== row.sizeBytes) {
-      return { message: UPLOAD_INCOMPLETE };
+      return {
+        message:
+          wanted.purpose === 'cv'
+            ? UPLOAD_INCOMPLETE_CV
+            : UPLOAD_INCOMPLETE_ATTACHMENT,
+      };
     }
     const bytes = await this.storage.readLeadingBytes(row.storageKey, SNIFF_BYTES);
     const mimeType = await sniffFileType(bytes);
-    if (!mimeType || !allowedTypes.includes(mimeType)) {
-      return { message: NOT_THE_CLAIMED_TYPE };
+    if (!mimeType || !wanted.allowedTypes.includes(mimeType)) {
+      return {
+        message:
+          wanted.purpose === 'cv'
+            ? NOT_THE_CLAIMED_TYPE_CV
+            : `That file isn't really the kind it claims to be. Upload a ${wanted.formats} file.`,
+      };
     }
     return { mimeType };
   }
@@ -243,14 +276,68 @@ export class ApplicationsService {
   }
 }
 
-const UPLOAD_INCOMPLETE = "Your CV didn't finish uploading. Upload it again.";
-const NOT_THE_CLAIMED_TYPE =
+const UPLOAD_INCOMPLETE_CV = "Your CV didn't finish uploading. Upload it again.";
+const UPLOAD_INCOMPLETE_ATTACHMENT = "Your file didn't finish uploading. Upload it again.";
+const NOT_THE_CLAIMED_TYPE_CV =
   "That file isn't really a PDF or DOCX. Upload your CV as a PDF or DOCX file.";
 
-/** 409 for a file that can't be used at all; `errors` lets the apply form put it on the CV step, as for 400s. */
-function fileConflict(): ConflictException {
-  const message = "Your CV couldn't be attached to this application. Upload it again and resubmit.";
-  return new ConflictException({ message, errors: [{ path: 'cvFileId', message }] });
+/**
+ * A file a submit refers to, and what it must turn out to be. Built from the form version, so the
+ * rules are the ones the applicant was shown: the CV's fixed ones, or the question's own.
+ */
+interface WantedFile extends Omit<FileToAttach, 'mimeType'> {
+  /** The types the bytes may turn out to be. */
+  allowedTypes: readonly string[];
+  /** The same, for messages: "PDF or DOCX". */
+  formats: string;
+}
+
+/**
+ * The files this submit refers to: the CV, and the answer of every file question. Only answers that
+ * passed `parseAnswers()` are looked at, so each is a well-formed id; whether it is a usable file
+ * is decided by `verifyFiles()` and the attach.
+ */
+function wantedFiles(found: OpenJob, dto: SubmitApplicationDto, answers: Answers): WantedFile[] {
+  const wanted: WantedFile[] = [];
+  if (dto.cvFileId) {
+    wanted.push({
+      id: dto.cvFileId,
+      purpose: 'cv',
+      fieldKey: null,
+      allowedTypes: CV_CONTENT_TYPES,
+      formats: 'PDF or DOCX',
+    });
+  }
+  for (const field of found.form.fields) {
+    const answer = answers[field.key];
+    if (field.type === 'file' && typeof answer === 'string') {
+      wanted.push({
+        id: answer,
+        purpose: 'answer',
+        fieldKey: field.key,
+        allowedTypes: allowedContentTypes(field.config.kinds),
+        formats: fileFormatNames(field.config.kinds),
+      });
+    }
+  }
+  return wanted;
+}
+
+/** Where the applicant's form shows an error about this file: the CV's step, or the question's. */
+function pathOf(file: Pick<WantedFile, 'fieldKey'>): string {
+  return file.fieldKey ?? 'cvFileId';
+}
+
+/**
+ * 409 for a file that can't be used at all; `errors` lets the apply form put it on the step the
+ * file belongs to, as for 400s.
+ */
+function fileConflict(file: WantedFile | undefined): ConflictException {
+  const message =
+    file?.purpose === 'answer'
+      ? "Your file couldn't be attached to this application. Upload it again and resubmit."
+      : "Your CV couldn't be attached to this application. Upload it again and resubmit.";
+  return new ConflictException({ message, errors: [{ path: file ? pathOf(file) : 'cvFileId', message }] });
 }
 
 /** 400 in the same `{ message, errors }` shape as validation failures (common/validation-errors.ts). */

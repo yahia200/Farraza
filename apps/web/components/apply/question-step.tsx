@@ -17,7 +17,8 @@ import { isLockedOption, type AnswerInput, type ApplyValues } from './apply-valu
  * One job question as a questionnaire step (shadcn Questionnaire:
  * https://ui.shadcn.com/docs/components/base/questionnaire). React Hook Form
  * owns the value, so every choice and input is controlled; the step's `name`
- * is the question key, which is also its answer key.
+ * is the question key, which is also its answer key. File questions are `AttachmentStep`s
+ * (attachment-step.tsx), which the questionnaire's inputs can't express.
  */
 export function QuestionStep({
   form,
@@ -137,10 +138,6 @@ export function QuestionStep({
                   );
                 })}
 
-              {field.type === 'file' && (
-                // Publishing refuses file questions now, but an older published form may have one.
-                <p className="text-sm text-muted-foreground">File uploads aren&apos;t available yet.</p>
-              )}
             </QuestionnaireChoices>
 
             {/* Text questions get parseAnswers' wording instead of the questionnaire's

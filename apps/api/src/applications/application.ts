@@ -47,10 +47,14 @@ export interface NewPendingFile {
 }
 
 /**
- * How a submit ended. `file_conflict` means a referenced file isn't this job's, doesn't match, is
- * already attached or is missing; nothing was saved.
+ * How a submit ended. A `file_conflict` means a referenced file isn't this job's, doesn't match its
+ * question, is already attached or is missing; nothing was saved. It names the first such file, so
+ * the applicant is sent to the right step.
  */
-export type SubmitResult = 'created' | 'duplicate' | 'file_conflict';
+export type SubmitResult =
+  | 'created'
+  | 'duplicate'
+  | { status: 'file_conflict'; fileId: string };
 
 export interface NewApplication {
   companyId: string;
