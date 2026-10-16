@@ -219,3 +219,50 @@ export function MediaViewer({ file, kind }: { file: ViewerFile; kind: 'video' | 
     <audio {...player} className="w-full" />
   );
 }
+
+// --- Images (ticket 08) ------------------------------------------------------------------------
+
+/**
+ * An image attachment shown in place, straight from the bucket with an `<img>`.
+ *
+ * Why this is safe and needs nothing else: the link answers with the stored image type pinned and an
+ * inline disposition (see StorageService.createViewUrl; SVG is never a stored type), and an `<img>`
+ * never runs script, even from a file that lied about being an image. A cross-origin `<img>` needs
+ * no CORS headers (unlike the DOCX `fetch`). `referrerPolicy="no-referrer"` keeps the dashboard
+ * address (company, job and application ids) out of the bucket's logs. The picture is scaled to fit
+ * the sheet (the original is a Download away); a failure to load falls back to the same alert as the
+ * other viewers.
+ * https://developer.mozilla.org/docs/Web/HTML/Reference/Elements/img#referrerpolicy
+ */
+export function ImageViewer({ file }: { file: ViewerFile }) {
+  const view = useViewUrl(file);
+  const [image, setImage] = useState<'loading' | 'loaded' | 'failed'>('loading');
+
+  if (view.status === 'failed') return <ViewerFailure message={view.message} />;
+  if (image === 'failed') return <ViewerFailure message="This image couldn't be displayed." />;
+  return (
+    <div aria-busy={image === 'loading'}>
+      {(view.status === 'loading' || image === 'loading') && (
+        <div className="relative h-48 w-full">
+          <Skeleton className="absolute inset-0 rounded-xl" />
+          <div className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Spinner />
+            Opening the image…
+          </div>
+        </div>
+      )}
+      {view.status === 'ready' && (
+        // eslint-disable-next-line @next/next/no-img-element -- a short-lived presigned URL on another origin: next/image can't optimise it
+        <img
+          src={view.url}
+          alt={file.fileName}
+          referrerPolicy="no-referrer"
+          decoding="async"
+          onLoad={() => setImage('loaded')}
+          onError={() => setImage('failed')}
+          className={image === 'loaded' ? 'mx-auto max-h-[70vh] max-w-full rounded-xl border object-contain' : 'hidden'}
+        />
+      )}
+    </div>
+  );
+}

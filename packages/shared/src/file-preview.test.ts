@@ -18,6 +18,12 @@ describe('previewKindOf', () => {
     expect(previewKindOf(type)).toBe('audio');
   });
 
+  it('previews the image types an applicant can upload', () => {
+    expect(previewKindOf('image/jpeg')).toBe('image');
+    expect(previewKindOf('image/png')).toBe('image');
+    expect(previewKindOf('image/webp')).toBe('image');
+  });
+
   it('ignores the case of the type', () => {
     expect(previewKindOf('Application/PDF')).toBe('pdf');
   });
