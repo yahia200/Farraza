@@ -1,6 +1,6 @@
 # File uploads: CVs and Attachments
 
-Status: ready-for-agent
+Status: resolved
 
 Related: ADR-0002 (CV is a built-in slot on the form version), `GLOSSARY.md` (CV, Attachment), `docs/db-schema.md` §8.1 (`files` table).
 

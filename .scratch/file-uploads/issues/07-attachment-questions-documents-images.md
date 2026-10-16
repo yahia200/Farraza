@@ -6,15 +6,21 @@ This replaces the old file config (pdf, image, document) with kinds (document, i
 
 **Blocked by:** 04, 05
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The file question config validates kinds (at least one) and size 1–200; tests cover valid and invalid configs, answers and the public field projection.
-- [ ] No published or stored form uses the old kinds enum (confirmed before replacing it).
-- [ ] The file type appears in the builder with a kinds and size editor and default suggestions; required/optional and help text work like other questions.
-- [ ] A form with file questions can be saved and published; the public payload exposes their limits.
-- [ ] Create-upload validates the declared type and size against the question; the applicant's browser rejects bad files first.
-- [ ] Answers store the file id; submit verification (ticket 04) and the conditional attach apply to Attachments, including field-key matching and required checks.
-- [ ] A file from a different question or job cannot be used as the answer.
-- [ ] The sheet lists Attachments under their question with a download button.
-- [ ] API service tests cover Attachment limits, field-key matching and required handling; shared tests cover the schema and answer rules.
+- [x] The file question config validates kinds (at least one) and size 1–200; tests cover valid and invalid configs, answers and the public field projection.
+- [x] No published or stored form uses the old kinds enum (confirmed before replacing it).
+- [x] The file type appears in the builder with a kinds and size editor and default suggestions; required/optional and help text work like other questions.
+- [x] A form with file questions can be saved and published; the public payload exposes their limits.
+- [x] Create-upload validates the declared type and size against the question; the applicant's browser rejects bad files first.
+- [x] Answers store the file id; submit verification (ticket 04) and the conditional attach apply to Attachments, including field-key matching and required checks.
+- [x] A file from a different question or job cannot be used as the answer.
+- [x] The sheet lists Attachments under their question with a download button.
+- [x] API service tests cover Attachment limits, field-key matching and required handling; shared tests cover the schema and answer rules.
 - [ ] Manually verified: build a form with a document and an image question, apply, download both.
+
+## Comments
+
+Resolved on integration branch `feat/file-uploads`: merge 6e5a3ee (feat 9e46f69).
+
+Confirmed read-only on the dev DB before replacing the old enum: 10 form versions, none with a file question, none with `allowedTypes`. Verified on a scratch stack (document + image question, apply, fake PNG refused at submit, three downloads). **Pending on the live stack:** the same flow, interviewer read-only builder, keyboard and screen-reader use of the file input.

@@ -4,12 +4,18 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The contract gains the `files` table as planned in the schema doc (with a declared duration column) and a CV mode column on form versions, as text with a CHECK; contract artifacts are re-emitted and the dev database updated.
-- [ ] `docs/db-schema.md` matches the contract.
-- [ ] The shared form schemas carry the CV mode; tests cover valid and invalid values.
-- [ ] Saving a draft and publishing persist the mode; editing after publish creates a new draft version that keeps it.
+- [x] The contract gains the `files` table as planned in the schema doc (with a declared duration column) and a CV mode column on form versions, as text with a CHECK; contract artifacts are re-emitted and the dev database updated.
+- [x] `docs/db-schema.md` matches the contract.
+- [x] The shared form schemas carry the CV mode; tests cover valid and invalid values.
+- [x] Saving a draft and publishing persist the mode; editing after publish creates a new draft version that keeps it.
 - [ ] The builder shows the CV card with a three-way toggle group; interviewers see it read-only; the unsaved-changes backup still works.
-- [ ] The public job payload includes the CV mode.
-- [ ] Existing published forms read back as off.
+- [x] The public job payload includes the CV mode.
+- [x] Existing published forms read back as off.
+
+## Comments
+
+Resolved on integration branch `feat/file-uploads`: merge af23fc3 (feat acc2f47).
+
+Verified at repository level against the dev DB (create, update, publish, new draft after publish; all 10 existing form versions read back `off`). **Not yet verified in a browser on the live stack:** the CV card and toggle, interviewer read-only, the unsaved-changes backup. Review fix 0a8a43e added service tests for persistence across publish.

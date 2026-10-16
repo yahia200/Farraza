@@ -4,13 +4,21 @@
 
 **Blocked by:** 07
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The shared config requires a duration limit when video or audio is allowed and null otherwise; the builder shows a clear error and hides the field when not relevant; tests cover both.
-- [ ] `file-type` detects all listed video and audio formats in the verification step (ticket 04 path), including WebM audio.
-- [ ] Create-upload rejects a declared duration above the question's limit and stores the declared duration.
-- [ ] The apply control reads duration in the browser and rejects over-long files with the allowed length in the message.
-- [ ] The sheet plays video and audio inline with the duration shown, and download remains available.
-- [ ] API service tests cover duration limits and format acceptance; shared tests cover the config rule.
-- [ ] The schema doc notes that the storage provider is a deploy-time choice and the egress trade-off.
+- [x] The shared config requires a duration limit when video or audio is allowed and null otherwise; the builder shows a clear error and hides the field when not relevant; tests cover both.
+- [x] `file-type` detects all listed video and audio formats in the verification step (ticket 04 path), including WebM audio.
+- [x] Create-upload rejects a declared duration above the question's limit and stores the declared duration.
+- [x] The apply control reads duration in the browser and rejects over-long files with the allowed length in the message.
+- [x] The sheet plays video and audio inline with the duration shown, and download remains available.
+- [x] API service tests cover duration limits and format acceptance; shared tests cover the config rule.
+- [x] The schema doc notes that the storage provider is a deploy-time choice and the egress trade-off.
 - [ ] Manually verified with a short video and a short audio file.
+
+## Comments
+
+Resolved on integration branch `feat/file-uploads`: merge a98e087 (feat 0821789).
+
+`file-type` 22.2.0 results: MP4 `video/mp4`; MOV `video/quicktime`; WebM `video/webm` for both video and audio-only (there is no `audio/webm`); MP3 `audio/mpeg`; M4A `audio/x-m4a` (an audio-only MP4 with brand mp42/isom gives `video/mp4`); WAV `audio/wav`; OGG Vorbis `audio/ogg`, Opus `audio/ogg; codecs=opus`. All detected from the first bytes, so the 64 KiB read is enough. `matchAllowedType` maps aliases so a WebM is accepted for either kind.
+
+Apply-side duration check browser-verified on a scratch stack. **Pending on the live stack:** inline video/audio playback on the candidate sheet and the real-bucket round trip. Owner decisions outstanding: declared duration rounds up, unreadable duration is rejected.
