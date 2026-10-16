@@ -38,3 +38,42 @@ export const DOWNLOAD_URL_TTL_SECONDS = 300;
 export function buildObjectKey(target: UploadTarget): string {
   return `companies/${target.companyId}/jobs/${target.jobId}/files/${target.fileId}`;
 }
+
+// --- Recruiter downloads (ticket 05) ---
+
+/**
+ * The `Content-Disposition` value that makes a browser save a file under the applicant's name.
+ *
+ * `attachment` stops the browser rendering the file on the bucket's origin. The name goes out twice
+ * (RFC 6266 section 4.3, https://www.rfc-editor.org/rfc/rfc6266): `filename` is a quoted ASCII
+ * fallback for old clients, and `filename*` is the real name as an RFC 8187 ext-value, UTF-8 with
+ * percent-encoding (https://www.rfc-editor.org/rfc/rfc8187#section-3.2.1). Modern browsers use
+ * `filename*`. The name is untrusted, so it is reduced to its last path segment and stripped of
+ * control characters (RFC 6266 section 4.3 asks recipients to do the same; doing it here means the
+ * header is safe whatever the recipient does).
+ */
+export function attachmentDisposition(originalName: string): string {
+  const name = safeFileName(originalName);
+  // Quoted-string: no quote or backslash; `%` is replaced because some old clients decode it.
+  const fallback = name.replace(/[^\x20-\x7e]|["\\%]/g, '_');
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeExtValue(name)}`;
+}
+
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+
+function safeFileName(originalName: string): string {
+  const lastSegment = originalName.split(/[\\/]/).pop() ?? '';
+  const name = lastSegment
+    .replace(/\p{Cc}/gu, '') // control characters: C0, DEL and C1
+    .replace(LONE_SURROGATE, '\uFFFD')
+    .trim();
+  return name === '' || /^\.+$/.test(name) ? 'file' : name;
+}
+
+/** RFC 8187 `value-chars`: `encodeURIComponent` also leaves `' ( ) *` bare, which `attr-char` forbids. */
+function encodeExtValue(value: string): string {
+  return encodeURIComponent(value).replace(
+    /['()*]/g,
+    (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+}
