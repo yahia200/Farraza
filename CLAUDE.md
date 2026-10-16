@@ -65,17 +65,16 @@ pnpm format                          # prettier over the whole repo
 
 The API imports `@repo/shared` from its built `dist/`. After changing `packages/shared`, rebuild it (`pnpm --filter @repo/shared build`) or keep `pnpm dev` running, which watches it.
 
-Tests use Vitest. API unit tests match `**/*.spec.ts` and e2e tests match `**/*.e2e-spec.ts`. Shared tests match `*.test.ts`.
+Tests use Vitest. API tests match `**/*.spec.ts` and sit next to the code they cover. Shared tests match `*.test.ts`.
 
 ```bash
 pnpm --filter @repo/shared test
 pnpm --filter @repo/shared exec vitest run src/answers.test.ts        # single file
 pnpm --filter api test
 pnpm --filter api exec vitest run src/path/to/file.spec.ts -t "name"  # single test
-pnpm --filter api test:e2e
 ```
 
-The only existing API specs (`src/app.controller.spec.ts`, `test/app.e2e-spec.ts`) are leftover Nest scaffolding: they import an `AppController` that no longer exists, so `pnpm --filter api test` currently fails. `packages/shared` has the real test suite.
+API specs test a service through its public methods, with the real service and real authorization policies wired to a hand-written in-memory fake of the repository (`src/jobs/jobs.service.spec.ts` is the pattern to copy). They need no database: `vitest.config.ts` sets a dummy `DATABASE_URL` so importing a service doesn't build a client against the real one. There are no API e2e tests. `packages/shared` has the pure-logic test suite.
 
 Linting: the API uses **oxlint** (`apps/api/oxlint.json`) and the web app uses ESLint. API Prettier config: single quotes, trailing commas.
 
