@@ -1,9 +1,8 @@
 import { FileTextIcon } from 'lucide-react';
-import { previewKindOf } from '@repo/shared';
+import { fileTypeLabel, previewKindOf } from '@repo/shared';
 import type { ApplicationFileView } from '@/lib/dal';
-import { formatFileSize } from '@/lib/format';
+import { formatDuration, formatFileSize } from '@/lib/format';
 import { FileCard } from './file-card';
-import { fileTypeLabel, formatDuration } from './file-type-label';
 
 /**
  * One file an applicant sent: its name, type, size (and length, for video and audio), a download
