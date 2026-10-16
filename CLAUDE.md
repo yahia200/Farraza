@@ -44,6 +44,7 @@ Use the local docs first: they match the installed version. Paths are relative t
 | ESLint | 9.39.5 | — | https://eslint.org |
 | Tailwind CSS | 4.3.3 | — | https://tailwindcss.com/docs |
 | Base UI (`@base-ui/react`) | 1.8.0 | `apps/web/node_modules/@base-ui/react/docs/` | https://base-ui.com |
+| docx-preview | 0.4.1 | `apps/web/node_modules/docx-preview/README.md` (API and options), `dist/docx-preview.d.ts`, readable source `dist/docx-preview.mjs` | https://github.com/VolodymyrBaydalka/docxjs |
 | shadcn | 4.21.3 | `apps/web/node_modules/shadcn/README.md` | https://ui.shadcn.com/docs |
 
 Prisma 8 differs most from older knowledge: there is no `PrismaClient`, no `prisma generate`, and no `schema.prisma`. See the "Database" section below.
