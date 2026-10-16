@@ -24,7 +24,7 @@ export class FormsController {
     @Param('jobSlug') jobSlug: string,
     @Body({ schema: saveFormSchema }) dto: SaveFormDto,
   ) {
-    return this.forms.saveDraft(user, membership, jobSlug, dto.fields);
+    return this.forms.saveDraft(user, membership, jobSlug, dto);
   }
 
   @Post('publish')

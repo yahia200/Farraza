@@ -52,7 +52,7 @@ export class ApplicationsRepository {
         brandColor: company.brandColor,
       },
       job: { id: job.id, title: job.title, description: job.description },
-      form: { id: form.id, fields: form.fields as FormFields },
+      form: { id: form.id, fields: form.fields as FormFields, cvMode: form.cvMode },
       firstStageId: first.id,
       rejectedStageId: rejected.id,
     };

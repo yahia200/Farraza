@@ -25,6 +25,7 @@ export class ApplicationsService {
         brandColor: found.company.brandColor,
       },
       job: { title: found.job.title, description: found.job.description },
+      cvMode: found.form.cvMode,
       fields: toPublicFields(found.form.fields),
     };
   }
