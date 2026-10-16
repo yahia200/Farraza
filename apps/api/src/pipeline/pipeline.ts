@@ -50,6 +50,33 @@ export interface ApplicationDetail {
   notes: NoteView[];
 }
 
+/** A file an applicant sent with an Application, as recruiters see it: no storage key. */
+export interface ApplicationFile {
+  id: string;
+  /** `cv` for the built-in CV slot, `answer` for the answer to a file question. */
+  purpose: 'cv' | 'answer';
+  /** The file question's key for an `answer`; null for the CV. */
+  fieldKey: string | null;
+  /** The applicant's own name for the file (untrusted text). */
+  originalName: string;
+  /** The type of the file, as stored on its row. */
+  mimeType: string;
+  sizeBytes: number;
+  /** What the browser declared for video and audio; null for other files. */
+  durationSeconds: number | null;
+}
+
+/** An `ApplicationFile` plus where its bytes are. Stays inside the API: never sent to a client. */
+export interface DownloadableFile extends ApplicationFile {
+  storageKey: string;
+}
+
+/** A short-lived link to a file's bytes. */
+export interface FileLink {
+  url: string;
+  expiresInSeconds: number;
+}
+
 export const STATUS_FOR_STAGE: Record<StageKind, ApplicationStatus> = {
   normal: 'active',
   hired: 'hired',

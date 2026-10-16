@@ -125,7 +125,39 @@ const applicationPath = (companySlug: string, jobSlug: string, applicationId: st
   `/api/companies/${encodeURIComponent(companySlug)}/jobs/${encodeURIComponent(jobSlug)}` +
   `/applications/${encodeURIComponent(applicationId)}`;
 
-export type AddNoteResult = ActionFailure<'body'> & { ok?: boolean };
+export type FileDownloadResult = ActionFailure<never> & { url?: string };
+
+/**
+ * Mints a link that downloads one of an application's files, calling
+ * GET .../applications/:id/files/:fileId/download (apps/api/src/pipeline). Every member
+ * may, interviewers included. The link is valid for a few minutes, so it is minted on each
+ * click and never cached: this is an action rather than part of the cached DAL
+ * (lib/dal.ts), and it revalidates nothing because opening a file changes nothing.
+ * The ids are checked by the API (ParseUUIDPipe, then the tenant lookup).
+ */
+export async function getFileDownloadUrl(
+  companySlug: string,
+  jobSlug: string,
+  applicationId: string,
+  fileId: string,
+): Promise<FileDownloadResult> {
+  const response = await apiFetch(
+    `${applicationPath(companySlug, jobSlug, applicationId)}/files/${encodeURIComponent(fileId)}/download`,
+  );
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (!response.ok) {
+    return failureFromResponse(response, [], {
+      400: () => ({ formError: 'That file could not be found. Reload the page.' }),
+      404: () => ({ formError: 'That file is no longer available. Reload the page.' }),
+    });
+  }
+  const { url } = (await response.json()) as { url: string; expiresInSeconds: number };
+  return { url };
+}
+
+export type AddNoteResult =ActionFailure<'body'> & { ok?: boolean };
 
 /**
  * Adds a note to an application (POST .../applications/:id/notes). Every role

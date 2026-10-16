@@ -10,6 +10,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
+  attachmentDisposition,
   buildObjectKey,
   UPLOAD_URL_TTL_SECONDS,
   DOWNLOAD_URL_TTL_SECONDS,
@@ -119,9 +120,22 @@ export class StorageService {
   }
   // --- end of verification and cleanup ---------------------------------------------------------
 
-  /** Mints a presigned GET URL so an authenticated reader can fetch a file. */
-  async createDownloadUrl(key: string): Promise<string> {
-    const command = new GetObjectCommand({ Bucket: this.bucket, Key: key });
+  // --- Recruiter downloads (ticket 05) ---
+
+  /**
+   * Mints a presigned GET URL that downloads a file under the applicant's original file name.
+   *
+   * `ResponseContentDisposition` asks the bucket to answer with that `Content-Disposition` header
+   * (an attachment, so the file is never rendered on the bucket's origin); it is part of the signed
+   * query string, so it can't be changed in transit. Docs: `GetObjectRequest.ResponseContentDisposition`
+   * in apps/api/node_modules/@aws-sdk/client-s3/dist-types/models/models_0.d.ts.
+   */
+  async createDownloadUrl(key: string, originalName: string): Promise<string> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      ResponseContentDisposition: attachmentDisposition(originalName),
+    });
     return getSignedUrl(this.client, command, {
       expiresIn: DOWNLOAD_URL_TTL_SECONDS,
     });

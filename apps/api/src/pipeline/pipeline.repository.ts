@@ -2,8 +2,35 @@ import { Injectable } from '@nestjs/common';
 import type { Answers, FormFields } from '@repo/shared';
 import type { StageKind } from '../jobs/job.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { ApplicationCard, ApplicationDetail, ApplicationStatus, NoteView } from './pipeline.js';
+import type {
+  ApplicationCard,
+  ApplicationDetail,
+  ApplicationFile,
+  ApplicationStatus,
+  DownloadableFile,
+  NoteView,
+} from './pipeline.js';
 import { EVENT_FOR_STAGE, STATUS_FOR_STAGE } from './pipeline.js';
+
+function toApplicationFile(row: {
+  id: string;
+  purpose: 'cv' | 'answer';
+  fieldKey: string | null;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  durationSeconds: number | null;
+}): ApplicationFile {
+  return {
+    id: row.id,
+    purpose: row.purpose,
+    fieldKey: row.fieldKey,
+    originalName: row.originalName,
+    mimeType: row.mimeType,
+    sizeBytes: row.sizeBytes,
+    durationSeconds: row.durationSeconds,
+  };
+}
 
 @Injectable()
 export class PipelineRepository {
@@ -101,6 +128,42 @@ export class PipelineRepository {
         createdAt: note.createdAt,
       })),
     };
+  }
+
+  private get files() {
+    return this.prisma.db.orm.public.File;
+  }
+
+  /**
+   * The files attached to an Application, oldest first, or null if the Application isn't in this
+   * company's job. Pending files have no Application, so they never appear.
+   */
+  async findFiles(
+    companyId: string,
+    jobId: string,
+    applicationId: string,
+  ): Promise<ApplicationFile[] | null> {
+    const application = await this.applications.where({ id: applicationId, companyId, jobId }).first();
+    if (!application) return null;
+
+    const rows = await this.files
+      .where({ companyId, jobId, applicationId, status: 'uploaded' })
+      .orderBy((file) => file.createdAt.asc())
+      .all();
+    return rows.map(toApplicationFile);
+  }
+
+  /** One uploaded file of this Application, or null if it isn't that company's, job's and Application's. */
+  async findFile(
+    companyId: string,
+    jobId: string,
+    applicationId: string,
+    fileId: string,
+  ): Promise<DownloadableFile | null> {
+    const row = await this.files
+      .where({ id: fileId, companyId, jobId, applicationId, status: 'uploaded' })
+      .first();
+    return row ? { ...toApplicationFile(row), storageKey: row.storageKey } : null;
   }
 
   /** Returns null if the application is no longer in `from`. */
