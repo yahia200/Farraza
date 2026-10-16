@@ -115,12 +115,20 @@ model Stage {
   @@map("stages")
 }
 
+enum CvMode {
+  Off      = "off"
+  Optional = "optional"
+  Required = "required"
+}
+
 model FormVersion {
   id          Uuid                       @id @default(sql`gen_random_uuid()`)
   companyId   Uuid                       @map("company_id")
   jobId       Uuid                       @map("job_id")
   version     Int
   fields      Jsonb                      @default(json`[]`)
+  /// Whether the form asks for a CV (ADR-0002). Existing versions are `off`; the builder starts new jobs at `optional`.
+  cvMode      CvMode                     @default(Off) @map("cv_mode")
   publishedAt TimestamptzJsDate?         @map("published_at")
   createdById Uuid?                      @map("created_by")
   createdAt   TimestamptzJsDate          @default(now()) @map("created_at")
@@ -236,6 +244,53 @@ model Note {
   @@index([applicationId, createdAt])
   @@check(expression: "length(trim(body)) > 0", name: "notes_body_not_blank")
   @@map("notes")
+}
+
+enum FilePurpose {
+  Cv     = "cv"
+  Answer = "answer"
+}
+
+enum FileStatus {
+  Pending  = "pending"
+  Uploaded = "uploaded"
+}
+
+/// An applicant's upload: the CV, or the answer to a file question. Rows exist before the Application does.
+model File {
+  id              Uuid               @id @default(sql`gen_random_uuid()`)
+  companyId       Uuid               @map("company_id")
+  jobId           Uuid               @map("job_id")
+  /// Set when the form is submitted; NULL while the file is only uploaded.
+  applicationId   Uuid?              @map("application_id")
+  purpose         FilePurpose
+  /// The file question's key; only for `purpose = 'answer'`.
+  fieldKey        Uuid?              @map("field_key")
+  storageKey      String             @unique @map("storage_key")
+  originalName    String             @map("original_name")
+  /// The real type, detected from the file's bytes (not the browser's claim).
+  mimeType        String             @map("mime_type")
+  sizeBytes       BigIntNumber       @map("size_bytes")
+  /// What the browser declared for video and audio; the server doesn't re-measure it.
+  durationSeconds Int?               @map("duration_seconds")
+  status          FileStatus         @default(Pending)
+  uploadedAt      TimestamptzJsDate? @map("uploaded_at")
+  createdAt       TimestamptzJsDate  @default(now()) @map("created_at")
+
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  job         Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  application Application? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@index([companyId])
+  @@index([jobId])
+  @@index([status, createdAt])
+  // One CV per application.
+  @@index([applicationId], where: "(purpose = 'cv')", unique: true, name: "files_one_cv_per_application")
+  @@check(expression: "(purpose = 'answer') = (field_key IS NOT NULL)", name: "files_field_key_matches_purpose")
+  @@check(expression: "size_bytes > 0", name: "files_size_positive")
+  @@check(expression: "duration_seconds IS NULL OR duration_seconds > 0", name: "files_duration_positive")
+  @@map("files")
 }
 
 enum SessionMfa {

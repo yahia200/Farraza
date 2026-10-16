@@ -8,7 +8,7 @@ import {
   type Path,
 } from "react-hook-form";
 import { ArrowRightIcon, CircleCheckIcon } from "lucide-react";
-import type { FieldError, PublicFormField } from "@repo/shared";
+import type { CvMode, FieldError, PublicFormField } from "@repo/shared";
 import type { QuestionnaireItemDefinition } from "@shadcn/react/questionnaire";
 import { submitApplication } from "@/app/actions/applications";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -52,6 +52,8 @@ import {
   type AnswerInput,
   type ApplyValues,
 } from "./apply-values";
+import { AttachmentStep } from "./attachment-step";
+import { CvStep } from "./cv-step";
 import { QuestionStep } from "./question-step";
 import type { PublicJob } from "@/lib/public-jobs";
 import { initials } from "@/components/dashboard/initials";
@@ -88,17 +90,25 @@ const CONTACT_STEPS = [
 type ContactName = (typeof CONTACT_STEPS)[number]["name"];
 const CONTACT_NAMES: readonly string[] = CONTACT_STEPS.map((step) => step.name);
 
-/** A step's name is a contact field or a question key; this is where its value lives in the form. */
+/**
+ * The CV step, first when the job asks for a CV. Named like the API's request property, so a
+ * server error with the path `cvFileId` finds its step.
+ */
+const CV_STEP = "cvFileId";
+
+/** A step's name is the CV, a contact field or a question key; this is where its value lives in the form. */
 const pathFor = (step: string) =>
-  (CONTACT_NAMES.includes(step)
+  (step === CV_STEP || CONTACT_NAMES.includes(step)
     ? step
     : `answers.${step}`) as Path<ApplyValues>;
 
 const hasError = (errors: FieldErrors<ApplyValues>, step: string) =>
   Boolean(
-    CONTACT_NAMES.includes(step)
-      ? errors[step as ContactName]
-      : errors.answers?.[step],
+    step === CV_STEP
+      ? errors.cvFileId
+      : CONTACT_NAMES.includes(step)
+        ? errors[step as ContactName]
+        : errors.answers?.[step],
   );
 
 /** A callback ref defined once, so React calls it only when the element mounts. */
@@ -119,6 +129,7 @@ export function ApplyForm({
   jobSlug,
   jobTitle,
   jobDescription,
+  cvMode,
   fields,
   source,
 }: {
@@ -126,13 +137,15 @@ export function ApplyForm({
   jobSlug: string;
   jobTitle: string;
   jobDescription?: string | null;
+  /** Whether the form asks for a CV: off hides the step, required stops the applicant without one. */
+  cvMode: CvMode;
   fields: PublicFormField[];
   /** utm_source from the link; sent only if it's usable (see the Server Action). */
   source?: string;
 }) {
   // Unique ids even if two apply pages stay mounted (Next keeps recent pages alive).
   const idPrefix = useId();
-  const resolver = useMemo(() => applyResolver(fields), [fields]);
+  const resolver = useMemo(() => applyResolver(fields, cvMode), [fields, cvMode]);
   const form = useForm<ApplyValues>({
     resolver,
     defaultValues: emptyValues(fields),
@@ -141,6 +154,19 @@ export function ApplyForm({
   const [formError, setFormError] = useState<string>();
   const [sent, setSent] = useState(false);
   const [started, setStarted] = useState(false);
+  // The steps (the CV and file questions) whose file is being sent. While any is, the form can't be
+  // left, skipped or submitted. A list rather than a flag, so each upload control only reports its own.
+  const [uploadingSteps, setUploadingSteps] = useState<string[]>([]);
+  const uploading = uploadingSteps.length > 0;
+  function setStepUploading(step: string, busy: boolean) {
+    setUploadingSteps((current) =>
+      busy
+        ? current.includes(step)
+          ? current
+          : [...current, step]
+        : current.filter((name) => name !== step),
+    );
+  }
 
   // Multiple-choice options locked at their question's limit, as a string of ids.
   // Updated in answer() (every change goes through it) rather than by watching all
@@ -154,6 +180,9 @@ export function ApplyForm({
   // agree with what the steps render, including which choices are disabled.
   const steps = useMemo<QuestionnaireItemDefinition[]>(
     () => [
+      ...(cvMode === "off"
+        ? []
+        : [{ name: CV_STEP, required: cvMode === "required" }]),
       ...CONTACT_STEPS.map((step) => ({ name: step.name, required: true })),
       ...fields.map((field) => ({
         name: field.key,
@@ -173,13 +202,16 @@ export function ApplyForm({
               : undefined,
       })),
     ],
-    [fields, lockedOptions],
+    [cvMode, fields, lockedOptions],
   );
   const order = useMemo(() => steps.map((step) => step.name), [steps]);
   const [item, setItem] = useState(order[0]!);
 
   /** Moving forward checks the current step with our rules; moving back is always allowed. */
   async function changeStep(next: string) {
+    if (uploading) {
+      return;
+    }
     if (
       order.indexOf(next) > order.indexOf(item) &&
       !(await form.trigger(pathFor(item)))
@@ -221,6 +253,12 @@ export function ApplyForm({
   /** Puts the server's errors on their steps; anything else is shown by the buttons. */
   function applyServerErrors(errors: FieldError[]) {
     for (const { path, message } of errors) {
+      if (path === CV_STEP) {
+        // The API refused this file id, so the upload no longer counts: the step asks for it again.
+        form.setValue("cvFileId", null);
+      } else if (fields.some((field) => field.key === path && field.type === "file")) {
+        form.setValue(`answers.${path}`, null);
+      }
       if (order.includes(path)) {
         form.setError(pathFor(path), { type: "server", message });
       } else {
@@ -244,6 +282,7 @@ export function ApplyForm({
           name: values.name,
           email: values.email,
           phone: values.phone,
+          cvFileId: cvMode === "off" ? undefined : (values.cvFileId ?? undefined),
           answers: compactAnswers(values.answers),
           website: values.website,
           source,
@@ -350,6 +389,24 @@ export function ApplyForm({
         >
           <QuestionnaireProgress />
 
+          {cvMode !== "off" && (
+            <Controller
+              name="cvFileId"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <CvStep
+                  companySlug={company.slug}
+                  jobSlug={jobSlug}
+                  required={cvMode === "required"}
+                  value={field.value}
+                  error={fieldState.error?.message}
+                  onChange={(fileId) => answer("cvFileId", fileId)}
+                  onBusyChange={(busy) => setStepUploading(CV_STEP, busy)}
+                />
+              )}
+            />
+          )}
+
           {CONTACT_STEPS.map((step) => (
             <Controller
               key={step.name}
@@ -386,14 +443,26 @@ export function ApplyForm({
             />
           ))}
 
-          {fields.map((field) => (
-            <QuestionStep
-              key={field.key}
-              form={form}
-              field={field}
-              onAnswer={answer}
-            />
-          ))}
+          {fields.map((field) =>
+            field.type === "file" ? (
+              <AttachmentStep
+                key={field.key}
+                form={form}
+                field={field}
+                companySlug={company.slug}
+                jobSlug={jobSlug}
+                onAnswer={answer}
+                onBusyChange={(busy) => setStepUploading(field.key, busy)}
+              />
+            ) : (
+              <QuestionStep
+                key={field.key}
+                form={form}
+                field={field}
+                onAnswer={answer}
+              />
+            ),
+          )}
 
           {/* Honeypot. People never see it, so it stays empty; bots that fill in every
           input give themselves away, and the API quietly drops their application.
@@ -433,9 +502,9 @@ export function ApplyForm({
 
           <QuestionnaireActions>
             <QuestionnairePrevious />
-            <QuestionnaireSkip />
-            <QuestionnaireNext />
-            <QuestionnaireSubmit disabled={pending}>
+            <QuestionnaireSkip disabled={uploading} />
+            <QuestionnaireNext disabled={uploading} />
+            <QuestionnaireSubmit disabled={pending || uploading}>
               {pending && <Spinner data-icon="inline-start" />}
               Send application
             </QuestionnaireSubmit>

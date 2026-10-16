@@ -1,12 +1,62 @@
-import type { Answers, FormFields } from '@repo/shared';
+import type { Answers, CvMode, FilePurpose, FormFields } from '@repo/shared';
 
 export interface OpenJob {
   company: { id: string; name: string; slug: string; logoUrl: string | null; brandColor: string | null };
   job: { id: string; title: string; description: string | null };
-  form: { id: string; fields: FormFields };
+  form: { id: string; fields: FormFields; cvMode: CvMode };
   firstStageId: string;
   rejectedStageId: string;
 }
+
+/** A file the applicant uploaded for this submission, to be attached inside the Application's transaction. */
+export interface FileToAttach {
+  id: string;
+  purpose: FilePurpose;
+  /** The file question's key for an `answer`; null for the CV. */
+  fieldKey: string | null;
+  /** The type found in the object's bytes (not the browser's claim); stored on the row when attached. */
+  mimeType: string;
+}
+
+/**
+ * A pending, unattached `files` row of this job that a submit refers to, with what the check at
+ * submit compares the bucket object against.
+ */
+export interface FileToVerify {
+  id: string;
+  purpose: FilePurpose;
+  fieldKey: string | null;
+  storageKey: string;
+  /** The size declared when the upload was created, which the presigned URL pinned. */
+  sizeBytes: number;
+}
+
+/** A `files` row created when an upload starts, before any bytes exist and before the Application does. */
+export interface NewPendingFile {
+  id: string;
+  companyId: string;
+  jobId: string;
+  purpose: FilePurpose;
+  fieldKey?: string | null;
+  storageKey: string;
+  /** The applicant's own name for the file: untrusted, shown to recruiters, never part of the key. */
+  originalName: string;
+  /** What the browser declared; a later check replaces it with the type found in the bytes. */
+  mimeType: string;
+  sizeBytes: number;
+  /** Video and audio only: the length in whole seconds the browser declared; the server does not re-measure it. */
+  durationSeconds?: number | null;
+}
+
+/**
+ * How a submit ended. A `file_conflict` means a referenced file isn't this job's, doesn't match its
+ * question, is already attached or is missing; nothing was saved. It names the first such file, so
+ * the applicant is sent to the right step.
+ */
+export type SubmitResult =
+  | 'created'
+  | 'duplicate'
+  | { status: 'file_conflict'; fileId: string };
 
 export interface NewApplication {
   companyId: string;
@@ -16,6 +66,7 @@ export interface NewApplication {
   status: 'active' | 'rejected';
   candidate: { email: string; name: string; phone: string };
   answers: Answers;
+  files: FileToAttach[];
   source: string | null;
   events: Array<{
     type: 'applied' | 'auto_rejected';

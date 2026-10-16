@@ -1,6 +1,12 @@
 import { toNestErrors } from '@hookform/resolvers';
 import type { FieldError as FormFieldError, FieldErrors, Resolver } from 'react-hook-form';
-import { parseAnswers, submitApplicationSchema, type Answers, type PublicFormField } from '@repo/shared';
+import {
+  parseAnswers,
+  submitApplicationSchema,
+  type Answers,
+  type CvMode,
+  type PublicFormField,
+} from '@repo/shared';
 
 /**
  * The apply form's values and validation. Answers are checked with
@@ -17,6 +23,8 @@ export interface ApplyValues {
   phone: string;
   /** Honeypot: hidden from people, so only bots fill it in (see ApplyForm). */
   website: string;
+  /** The id of the uploaded CV (a `files` row), or null. The file itself never enters the form. */
+  cvFileId: string | null;
   /** Keyed by question key. */
   answers: Record<string, AnswerInput>;
 }
@@ -27,7 +35,7 @@ export function emptyValues(fields: readonly PublicFormField[]): ApplyValues {
     answers[field.key] =
       field.type === 'multi_select' ? [] : field.type === 'short_text' || field.type === 'long_text' ? '' : null;
   }
-  return { name: '', email: '', phone: '', website: '', answers };
+  return { name: '', email: '', phone: '', website: '', cvFileId: null, answers };
 }
 
 /** Leaves out unanswered questions, as the API expects (an optional question is simply absent). */
@@ -59,9 +67,14 @@ const contactSchema =submitApplicationSchema.pick({ name: true, email: true, pho
  * job's questions; `toNestErrors` turns flat paths like "answers.<key>" into
  * RHF's nested error object.
  */
-export function applyResolver(fields: readonly PublicFormField[]): Resolver<ApplyValues> {
+export function applyResolver(fields: readonly PublicFormField[], cvMode: CvMode): Resolver<ApplyValues> {
   return (values, _context, options) => {
     const errors: Record<string, FormFieldError> = {};
+
+    // Same rule as the API's submit. Whether the file is really this job's is the API's call.
+    if (cvMode === 'required' && !values.cvFileId) {
+      errors.cvFileId = { type: 'validation', message: 'Upload your CV to apply.' };
+    }
 
     const contact = contactSchema.safeParse({ name: values.name, email: values.email, phone: values.phone });
     if (!contact.success) {

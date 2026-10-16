@@ -5,8 +5,10 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import {
   createNoteSchema,
+  createUploadSchema,
   moveApplicationSchema,
   submitApplicationSchema,
+  type CreateUploadInput,
   type FieldError,
   type SubmitApplicationInput,
 } from '@repo/shared';
@@ -61,10 +63,58 @@ export async function submitApplication(
       return body.errors?.length ? { fieldErrors: body.errors } : { formError: message };
     case 404:
       return { formError: 'This job just stopped accepting applications.' };
-    case 409: // "You have already applied for this job."
-      return { formError: message };
+    case 409:
+      // "You've already applied for this job", or a CV that couldn't be attached (with `errors`).
+      return body.errors?.length ? { fieldErrors: body.errors } : { formError: message };
     case 429: // ThrottlerGuard: 5 applications per 10 minutes per visitor.
       return { formError: 'Too many attempts. Wait a few minutes and try again.' };
+    default:
+      return { formError: 'Something went wrong. Please try again.' };
+  }
+}
+
+export interface CreateUploadResult {
+  /** Where to PUT the file, and the id to send with the application. Valid for a few minutes. */
+  upload?: { fileId: string; url: string; contentType: string };
+  /** One message the upload control shows as it is. */
+  formError?: string;
+}
+
+/**
+ * Starts an upload for the CV or for a file question's answer (`purpose`), calling
+ * POST /api/public/:companySlug/:jobSlug/uploads
+ * (apps/api/src/applications). The browser can't call the API, so the apply form
+ * asks this action for a presigned URL, then PUTs the file straight to the bucket.
+ * It is an action rather than part of the cached job (lib/public-jobs.ts) because
+ * a presigned URL is bound to one object and must never be shared between visitors.
+ */
+export async function createUpload(
+  companySlug: string,
+  jobSlug: string,
+  input: CreateUploadInput,
+): Promise<CreateUploadResult> {
+  const parsed = createUploadSchema.safeParse(input);
+  if (!parsed.success) {
+    return { formError: parsed.error.issues[0]?.message ?? 'Choose your file again.' };
+  }
+
+  const response = await apiFetch(
+    `/api/public/${encodeURIComponent(companySlug)}/${encodeURIComponent(jobSlug)}/uploads`,
+    { method: 'POST', body: JSON.stringify(parsed.data) },
+  );
+  if (response.ok) {
+    return { upload: (await response.json()) as NonNullable<CreateUploadResult['upload']> };
+  }
+
+  const body = await readApiError(response);
+  const message = Array.isArray(body.message) ? body.message.join(' ') : body.message;
+  switch (response.status) {
+    case 400: // The file broke the job's rules; the message says which.
+      return { formError: body.errors?.[0]?.message ?? message };
+    case 404:
+      return { formError: 'This job just stopped accepting applications.' };
+    case 429: // ThrottlerGuard: 20 uploads per 10 minutes per visitor.
+      return { formError: 'Too many uploads. Wait a few minutes and try again.' };
     default:
       return { formError: 'Something went wrong. Please try again.' };
   }
@@ -75,6 +125,85 @@ export async function submitApplication(
 const applicationPath = (companySlug: string, jobSlug: string, applicationId: string) =>
   `/api/companies/${encodeURIComponent(companySlug)}/jobs/${encodeURIComponent(jobSlug)}` +
   `/applications/${encodeURIComponent(applicationId)}`;
+
+export type FileDownloadResult = ActionFailure<never> & { url?: string };
+
+/**
+ * Asks the API for a short-lived link to one of an application's files and returns it. `route` is
+ * the API's path segment after the file id; `badRequest` is what a 400 means to the person: the
+ * ids are checked by the API (ParseUUIDPipe, then the tenant lookup), and `view` also answers 400
+ * for a type that can't be shown inline.
+ */
+async function mintFileLink(
+  companySlug: string,
+  jobSlug: string,
+  applicationId: string,
+  fileId: string,
+  route: 'download' | 'view',
+  badRequest: string,
+): Promise<FileDownloadResult> {
+  const response = await apiFetch(
+    `${applicationPath(companySlug, jobSlug, applicationId)}/files/${encodeURIComponent(fileId)}/${route}`,
+  );
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (!response.ok) {
+    return failureFromResponse(response, [], {
+      400: () => ({ formError: badRequest }),
+      404: () => ({ formError: 'That file is no longer available. Reload the page.' }),
+    });
+  }
+  const { url } = (await response.json()) as { url: string; expiresInSeconds: number };
+  return { url };
+}
+
+/**
+ * Mints a link that downloads one of an application's files, calling
+ * GET .../applications/:id/files/:fileId/download (apps/api/src/pipeline). Every member
+ * may, interviewers included. The link is valid for a few minutes, so it is minted on each
+ * click and never cached: this is an action rather than part of the cached DAL
+ * (lib/dal.ts), and it revalidates nothing because opening a file changes nothing.
+ * The ids are checked by the API (ParseUUIDPipe, then the tenant lookup).
+ */
+export async function getFileDownloadUrl(
+  companySlug: string,
+  jobSlug: string,
+  applicationId: string,
+  fileId: string,
+): Promise<FileDownloadResult> {
+  return mintFileLink(
+    companySlug,
+    jobSlug,
+    applicationId,
+    fileId,
+    'download',
+    'That file could not be found. Reload the page.',
+  );
+}
+
+/**
+ * Mints a link that shows one of an application's files in place (inline disposition), calling
+ * GET .../applications/:id/files/:fileId/view. Same rules as `getFileDownloadUrl`: every member
+ * may, the link lasts minutes, so it is minted each time the viewer opens and never cached. The
+ * API refuses (400) a file whose type the sheet doesn't render inline (`previewKindOf` in
+ * @repo/shared); the viewer isn't offered for those, so this is the backstop.
+ */
+export async function getFileViewUrl(
+  companySlug: string,
+  jobSlug: string,
+  applicationId: string,
+  fileId: string,
+): Promise<FileDownloadResult> {
+  return mintFileLink(
+    companySlug,
+    jobSlug,
+    applicationId,
+    fileId,
+    'view',
+    "This file can't be previewed. Download it instead.",
+  );
+}
 
 export type AddNoteResult = ActionFailure<'body'> & { ok?: boolean };
 

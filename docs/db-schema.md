@@ -28,6 +28,9 @@ Sections 1–7 describe what is built. Section 8 lists designed tables and const
 | `PublicLabel` | `stages.public_label` | `received`, `in_review`, `interview`, `offer`, `closed` |
 | `ApplicationStatus` | `applications.status` | `active`, `rejected`, `hired`, `withdrawn` |
 | `ApplicationEventType` | `application_events.type` | `applied`, `auto_rejected`, `stage_changed`, `rejected`, `hired`, `withdrawn`, `note_added` |
+| `CvMode` | `form_versions.cv_mode` | `off`, `optional`, `required` |
+| `FilePurpose` | `files.purpose` | `cv`, `answer` |
+| `FileStatus` | `files.status` | `pending`, `uploaded` |
 | `SessionMfa` | `sessions.mfa` | `pending`, `verified` |
 
 No code writes `withdrawn` yet, either as a status or as an event type.
@@ -127,6 +130,7 @@ One row per version of a job's application form. A published version is never ed
 | `job_id` | `jobId` | `uuid` | NOT NULL, FK → `jobs.id` ON DELETE CASCADE |
 | `version` | `version` | `integer` | NOT NULL |
 | `fields` | `fields` | `jsonb` | NOT NULL, DEFAULT `'[]'` (shape in §4.1) |
+| `cv_mode` | `cvMode` | `text` (`CvMode`) | NOT NULL, DEFAULT `'off'` |
 | `published_at` | `publishedAt` | `timestamptz` | NULL (NULL means draft) |
 | `created_by` | `createdById` | `uuid` | NULL, **no FK** |
 | `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
@@ -137,6 +141,7 @@ One row per version of a job's application form. A published version is never ed
 - INDEX (`company_id`)
 - CHECK `form_versions_version_positive`: `version > 0`
 - A new draft gets `version` = latest published version + 1. Immutability after publishing is enforced in the application.
+- `cv_mode` says whether the form asks for a CV (ADR-0002): `off`, `optional` or `required`. The CV is not an entry in `fields` and never appears in `applications.answers`; it is a `files` row with `purpose = 'cv'`. The column defaults to `off`, so versions that existed before it keep asking for no CV. The form builder starts a brand-new job's first draft at `optional` (`DEFAULT_CV_MODE` in `packages/shared/src/cv-mode.ts`), and every save sends the mode explicitly. Because published versions are immutable, changing the mode after publishing creates a new version like any other edit.
 
 ### 3.7 `stages` (model `Stage`)
 Pipeline stages, owned by a job. Created from a default set when the job is created.
@@ -248,6 +253,33 @@ Append-only history of everything that happens to an application. The applicatio
 - CHECK `notes_body_not_blank`: `length(trim(body)) > 0`
 - Adding a note also writes a `note_added` event in the same transaction.
 
+### 3.12 `files` (model `File`)
+An applicant's uploaded files: the CV, and the answers to file questions. A row is created before the upload starts, so it usually exists before the application does. Enums: `FilePurpose`, `FileStatus` (§2).
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK |
+| `company_id` | `companyId` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
+| `job_id` | `jobId` | `uuid` | NOT NULL, FK → `jobs.id` ON DELETE CASCADE |
+| `application_id` | `applicationId` | `uuid` | NULL, FK → `applications.id` ON DELETE CASCADE (set when the form is submitted) |
+| `purpose` | `purpose` | `text` (`FilePurpose`) | NOT NULL |
+| `field_key` | `fieldKey` | `uuid` | NULL (the file question's key) |
+| `storage_key` | `storageKey` | `text` | NOT NULL, UNIQUE |
+| `original_name` | `originalName` | `text` | NOT NULL |
+| `mime_type` | `mimeType` | `text` | NOT NULL (the real type detected from the file's bytes, not the browser's claim. A pending row holds the type the browser declared; the attach at submit overwrites it with the sniffed one, so an `uploaded` row always has the detected type) |
+| `size_bytes` | `sizeBytes` | `bigint` (`int8`, read as a JS `number`) | NOT NULL, CHECK `size_bytes > 0` |
+| `duration_seconds` | `durationSeconds` | `integer` | NULL, CHECK `duration_seconds IS NULL OR duration_seconds > 0` (declared by the browser for video and audio, in whole seconds rounded up, and stored at create-upload after the check against the question's `maxDurationSeconds`; null for documents and images; the server does not re-measure it, the size cap is the hard limit) |
+| `status` | `status` | `text` (`FileStatus`) | NOT NULL, DEFAULT `'pending'` |
+| `uploaded_at` | `uploadedAt` | `timestamptz` | NULL |
+| `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+
+- CHECK `files_field_key_matches_purpose`: `(purpose = 'answer') = (field_key IS NOT NULL)`
+- UNIQUE INDEX `files_one_cv_per_application` (`application_id`) WHERE `purpose = 'cv'`: one CV per application
+- INDEX (`application_id`), INDEX (`company_id`), INDEX (`job_id`), and INDEX (`status`, `created_at`) for cleaning up uploads that were never finished or never attached
+- `size_bytes` uses the contract type `BigIntNumber`, so it is an `int8` column that the ORM reads as a plain `number` (file sizes are far below 2^53). Use `BigInt` instead if a value could ever exceed that.
+- Deleting a row does not delete the object in storage. The application must delete the object as well.
+- Nothing parsing-specific is stored. A later parse table would reference the CV's row.
+
 ## 4. JSONB shapes
 
 The database does not validate these. The application does, using the Zod schemas and parsers in `packages/shared` (`@repo/shared`).
@@ -284,7 +316,7 @@ An array of at most 50 field objects (`formFieldsSchema` in `form-fields.ts`, ch
 | `single_select` | `{ "options": [{ "id": "uuid", "label": "..." }], "rejectOptionIds": ["uuid"] }` | option id (string) |
 | `multi_select` | `{ "options": [...], "maxSelections": 3 }` (`maxSelections` ≥ 1, or `null` for no limit) | array of distinct option ids |
 | `yes_no` | `{ "rejectWhen": false }` (`true`, `false`, or `null` for no knockout) | boolean |
-| `file` | `{ "allowedTypes": ["pdf", "image", "document"], "maxSizeMb": 10 }` (at least one type; 1–25 MB) | file id (uuid string). Only the format is checked until `files` exists (§8). Until then `parseFormFields` refuses file questions and the API won't publish a draft that has one, so no new form can contain them. |
+| `file` (an Attachment) | `{ "kinds": ["document", "image"], "maxSizeMb": 10, "maxDurationSeconds": null }` (`kinds`: at least one of `document`, `image`, `video`, `audio`, none twice; `maxSizeMb`: whole number 1–200; `maxDurationSeconds`: a whole number ≥ 1, required when `video` or `audio` is allowed and null otherwise; `parseFormFields` refuses both mistakes, with the missing one reported on `config.maxDurationSeconds`) | file id (uuid string) of a `files` row uploaded for this question (§7). `document` means PDF and DOCX, `image` means JPEG, PNG and WebP (never SVG) (`FILE_KIND_TYPES` in `packages/shared/src/files.ts`). `video` means MP4, MOV and WebM and `audio` means MP3, M4A, WAV, OGG and WebM audio (ticket 09). Those lists are the types a file is declared and stored as; `matchAllowedType` maps other names onto them (`audio/x-m4a`, `audio/x-wav`, `audio/mp3`, parameters such as `audio/ogg; codecs=opus`) and lets `video/mp4` and `video/webm` stand for `audio/mp4` and `audio/webm` where a question allows audio but not video, because those containers cannot say whether they carry pictures. The previous config (`allowedTypes`, 1–25 MB) was replaced; no stored form ever contained a file question. |
 
 Rules across properties:
 
@@ -328,11 +360,11 @@ A knocked-out application is created directly in the Rejected stage with `status
 
 These are the relations declared in `contract.prisma`. Columns marked "no FK" above are not relations.
 
-- A `company` has many `memberships`, `jobs`, `stages`, `form_versions`, `candidates`, and `applications`.
+- A `company` has many `memberships`, `jobs`, `stages`, `form_versions`, `candidates`, `applications`, and `files`.
 - A `user` has many `memberships` and `sessions`, and is referenced by `jobs.created_by` and `notes.author_id`.
-- A `job` has many `form_versions`, `stages`, and `applications`.
+- A `job` has many `form_versions`, `stages`, `applications`, and `files`.
 - A `candidate` has many `applications`.
-- An `application` belongs to one `job`, one `candidate`, one `form_version`, and one `stage`, and has many `application_events` and `notes`.
+- An `application` belongs to one `job`, one `candidate`, one `form_version`, and one `stage`, and has many `application_events`, `notes`, and `files`.
 
 ## 6. Changing the schema
 
@@ -354,6 +386,10 @@ The database cannot check these, so the services must:
 - `applications.stage_id` belongs to the same job as the application. A move is rejected unless the target is one of the job's stages.
 - `applications.form_version_id` is the job's latest published version at submit time, and `applications.answers` is valid against its fields.
 - A published `form_versions` row is never modified. Draft updates and publishing are conditional on `published_at IS NULL`.
+- `form_versions.cv_mode` is saved together with `fields`, and publishing keeps it. A published version's `cv_mode` is never changed.
+- A `files` row is attached to an application (and becomes `uploaded`) only if it belongs to the same job, matches the purpose and field key, is still unattached and `pending`, and is attached in the same transaction that creates the application. A CV id is accepted only when the form version's `cv_mode` is not `off`, and is required when it is `required`. `file` answers in `applications.answers` must reference such a row. (`ApplicationsRepository.submit` does the conditional attach inside its transaction for the CV and for every file answer: a `file` answer is attached with `purpose = 'answer'` and `field_key` = the question's key, so a file uploaded for another question, another job, or as the CV cannot be used. A refused attach fails the submit with a 409 whose `errors` point at the file's step: `cvFileId` for the CV, the question key for an Attachment. Create-upload checks the declared type and size against the question's `config`; the submit-time check (below) allows only the bytes of the question's kinds.)
+- Before the transaction, each referenced file is checked against the bucket (§9, "Submit-time check"): the object must exist, have exactly `size_bytes`, and its leading bytes must be an allowed format. A file that fails is deleted from the bucket and its row removed, and the submit fails with a 400 whose `errors` point at the question (`cvFileId` for the CV). Duplicate-application and validation failures happen before or after this step without touching files, so those files stay `pending` and a retry with the same ids works. The attach then stores the sniffed type in `mime_type`.
+- Creating an upload (`POST /api/public/:company/:job/uploads`) is allowed only for an open job, and validates the declared name, type and size against the published form version (for the CV: PDF or DOCX, up to 5 MB, and `cv_mode` not `off`; for an answer: the file question named by `fieldKey` must be on that version, and the type must be one of its `kinds` and the size within its `maxSizeMb`) before any row or URL exists.
 - A job can be opened only if it has a published form version. Opening and closing are conditional on the current `status`.
 - On every stage move, `applications.status` follows the target stage's kind (`normal` → `active`, `hired` → `hired`, `rejected` → `rejected`). It is updated in the same transaction as `stage_id`, together with an `application_events` row. The update is conditional on the application still being in its source stage, so concurrent moves get a 409 instead of overwriting each other.
 - Every state change writes its `application_events` row in the same transaction. Events are never updated or deleted.
@@ -391,32 +427,6 @@ It also adds `candidates.account_id uuid NULL` (FK → `candidate_accounts.id` O
 | `used_at` | `timestamptz` | NULL |
 | `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
 
-**`files`**: uploaded CVs and file-type answers. Rows are created before the upload starts, often before the application exists. New enums: `FilePurpose` (`cv`, `answer`) and `FileStatus` (`pending`, `uploaded`).
-
-| Column | Type | Constraints |
-|---|---|---|
-| `id` | `uuid` | PK |
-| `company_id` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
-| `job_id` | `uuid` | NOT NULL, FK → `jobs.id` ON DELETE CASCADE |
-| `application_id` | `uuid` | NULL, FK → `applications.id` ON DELETE CASCADE (set when the form is submitted) |
-| `purpose` | `text` (`FilePurpose`) | NOT NULL |
-| `field_key` | `uuid` | NULL |
-| `storage_key` | `text` | NOT NULL, UNIQUE |
-| `original_name` | `text` | NOT NULL |
-| `mime_type` | `text` | NOT NULL |
-| `size_bytes` | `bigint` | NOT NULL, CHECK `size_bytes > 0` |
-| `status` | `text` (`FileStatus`) | NOT NULL, DEFAULT `'pending'` |
-| `uploaded_at` | `timestamptz` | NULL |
-| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
-
-Constraints and notes for `files`:
-
-- CHECK `(purpose = 'answer') = (field_key IS NOT NULL)`
-- UNIQUE (`application_id`) WHERE `purpose = 'cv'`: one CV per application
-- INDEX (`application_id`), and INDEX (`status`, `created_at`) for cleaning up uploads that never finished or were never attached
-- `file` answers in `applications.answers` would then have to reference an `uploaded` row for the same job and field.
-- Deleting a row does not delete the object in storage. The application must delete the object as well.
-
 **`scores`**: a reviewer's rating of an application overall, or of one answer. Adds `score_added` (`{ "scoreId": "uuid", "value": 4 }`) to `ApplicationEventType`.
 
 | Column | Type | Constraints |
@@ -443,5 +453,24 @@ Constraints and notes for `files`:
 
 - **Invitations** (inviting teammates by email): add with the team feature. For now, members are added directly by email.
 - **Emails sent to candidates:** adds `email_sent` (`{ "template": "application_received" }`) to `ApplicationEventType`, and uses `applications.rejection_notified_at`.
-- **Structured experience, timed questions, and video fields:** new field types in `form_versions.fields`. Video will also need transcoding columns on `files`.
+- **Structured experience and timed questions:** new field types in `form_versions.fields`.
+- **Server-side video processing:** video and audio Attachments already exist (§3.12, §9). What is not built is anything the server does to the media itself (transcoding, thumbnails), which would need extra columns on `files`.
 - **Billing and plans.**
+
+## 9. Object storage for applicant files
+
+Applicant files live in an S3-compatible bucket (RustFS locally; the provider is a deploy-time choice through `S3_*` settings). The `files` table (§3.12) is the index.
+
+- **Object keys** are `companies/<companyId>/jobs/<jobId>/files/<fileId>` (`buildObjectKey` in `apps/api/src/storage/storage.ts`). The applicant's file name is untrusted and lives only in `files.original_name`; it never appears in a key.
+- **Upload flow.** The browser never calls the API. The web app's Server Action `createUpload` asks the API for a pending `files` row and a presigned PUT URL; the browser then PUTs the bytes straight to the bucket. Presigned URLs are minted one per chosen file and are never part of the cached public job.
+- **The presigned PUT signs `content-type` and `content-length`** (`StorageService.createUpload`). The AWS presigner never signs `content-type` on its own, so it is added through `signableHeaders`; `content-length` is signed because `ContentLength` is set. The S3 client is created with `requestChecksumCalculation: 'WHEN_REQUIRED'`, because the default puts a CRC32 of an empty body into the URL's query string.
+- **Finding: RustFS enforces the signed length and type.** Checked against `rustfs/rustfs:latest` (2026-10-16) with a scratch key: with the URL signed for 10 bytes of `application/pdf`, a PUT of exactly that succeeds (HEAD shows 10 bytes, `application/pdf`); a PUT of 20 bytes, of 5 bytes, or with `Content-Type: text/html` is refused with 403 `SignatureDoesNotMatch` and creates no object. This is the bucket checking the signature, so any S3-compatible provider that verifies SigV4 signed headers should do the same, but AWS S3 and R2 have not been tested here. The submit-time check below stays the backstop for providers or situations where that is not enforced (a truncated or swapped object, a different provider).
+- **Submit-time check.** `ApplicationsService.submit` verifies each referenced file before the Application transaction, with three `StorageService` calls using the API's own credentials: `headObject` (`HeadObject`: the object exists and `ContentLength` equals `files.size_bytes`), `readLeadingBytes` (`GetObject` with `Range: bytes=0-65535`) and `deleteObject` (`DeleteObject`). The bytes go to `sniffFileType` (`apps/api/src/storage/file-sniff.ts`), which calls `fileTypeFromBuffer` from `file-type` and returns the detected MIME type. A CV must be `application/pdf` or the DOCX type, and an Attachment must be one of its question's kinds (`allowedContentTypes(config.kinds)`; the sniffed type goes through `matchAllowedType`, and the allowed type it stands for is what is stored); anything else (a renamed program, a plain zip, text, an SVG) is refused. 64 KiB (`SNIFF_BYTES`) is read because `file-type` calls a zip a DOCX only when `[Content_Types].xml`, normally the first entry, lies wholly inside the bytes it is given; cut inside that entry it answers `application/zip`. **Video and audio (ticket 09), checked against `file-type` 22.2.0 with hand-built fixtures (`apps/api/src/storage/media-sniff.spec.ts`):** an MP4 (brand `isom`) is `video/mp4`; a MOV is `video/quicktime` (brand `qt  `, or a file starting with `moov`, `free`, `wide` or `mdat`); any WebM is `video/webm` whether it has a video track or only audio (it reads the EBML DocType, not the tracks); an MP3 is `audio/mpeg` with or without an ID3 tag; an M4A (brand `M4A `) is `audio/x-m4a`, but an audio-only MP4 with brand `mp42` or `isom` is `video/mp4`; a WAV is `audio/wav`; Ogg Vorbis is `audio/ogg` and Ogg Opus is `audio/ogg; codecs=opus`. An Ogg whose codec it cannot tell is `application/ogg` and Ogg Theora is `video/ogg`; both are refused. All of these are decided from the first bytes (the `ftyp` box, the EBML header, the RIFF header and the Ogg page are at the start), so the 64 KiB read copes with a 200 MB MP4 or MOV; an MP3 whose ID3 tag (cover art) is longer than the read is still called `audio/mpeg`, because `file-type` answers MP3 when the declared tag runs past the bytes it has. The consequence for the allowlist is that a WebM or MP4 sniffed as `video/*` must be accepted for an audio question (see `matchAllowedType`). `file-type` is a best-effort signature check, not a validator: a file with a valid PDF header can still be malformed. A refused file's object is deleted first, then its row (conditional on `pending` and unattached); if the bucket cannot delete, the row stays `pending` so a cleanup job can find the object, and the failure is logged.
+- **CORS.** The browser's PUT is cross-origin, so the bucket needs rules. Locally they are `docker/rustfs-cors.json`, applied by the `createbuckets` service (`aws s3api put-bucket-cors`; RustFS supports it, verified with a preflight from an allowed and a disallowed origin). To apply them to an existing local setup run `docker compose up createbuckets`. The rules allow `PUT`, `GET`, `HEAD`, any request header, and the web app's origins (`https://localhost:3000`, `http://localhost:3000`); add another origin (for example a LAN address) to that file. Production needs the same rules on its bucket, with the production web origin and no wildcard: on S3 or R2, set the bucket's CORS configuration to `[{"AllowedOrigins":["https://<web-origin>"],"AllowedMethods":["PUT","GET","HEAD"],"AllowedHeaders":["*"],"ExposeHeaders":["ETag"],"MaxAgeSeconds":3000}]`.
+- **Recruiter downloads.** Members (interviewers included) list an Application's files with `GET /api/companies/:c/jobs/:j/applications/:id/files` (metadata only) and get a presigned GET for one with `.../files/:fileId/download`, which answers `{ url, expiresInSeconds }`. Only `uploaded` files of that company, job and Application are found; anything else is 404. The URL is `GetObjectCommand` with `ResponseContentDisposition` (`attachmentDisposition` in `apps/api/src/storage/storage.ts`), so the bucket answers `Content-Disposition: attachment; filename="<ASCII fallback>"; filename*=UTF-8''<percent-encoded original name>` (RFC 6266 section 4.3, RFC 8187 section 3.2.1); the override is part of the signed query string. The TTL is `DOWNLOAD_URL_TTL_SECONDS` (300). Opening a file writes no `application_events` row. Checked against a live RustFS (2026-10-16): the disposition and content-type overrides are both honoured, with a `Content-Disposition` and, for the view link, a `Content-Type` that differ from what the object was stored with; S3 and R2 are not tested here.
+- **Inline viewing** (ticket 06). `.../files/:fileId/view` answers the same `{ url, expiresInSeconds }` with a presigned GET whose `ResponseContentDisposition` is `inline; filename=...` (`inlineDisposition`) and whose `ResponseContentType` is pinned to the file's stored `mime_type` (`StorageService.createViewUrl`), so the bucket serves the type we recorded whatever the object's own metadata says (RustFS does not add `X-Content-Type-Options: nosniff`, so the forced type is what keeps a hostile object from being sniffed into a page). The API issues it only for types in `previewKindOf` (`packages/shared/src/file-preview.ts`: PDF, DOCX, the image types JPEG, PNG and WebP, video and audio; the sheet plays video and audio in the browser's own `<video controls>` and `<audio controls>` on this link, which the bucket serves with range support); any other type is 400, so an inline link for `text/html` or SVG cannot exist. The browser uses it four ways: a PDF in an `<iframe src>` (the browser's own viewer, on the bucket's origin), an image in an `<img src>` (ticket 08; no CORS is needed for an image element, and an image can't run script even from a file that lied about its type), a video or audio file in a native `<video>` or `<audio>` element (ticket 09; same reasoning as the image: no script runs from a media element), and a DOCX read with `fetch` from the web app's origin, which is why the CORS rules above must list `GET`. DOCX bytes are rendered in the browser (`docx-preview`, see `.claude/rules/web.md`) and never sent to a third party.
+- **Known debt** (out of scope for the file-uploads work; tracked here so it is not forgotten):
+  - **Orphaned pending uploads.** A pending `files` row and its object are never deleted when the applicant removes or replaces a file, retries an upload, abandons the form, or never submits. Only a file that fails the submit-time check is cleaned up. The `(status, created_at)` index is there for a future job that deletes pending rows (and their objects) older than some age.
+  - **No bucket lifecycle rules.** Nothing expires objects by age, and nothing aborts incomplete multipart uploads. A bucket lifecycle rule (for example expire objects under `companies/` that have no row) needs per-provider setup and is not configured locally or documented for production.
+  - **No retention policy.** Files of rejected or old Applications are kept forever, with their Application. There is no rule for when to delete them, no deletion on request, and deleting a `files` row does not delete its object (§3.12).
+  - **Storage provider and egress.** The provider is a deploy-time choice made through the `S3_*` settings and needs no code change (`S3_FORCE_PATH_STYLE` covers path-style endpoints). Recruiters read files through presigned GETs straight from the bucket, so every preview and download is bucket egress, and video makes that the main cost: a 100 MB video watched or downloaded five times is 500 MB out. AWS S3 charges per GB of egress and has the widest feature set; an S3-compatible provider with free egress, such as Cloudflare R2, charges for storage and operations only, which suits media-heavy hiring. The trade-off is compatibility: the signed-header enforcement, the CORS rules and the response-header overrides recorded here were checked against RustFS only, so re-run them against the chosen provider (§9 findings) before relying on them. The size cap (1–200 MB per question) and the 5 MB CV limit bound the worst case per file either way.

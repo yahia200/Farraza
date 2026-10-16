@@ -24,6 +24,14 @@ _Avoid_: Applicant, lead, contact
 One Candidate's submission to one Job — the answers to that job's form at the moment they applied. A Candidate has at most one Application per Job. The UI labels a job's list of Applications "Candidates", but each row is an Application.
 _Avoid_: Submission, entry, candidate (a Candidate is the person; an Application is their submission to a job)
 
+**CV**:
+The document an applicant submits with an Application through the form's dedicated CV slot. An Application has at most one CV, and a job's form decides whether it is off, optional, or required.
+_Avoid_: Resume
+
+**Attachment**:
+A file an applicant uploads to answer a file question on the form. It belongs to that question and is distinct from the CV.
+_Avoid_: Upload, document
+
 ## Pipeline
 
 **Pipeline**:

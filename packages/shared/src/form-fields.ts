@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { FILE_KINDS, MAX_FILE_SIZE_MB, MIN_FILE_SIZE_MB, kindsNeedDuration } from './files.js';
 
 export const MAX_FIELDS = 50;
 
@@ -8,9 +9,6 @@ export const MAX_FIELDS = 50;
  * or a stale page rather than something to fix by typing.
  */
 const RELOAD = 'Something went wrong with this form. Reload the page and try again.';
-
-/** Shown for file questions until uploads exist (also used by the API when publishing). */
-export const FILE_UNSUPPORTED = "File upload questions aren't supported yet. Delete this question.";
 
 /** A whole number from `min` to `max`, with one message for every way it can fail. */
 function wholeNumber(min: number, max: number, error: string) {
@@ -99,10 +97,21 @@ const file = z.object({
   ...base,
   type: z.literal('file'),
   config: z.object({
-    allowedTypes: z
-      .array(z.enum(['pdf', 'image', 'document'], { error: RELOAD }))
-      .min(1, { error: 'Choose at least one file type.' }),
-    maxSizeMb: wholeNumber(1, 25, 'Set a file size limit from 1 to 25 MB.'),
+    /** What the question accepts; at least one, none twice (see below). */
+    kinds: z
+      .array(z.enum(FILE_KINDS, { error: RELOAD }), { error: RELOAD })
+      .min(1, { error: 'Choose at least one kind of file.' }),
+    maxSizeMb: wholeNumber(
+      MIN_FILE_SIZE_MB,
+      MAX_FILE_SIZE_MB,
+      `Set a file size limit from ${MIN_FILE_SIZE_MB} to ${MAX_FILE_SIZE_MB} MB.`,
+    ),
+    /** Longest video or audio in whole seconds: set when either is allowed, null otherwise (see below). */
+    maxDurationSeconds: z
+      .number({ error: 'Set a length limit in whole seconds.' })
+      .int({ error: 'Set a length limit in whole seconds.' })
+      .min(1, { error: 'Set a length limit of at least 1 second.' })
+      .nullable(),
   }),
 });
 
@@ -130,10 +139,27 @@ export const formFieldsSchema = z
       }
       keys.add(field.key);
 
-      // The schema can describe file questions, but there is no upload endpoint
-      // yet, so a form with one could never be completed by an applicant.
       if (field.type === 'file') {
-        ctx.addIssue({ code: 'custom', message: FILE_UNSUPPORTED, path: [index, 'type'] });
+        const { kinds, maxDurationSeconds } = field.config;
+        if (new Set(kinds).size !== kinds.length) {
+          ctx.addIssue({ code: 'custom', message: RELOAD, path: [index, 'config', 'kinds'] });
+        }
+        // The length limit is required when video or audio is allowed and null otherwise (spec).
+        if (kindsNeedDuration(kinds)) {
+          if (maxDurationSeconds === null) {
+            ctx.addIssue({
+              code: 'custom',
+              message: 'Set a length limit for video and audio files.',
+              path: [index, 'config', 'maxDurationSeconds'],
+            });
+          }
+        } else if (maxDurationSeconds !== null) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'A length limit only applies to video and audio.',
+            path: [index, 'config', 'maxDurationSeconds'],
+          });
+        }
         return;
       }
 

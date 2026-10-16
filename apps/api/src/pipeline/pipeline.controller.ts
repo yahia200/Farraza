@@ -27,6 +27,37 @@ export class PipelineController {
     return this.pipeline.detail(membership, jobSlug, applicationId);
   }
 
+  @Get(':applicationId/files')
+  files(
+    @CurrentMembership() membership: Membership,
+    @Param('jobSlug') jobSlug: string,
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+  ) {
+    return this.pipeline.listFiles(membership, jobSlug, applicationId);
+  }
+
+  /** A fresh link every call (never cached): `{ url, expiresInSeconds }`. */
+  @Get(':applicationId/files/:fileId/download')
+  downloadFile(
+    @CurrentMembership() membership: Membership,
+    @Param('jobSlug') jobSlug: string,
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+    @Param('fileId', ParseUUIDPipe) fileId: string,
+  ) {
+    return this.pipeline.downloadLink(membership, jobSlug, applicationId, fileId);
+  }
+
+  /** Like `download`, but an inline link for the candidate sheet's viewer; 400 for types it doesn't render. */
+  @Get(':applicationId/files/:fileId/view')
+  viewFile(
+    @CurrentMembership() membership: Membership,
+    @Param('jobSlug') jobSlug: string,
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+    @Param('fileId', ParseUUIDPipe) fileId: string,
+  ) {
+    return this.pipeline.viewLink(membership, jobSlug, applicationId, fileId);
+  }
+
   @Post(':applicationId/move')
   @HttpCode(200)
   move(

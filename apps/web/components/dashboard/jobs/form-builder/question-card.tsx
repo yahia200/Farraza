@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Controller, useWatch, type Path, type UseFormReturn } from 'react-hook-form';
 import { ArrowDownIcon, ArrowUpIcon, ChevronRightIcon, Trash2Icon } from 'lucide-react';
-import type { FormField, FormFields } from '@repo/shared';
+import type { CvMode, FormField, FormFields } from '@repo/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -12,10 +12,11 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { errorAt, FIELD_TYPES, typeLabel } from './field-types';
+import { errorAt, FIELD_TYPES } from './field-types';
+import { FileConfigEditor } from './file-config-editor';
 import { OptionsEditor } from './options-editor';
 
-export type BuilderValues = { fields: FormFields };
+export type BuilderValues = { fields: FormFields; cvMode: CvMode };
 type Form = UseFormReturn<BuilderValues>;
 
 /**
@@ -73,7 +74,7 @@ export function QuestionCard({
   if (hasError && !open) {
     setOpen(true);
   }
-  const TypeIcon = field.type === 'file' ? null : FIELD_TYPES[field.type].icon;
+  const TypeIcon = FIELD_TYPES[field.type].icon;
   const autoRejects =
     (field.type === 'single_select' && field.config.rejectOptionIds.length > 0) ||
     (field.type === 'yes_no' && field.config.rejectWhen !== null);
@@ -92,9 +93,9 @@ export function QuestionCard({
           className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm"
         >
           <ChevronRightIcon className={cn('size-4 shrink-0 transition-transform', open && 'rotate-90')} />
-          {TypeIcon && <TypeIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />}
+          <TypeIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
           <span className="truncate font-medium">{field.label || <span className="text-muted-foreground">Untitled question</span>}</span>
-          <span className="sr-only">({typeLabel(field.type)})</span>
+          <span className="sr-only">({FIELD_TYPES[field.type].label})</span>
           {field.required && <Badge variant="secondary">Required</Badge>}
           {autoRejects && <Badge variant="outline">Auto-reject</Badge>}
         </CollapsibleTrigger>
@@ -118,8 +119,6 @@ export function QuestionCard({
       <CollapsibleContent className="h-(--collapsible-panel-height) overflow-hidden transition-[height] duration-200 ease-out data-starting-style:h-0 data-ending-style:h-0 motion-reduce:transition-none">
         <div className="border-t p-4">
           <FieldGroup>
-            {/* A question-level problem with no input of its own (file questions, FILE_UNSUPPORTED). */}
-            {errorAt(errors, `fields.${index}.type`) && <FieldError>{errorAt(errors, `fields.${index}.type`)}</FieldError>}
             <Controller
               name={`fields.${index}.label`}
               control={form.control}
@@ -259,6 +258,20 @@ export function QuestionCard({
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
                 )}
+              />
+            )}
+
+            {field.type === 'file' && (
+              <FileConfigEditor
+                form={form}
+                index={index}
+                idPrefix={idPrefix}
+                kinds={field.config.kinds}
+                maxSizeMb={field.config.maxSizeMb}
+                maxDurationSeconds={field.config.maxDurationSeconds}
+                kindsError={errorAt(errors, `fields.${index}.config.kinds`)}
+                readOnly={readOnly}
+                disabled={disabled}
               />
             )}
 

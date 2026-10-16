@@ -1,8 +1,38 @@
 import { Injectable } from '@nestjs/common';
-import type { FormFields } from '@repo/shared';
+import type { FilePurpose, FormFields } from '@repo/shared';
 import { isUniqueViolation } from '../common/db-errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { NewApplication, OpenJob } from './application.js';
+import type {
+  FileToVerify,
+  NewApplication,
+  NewPendingFile,
+  OpenJob,
+  SubmitResult,
+} from './application.js';
+
+/** Thrown inside the submit transaction to roll it back when a file can't be attached. */
+class FileConflict extends Error {
+  constructor(readonly fileId: string) {
+    super(`File ${fileId} could not be attached`);
+  }
+}
+
+/** Maps a `files` row to the plain type the service works with (api.md, "Repository"). */
+function toFileToVerify(row: {
+  id: string;
+  purpose: FilePurpose;
+  fieldKey: string | null;
+  storageKey: string;
+  sizeBytes: number;
+}): FileToVerify {
+  return {
+    id: row.id,
+    purpose: row.purpose,
+    fieldKey: row.fieldKey,
+    storageKey: row.storageKey,
+    sizeBytes: row.sizeBytes,
+  };
+}
 
 @Injectable()
 export class ApplicationsRepository {
@@ -52,14 +82,65 @@ export class ApplicationsRepository {
         brandColor: company.brandColor,
       },
       job: { id: job.id, title: job.title, description: job.description },
-      form: { id: form.id, fields: form.fields as FormFields },
+      form: { id: form.id, fields: form.fields as FormFields, cvMode: form.cvMode },
       firstStageId: first.id,
       rejectedStageId: rejected.id,
     };
   }
 
-  /** Returns 'duplicate' if this person already applied to this job. */
-  async submit(input: NewApplication): Promise<'created' | 'duplicate'> {
+  private get files() {
+    return this.prisma.db.orm.public.File;
+  }
+
+  /** Records an upload that has been started: pending, and attached to no Application yet. */
+  async createPendingFile(input: NewPendingFile): Promise<void> {
+    await this.files.create({
+      ...input,
+      fieldKey: input.fieldKey ?? null,
+      durationSeconds: input.durationSeconds ?? null,
+    });
+  }
+
+  /**
+   * The rows among `ids` that a submit to this job may still use: this company's and job's, pending
+   * and unattached (the same conditions the attach update demands). Others are simply absent, so a
+   * missing, foreign, or already-attached id looks identical to the caller.
+   */
+  async findFilesToVerify(
+    companyId: string,
+    jobId: string,
+    ids: string[],
+  ): Promise<FileToVerify[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.files
+      .where({ companyId, jobId, status: 'pending' })
+      .where((f) => f.applicationId.isNull())
+      .where((f) => f.id.in(ids))
+      .all();
+    return rows.map(toFileToVerify);
+  }
+
+  /**
+   * Removes a file row that failed its check. Conditional like every write here: only if it is still
+   * pending and unattached, so a concurrent submit that attached it first is never undone.
+   */
+  async deletePendingFile(
+    companyId: string,
+    jobId: string,
+    id: string,
+  ): Promise<void> {
+    await this.files
+      .where({ id, companyId, jobId, status: 'pending' })
+      .where((f) => f.applicationId.isNull())
+      .deleteAndCount();
+  }
+
+  /**
+   * Creates the Application and attaches its files in one transaction. Returns 'duplicate' if this
+   * person already applied to this job, and a `file_conflict` (naming the file) if a file can't be
+   * attached. Nothing is saved in either case, so the files stay pending and can be sent again.
+   */
+  async submit(input: NewApplication): Promise<SubmitResult> {
     try {
       await this.prisma.db.transaction(async (tx) => {
         const candidate = await tx.orm.public.Candidate.upsert({
@@ -89,9 +170,36 @@ export class ApplicationsRepository {
             ...event,
           })),
         );
+
+        const attachedAt = new Date();
+        for (const file of input.files) {
+          // Conditional update (api.md, "Concurrency"): the file must be this company's and job's,
+          // match the purpose and question, be unattached and still pending. Anything else updates
+          // no row, and throwing rolls the whole submit back.
+          const attached = await tx.orm.public.File.where({
+            id: file.id,
+            companyId: input.companyId,
+            jobId: input.jobId,
+            purpose: file.purpose,
+            status: 'pending',
+          })
+            .where((f) => f.applicationId.isNull())
+            .where((f) => (file.fieldKey === null ? f.fieldKey.isNull() : f.fieldKey.eq(file.fieldKey)))
+            // The type is the one found in the bytes at the check, replacing the declared one.
+            .update({
+              applicationId: application.id,
+              status: 'uploaded',
+              uploadedAt: attachedAt,
+              mimeType: file.mimeType,
+            });
+          if (!attached) throw new FileConflict(file.id);
+        }
       });
       return 'created';
     } catch (error) {
+      if (error instanceof FileConflict) {
+        return { status: 'file_conflict', fileId: error.fileId };
+      }
       if (isUniqueViolation(error)) {
         return 'duplicate';
       }

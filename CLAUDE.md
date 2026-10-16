@@ -44,7 +44,11 @@ Use the local docs first: they match the installed version. Paths are relative t
 | ESLint | 9.39.5 | — | https://eslint.org |
 | Tailwind CSS | 4.3.3 | — | https://tailwindcss.com/docs |
 | Base UI (`@base-ui/react`) | 1.8.0 | `apps/web/node_modules/@base-ui/react/docs/` | https://base-ui.com |
+| docx-preview | 0.4.1 | `apps/web/node_modules/docx-preview/README.md` (API and options), `dist/docx-preview.d.ts`, readable source `dist/docx-preview.mjs` | https://github.com/VolodymyrBaydalka/docxjs |
 | shadcn | 4.21.3 | `apps/web/node_modules/shadcn/README.md` | https://ui.shadcn.com/docs |
+| `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner` | 3.1151.0 / 3.1151.0 | `apps/api/node_modules/@aws-sdk/client-s3/README.md` and `dist-types/` (commands in `dist-types/commands/`, request shapes in `dist-types/models/models_0.d.ts`); `apps/api/node_modules/@aws-sdk/s3-request-presigner/README.md` and `dist-types/index.d.ts` | https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/ |
+| `file-type` | 22.2.0 | `apps/api/node_modules/file-type/readme.md`, `apps/api/node_modules/file-type/source/index.d.ts` | https://github.com/sindresorhus/file-type |
+| `browser-image-compression` | 2.0.2 | `apps/web/node_modules/browser-image-compression/README.md`, `apps/web/node_modules/browser-image-compression/dist/browser-image-compression.d.ts` | https://github.com/Donaldcwl/browser-image-compression#readme |
 
 Prisma 8 differs most from older knowledge: there is no `PrismaClient`, no `prisma generate`, and no `schema.prisma`. See the "Database" section below.
 
@@ -53,7 +57,7 @@ Prisma 8 differs most from older knowledge: there is no `PrismaClient`, no `pris
 Run from the repo root unless noted. Node >= 24, pnpm 11.
 
 ```bash
-docker compose up -d                 # Postgres 17 on :5432 (user/pass/db: hiring)
+docker compose up -d                 # Postgres 17 on :5432 (user/pass/db: hiring) + RustFS S3 on :9000 with the dev bucket and its CORS rules (docker/rustfs-cors.json); re-apply CORS with `docker compose up createbuckets`
 pnpm dev                             # all apps (builds @repo/shared first via ^build)
 pnpm --filter api dev                # API only, watch mode
 pnpm --filter web dev                # web only, http://localhost:3000
@@ -65,17 +69,16 @@ pnpm format                          # prettier over the whole repo
 
 The API imports `@repo/shared` from its built `dist/`. After changing `packages/shared`, rebuild it (`pnpm --filter @repo/shared build`) or keep `pnpm dev` running, which watches it.
 
-Tests use Vitest. API unit tests match `**/*.spec.ts` and e2e tests match `**/*.e2e-spec.ts`. Shared tests match `*.test.ts`.
+Tests use Vitest. API tests match `**/*.spec.ts` and sit next to the code they cover. Shared tests match `*.test.ts`.
 
 ```bash
 pnpm --filter @repo/shared test
 pnpm --filter @repo/shared exec vitest run src/answers.test.ts        # single file
 pnpm --filter api test
 pnpm --filter api exec vitest run src/path/to/file.spec.ts -t "name"  # single test
-pnpm --filter api test:e2e
 ```
 
-The only existing API specs (`src/app.controller.spec.ts`, `test/app.e2e-spec.ts`) are leftover Nest scaffolding: they import an `AppController` that no longer exists, so `pnpm --filter api test` currently fails. `packages/shared` has the real test suite.
+API specs test a service through its public methods, with the real service and real authorization policies wired to a hand-written in-memory fake of the repository (`src/jobs/jobs.service.spec.ts` is the pattern to copy). They need no database: `vitest.config.ts` sets a dummy `DATABASE_URL` so importing a service doesn't build a client against the real one. There are no API e2e tests. `packages/shared` has the pure-logic test suite.
 
 Linting: the API uses **oxlint** (`apps/api/oxlint.json`) and the web app uses ESLint. API Prettier config: single quotes, trailing commas.
 

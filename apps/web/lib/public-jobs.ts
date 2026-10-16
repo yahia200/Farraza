@@ -1,6 +1,6 @@
 import 'server-only';
 import { cacheLife, cacheTag, updateTag } from 'next/cache';
-import type { PublicFormField } from '@repo/shared';
+import type { CvMode, PublicFormField } from '@repo/shared';
 import { apiUrl } from './api';
 
 /**
@@ -18,6 +18,12 @@ import { apiUrl } from './api';
 export interface PublicJob {
   company: { name: string; slug: string; logoUrl: string | null; brandColor: string | null };
   job: { title: string; description: string | null };
+  /**
+   * Whether the form asks for a CV (the apply form's first step unless `off`). No upload URLs
+   * here: this payload is shared by every visitor; `createUpload` (app/actions/applications.ts)
+   * mints one per chosen file.
+   */
+  cvMode: CvMode;
   /** Knockout rules already removed by the API (toPublicFields). */
   fields: PublicFormField[];
 }

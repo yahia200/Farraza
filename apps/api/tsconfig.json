@@ -10,5 +10,5 @@
       "node"
     ]
   },
-  "include": ["src/**/*", "test/**/*"]
+  "include": ["src/**/*"]
 }

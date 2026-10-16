@@ -99,6 +99,50 @@ describe('parseAnswers', () => {
   });
 });
 
+describe('file questions (Attachments)', () => {
+  const SAMPLE = '5e0d7c3a-2b1f-4a69-8c7d-6e5f4a3b2c10';
+  const FILE_ID = '9c2b1f3e-7a64-4d10-b5e8-0a1b2c3d4e5f';
+  const sample = (required: boolean): FormFields[number] => ({
+    key: SAMPLE,
+    type: 'file',
+    label: 'Work sample',
+    helpText: null,
+    required,
+    config: { kinds: ['document', 'image'], maxSizeMb: 10, maxDurationSeconds: null },
+  });
+
+  it('shows applicants the limits they need to check a file before uploading', () => {
+    const [publicField] = toPublicFields([sample(true)]);
+    expect(publicField).toMatchObject({
+      type: 'file',
+      config: { kinds: ['document', 'image'], maxSizeMb: 10, maxDurationSeconds: null },
+    });
+  });
+
+  it('takes the file id as the answer', () => {
+    expect(parseAnswers([sample(true)], { [SAMPLE]: FILE_ID })).toEqual({
+      ok: true,
+      answers: { [SAMPLE]: FILE_ID },
+    });
+  });
+
+  it('refuses an answer that is not a file id', () => {
+    for (const value of ['my-portfolio.pdf', 42, true, [FILE_ID]]) {
+      const result = parseAnswers([sample(true)], { [SAMPLE]: value });
+      expect(result).toEqual({ ok: false, errors: [{ path: SAMPLE, message: 'Upload a file.' }] });
+    }
+  });
+
+  it('needs a file when the question is required, and only then', () => {
+    expect(parseAnswers([sample(true)], {})).toEqual({
+      ok: false,
+      errors: [{ path: SAMPLE, message: 'This question needs an answer.' }],
+    });
+    expect(parseAnswers([sample(false)], {})).toEqual({ ok: true, answers: {} });
+    expect(parseAnswers([sample(false)], { [SAMPLE]: null })).toEqual({ ok: true, answers: {} });
+  });
+});
+
 describe('findKnockout', () => {
   it('finds a yes/no knockout', () => {
     expect(findKnockout(fields, { [ONSITE]: false, [LEVEL]: SENIOR })?.fieldKey).toBe(ONSITE);
