@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common';
 import type { FormFields } from '@repo/shared';
 import { isUniqueViolation } from '../common/db-errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { NewApplication, OpenJob } from './application.js';
+import type { NewApplication, NewPendingFile, OpenJob, SubmitResult } from './application.js';
+
+/** Thrown inside the submit transaction to roll it back when a file can't be attached. */
+class FileConflict extends Error {}
 
 @Injectable()
 export class ApplicationsRepository {
@@ -58,8 +61,21 @@ export class ApplicationsRepository {
     };
   }
 
-  /** Returns 'duplicate' if this person already applied to this job. */
-  async submit(input: NewApplication): Promise<'created' | 'duplicate'> {
+  private get files() {
+    return this.prisma.db.orm.public.File;
+  }
+
+  /** Records an upload that has been started: pending, and attached to no Application yet. */
+  async createPendingFile(input: NewPendingFile): Promise<void> {
+    await this.files.create({ ...input, fieldKey: input.fieldKey ?? null });
+  }
+
+  /**
+   * Creates the Application and attaches its files in one transaction. Returns 'duplicate' if this
+   * person already applied to this job, and 'file_conflict' if a file can't be attached. Nothing is
+   * saved in either case, so the files stay pending and can be sent again.
+   */
+  async submit(input: NewApplication): Promise<SubmitResult> {
     try {
       await this.prisma.db.transaction(async (tx) => {
         const candidate = await tx.orm.public.Candidate.upsert({
@@ -89,9 +105,30 @@ export class ApplicationsRepository {
             ...event,
           })),
         );
+
+        const attachedAt = new Date();
+        for (const file of input.files) {
+          // Conditional update (api.md, "Concurrency"): the file must be this company's and job's,
+          // match the purpose and question, be unattached and still pending. Anything else updates
+          // no row, and throwing rolls the whole submit back.
+          const attached = await tx.orm.public.File.where({
+            id: file.id,
+            companyId: input.companyId,
+            jobId: input.jobId,
+            purpose: file.purpose,
+            status: 'pending',
+          })
+            .where((f) => f.applicationId.isNull())
+            .where((f) => (file.fieldKey === null ? f.fieldKey.isNull() : f.fieldKey.eq(file.fieldKey)))
+            .update({ applicationId: application.id, status: 'uploaded', uploadedAt: attachedAt });
+          if (!attached) throw new FileConflict();
+        }
       });
       return 'created';
     } catch (error) {
+      if (error instanceof FileConflict) {
+        return 'file_conflict';
+      }
       if (isUniqueViolation(error)) {
         return 'duplicate';
       }
