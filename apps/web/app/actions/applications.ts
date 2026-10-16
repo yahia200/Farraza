@@ -157,6 +157,35 @@ export async function getFileDownloadUrl(
   return { url };
 }
 
+/**
+ * Mints a link that shows one of an application's files in place (inline disposition), calling
+ * GET .../applications/:id/files/:fileId/view. Same rules as `getFileDownloadUrl`: every member
+ * may, the link lasts minutes, so it is minted each time the viewer opens and never cached. The
+ * API refuses (400) a file whose type the sheet doesn't render inline (`previewKindOf` in
+ * @repo/shared); the viewer isn't offered for those, so this is the backstop.
+ */
+export async function getFileViewUrl(
+  companySlug: string,
+  jobSlug: string,
+  applicationId: string,
+  fileId: string,
+): Promise<FileDownloadResult> {
+  const response = await apiFetch(
+    `${applicationPath(companySlug, jobSlug, applicationId)}/files/${encodeURIComponent(fileId)}/view`,
+  );
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (!response.ok) {
+    return failureFromResponse(response, [], {
+      400: () => ({ formError: "This file can't be previewed. Download it instead." }),
+      404: () => ({ formError: 'That file is no longer available. Reload the page.' }),
+    });
+  }
+  const { url } = (await response.json()) as { url: string; expiresInSeconds: number };
+  return { url };
+}
+
 export type AddNoteResult =ActionFailure<'body'> & { ok?: boolean };
 
 /**
