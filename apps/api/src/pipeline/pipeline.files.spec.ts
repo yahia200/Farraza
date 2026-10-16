@@ -381,6 +381,34 @@ describe('files on an Application (recruiter side)', () => {
       },
     );
 
+    // Ticket 08: images are shown in place too (SVG stays refused, above).
+    it.each(['image/jpeg', 'image/png', 'image/webp'])(
+      'returns an inline link pinned to %s for an image attachment',
+      async (mimeType) => {
+        repository.seedFile({
+          id: 'file-photo',
+          purpose: 'answer',
+          fieldKey: 'question-1',
+          originalName: 'portfolio.jpg',
+          mimeType,
+        });
+
+        const link = await service.viewLink(
+          member('company-1', 'recruiter'),
+          'engineer',
+          'application-1',
+          'file-photo',
+        );
+
+        expect(link.url).toBe(
+          'https://bucket.test/companies/company-1/jobs/job-1/files/file-photo?signed=inline',
+        );
+        expect(storage.viewRequests).toEqual([
+          { key: 'companies/company-1/jobs/job-1/files/file-photo', fileName: 'portfolio.jpg', contentType: mimeType },
+        ]);
+      },
+    );
+
     it('gives interviewers the same access as recruiters', async () => {
       repository.seedFile({ id: 'file-cv' });
 
