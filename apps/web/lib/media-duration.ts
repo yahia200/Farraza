@@ -8,10 +8,11 @@
  *
  * `duration` is `NaN` before metadata and `Infinity` when the media has no known length
  * (https://developer.mozilla.org/docs/Web/API/HTMLMediaElement/duration). Files recorded in the
- * browser (a WebM from `MediaRecorder`) carry no length in their header, so they report `Infinity`.
- * The usual workaround is to seek far past the end: the browser then scans to the real end and
- * fires `durationchange` with the true length. That workaround is not in the MDN pages above; it was
- * checked by hand against a `MediaRecorder` WebM (see docs/db-schema.md §9).
+ * browser (a WebM from `MediaRecorder`) have been reported to carry no length in their header, so
+ * they report `Infinity`; the usual workaround is to seek far past the end so the browser scans to
+ * the real end and fires `durationchange` with the true length. That workaround is from memory,
+ * not from the MDN pages above, and it was NOT exercised: the Chrome used for the manual check
+ * (2026-10) already reported a finite length for `MediaRecorder` WebM files, video and audio.
  *
  * Resolves to null when the length cannot be read: the file is not playable here (an unsupported
  * codec, such as HEVC in a MOV on a browser without it), it is not media at all, the read is
