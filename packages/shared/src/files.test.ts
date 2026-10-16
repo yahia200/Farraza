@@ -9,6 +9,7 @@ import {
   checkCvFile,
   contentTypeOf,
   createUploadSchema,
+  fileAccept,
   suggestedMaxSizeMb,
   type FileKind,
 } from './files.js';
@@ -172,6 +173,21 @@ describe('Attachment rules', () => {
 
     it('refuses an empty file', () => {
       expect(checkAttachmentFile(both, { contentType: CV_PDF_TYPE, sizeBytes: 0 })?.path).toBe('sizeBytes');
+    });
+  });
+
+  describe('fileAccept', () => {
+    it('lists extensions as well as types, since some systems report no type for .docx', () => {
+      expect(fileAccept(['document']).split(',')).toEqual(['.pdf', '.docx', CV_PDF_TYPE, CV_DOCX_TYPE]);
+      expect(fileAccept(['image']).split(',')).toEqual([
+        '.jpg',
+        '.jpeg',
+        '.png',
+        '.webp',
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+      ]);
     });
   });
 

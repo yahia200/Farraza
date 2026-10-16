@@ -132,6 +132,18 @@ export function contentTypeOf(file: { name: string; type: string }): string {
   return file.name.includes('.') ? (TYPE_BY_EXTENSION[extension] ?? '') : '';
 }
 
+/**
+ * The value for a file input's `accept` attribute for these kinds: extensions as well as types, as
+ * some systems report no type for .docx. It only steers the file chooser; the checks are above.
+ */
+export function fileAccept(kinds: readonly FileKind[]): string {
+  const types = allowedContentTypes(kinds);
+  const extensions = Object.entries(TYPE_BY_EXTENSION)
+    .filter(([, type]) => types.includes(type))
+    .map(([extension]) => `.${extension}`);
+  return [...extensions, ...types].join(',');
+}
+
 /** What the browser says about the file; the API re-checks the real bytes when the form is submitted. */
 export interface DeclaredFile {
   contentType: string;
