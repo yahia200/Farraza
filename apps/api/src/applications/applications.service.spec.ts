@@ -399,6 +399,22 @@ describe('ApplicationsService', () => {
       ]);
     });
 
+    it('points a file conflict at the CV, so the form can ask for it again', async () => {
+      repository.seedJob({ slug: 'backend', cvMode: 'optional' });
+
+      const error = await service
+        .submit(
+          'acme',
+          'backend',
+          applicant({ cvFileId: '44444444-4444-4444-8444-444444444444' }),
+        )
+        .catch((e: unknown) => e);
+
+      expect((error as ConflictException).getResponse()).toMatchObject({
+        errors: [{ path: 'cvFileId' }],
+      });
+    });
+
     it("refuses another job's file with a conflict and creates no Application", async () => {
       repository.seedJob({ slug: 'backend', cvMode: 'optional' });
       const other = repository.seedJob({ slug: 'design', cvMode: 'optional' });

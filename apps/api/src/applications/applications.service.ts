@@ -142,9 +142,9 @@ export class ApplicationsService {
       throw new ConflictException("You've already applied for this job.");
     }
     if (result === 'file_conflict') {
-      throw new ConflictException(
-        "Your CV couldn't be attached to this application. Upload it again and resubmit.",
-      );
+      // `errors` lets the apply form put the message on the CV step, as it does for 400s.
+      const message = "Your CV couldn't be attached to this application. Upload it again and resubmit.";
+      throw new ConflictException({ message, errors: [{ path: 'cvFileId', message }] });
     }
     return { received: true };
   }
