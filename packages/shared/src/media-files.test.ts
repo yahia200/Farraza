@@ -9,8 +9,7 @@ import {
   declaredDuration,
   fileAccept,
   fileFormatPhrase,
-  formatClock,
-  formatDuration,
+  formatDurationInWords,
   isMediaContentType,
   matchAllowedType,
   suggestedMaxSizeMb,
@@ -147,6 +146,7 @@ describe('video and audio Attachments', () => {
     it('is true for the video and audio formats only', () => {
       expect(isMediaContentType('video/webm')).toBe(true);
       expect(isMediaContentType('audio/mpeg')).toBe(true);
+      expect(isMediaContentType('audio/x-m4a')).toBe(true);
       expect(isMediaContentType('image/png')).toBe(false);
       expect(isMediaContentType(CV_PDF_TYPE)).toBe(false);
     });
@@ -234,7 +234,7 @@ describe('video and audio Attachments', () => {
   });
 });
 
-describe('formatDuration', () => {
+describe('formatDurationInWords', () => {
   it.each([
     [1, '1 second'],
     [45, '45 seconds'],
@@ -244,16 +244,7 @@ describe('formatDuration', () => {
     [3600, '60 minutes'],
     [3661, '61 minutes 1 second'],
   ])('writes %s seconds as %j', (seconds, words) => {
-    expect(formatDuration(seconds)).toBe(words);
-  });
-
-  it.each([
-    [5, '0:05'],
-    [65, '1:05'],
-    [600, '10:00'],
-    [3725, '1:02:05'],
-  ])('shows %s seconds on a clock as %j', (seconds, clock) => {
-    expect(formatClock(seconds)).toBe(clock);
+    expect(formatDurationInWords(seconds)).toBe(words);
   });
 });
 

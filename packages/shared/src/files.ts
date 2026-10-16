@@ -77,9 +77,9 @@ export function matchAllowedType(allowed: readonly string[], type: string): stri
   return audio !== undefined && allowed.includes(audio) ? audio : null;
 }
 
-/** Whether a content type is a video or audio format, i.e. one whose files have a duration. */
+/** Whether a content type (under any of its names) is a video or audio format, i.e. one whose files have a duration. */
 export function isMediaContentType(type: string): boolean {
-  return FILE_KIND_TYPES.video.includes(type) || FILE_KIND_TYPES.audio.includes(type);
+  return matchAllowedType([...FILE_KIND_TYPES.video, ...FILE_KIND_TYPES.audio], type) !== null;
 }
 
 /** Whether a question accepting these kinds needs a duration limit. */
@@ -163,7 +163,7 @@ export function fileFormatPhrase(kinds: readonly FileKind[]): string {
 export function attachmentHint(rules: AttachmentRules): string {
   const length =
     kindsNeedDuration(rules.kinds) && rules.maxDurationSeconds !== null
-      ? ` and ${formatDuration(rules.maxDurationSeconds)}`
+      ? ` and ${formatDurationInWords(rules.maxDurationSeconds)}`
       : '';
   return `${fileFormatNames(rules.kinds)}, up to ${rules.maxSizeMb} MB${length}`;
 }
@@ -171,22 +171,13 @@ export function attachmentHint(rules: AttachmentRules): string {
 // --- Lengths of video and audio ------------------------------------------------------------------
 
 /** A length for a sentence: "45 seconds", "1 minute", "1 minute 30 seconds". */
-export function formatDuration(totalSeconds: number): string {
+export function formatDurationInWords(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   const part = (count: number, unit: string) => `${count} ${unit}${count === 1 ? '' : 's'}`;
   return [minutes > 0 ? part(minutes, 'minute') : '', seconds > 0 || minutes === 0 ? part(seconds, 'second') : '']
     .filter(Boolean)
     .join(' ');
-}
-
-/** A length as a player shows it: "0:05", "1:05", "1:02:05". */
-export function formatClock(totalSeconds: number): string {
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  const two = (value: number) => String(value).padStart(2, '0');
-  return hours > 0 ? `${hours}:${two(minutes)}:${two(seconds)}` : `${minutes}:${two(seconds)}`;
 }
 
 /**
@@ -222,7 +213,7 @@ export function checkAttachmentFile(rules: AttachmentRules, file: DeclaredFile):
     if (rules.maxDurationSeconds !== null && file.durationSeconds > rules.maxDurationSeconds) {
       return {
         path: 'durationSeconds',
-        message: `This file must be ${formatDuration(rules.maxDurationSeconds)} or shorter.`,
+        message: `This file must be ${formatDurationInWords(rules.maxDurationSeconds)} or shorter.`,
       };
     }
   }
