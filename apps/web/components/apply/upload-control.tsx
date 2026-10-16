@@ -2,20 +2,25 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { FileTextIcon, RotateCcwIcon, UploadIcon, XIcon } from 'lucide-react';
-import { contentTypeOf, type DeclaredFile, type FieldError } from '@repo/shared';
+import { contentTypeOf, shouldCompressImage, type DeclaredFile, type FieldError } from '@repo/shared';
 import { createUpload } from '@/app/actions/applications';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Progress, ProgressValue } from '@/components/ui/progress';
+import { Spinner } from '@/components/ui/spinner';
 import { QuestionnaireChoices, QuestionnaireInput } from '@/components/ui/questionnaire';
+import { compressImageForUpload } from '@/lib/compress-image';
 import { formatFileSize } from '@/lib/format';
 import { putFile } from '@/lib/put-file';
 import { cn } from '@/lib/utils';
 
 type Upload =
-  | { file: File; status: 'sending'; percent: number }
-  | { file: File; status: 'failed'; message: string }
+  /** A large image being shrunk in the browser before it is sent (ticket 08). */
+  | { file: File; status: 'compressing' }
+  /** `reducedFrom`: the size the applicant picked, when a smaller compressed copy is what is sent. */
+  | { file: File; status: 'sending'; percent: number; reducedFrom?: number }
+  | { file: File; status: 'failed'; message: string; reducedFrom?: number }
   /** The file id is held by the form (`value`), not here. */
-  | { file: File; status: 'sent' };
+  | { file: File; status: 'sent'; reducedFrom?: number };
 
 /** What a file is for, as the API's create-upload request says it (`purpose`, and the question for an answer). */
 export type UploadTarget = { purpose: 'cv' } | { purpose: 'answer'; fieldKey: string };
@@ -65,20 +70,47 @@ export function UploadControl({
 
   // The form can clear the id (the server refused it): then there is nothing uploaded any more.
   const shown = upload?.status === 'sent' && value === null ? null : upload;
-  const sending = shown?.status === 'sending';
+  const sending = shown?.status === 'sending' || shown?.status === 'compressing';
 
   function stop() {
     current.current?.abort();
     current.current = null;
   }
 
-  async function send(file: File) {
+  /**
+   * `reduce` is false for "Try again": the file is already the one to send, so it isn't shrunk
+   * again; `reducedFrom` carries the size originally picked, for the note under the name.
+   */
+  async function send(picked: File, { reduce = true, reducedFrom }: { reduce?: boolean; reducedFrom?: number } = {}) {
     stop();
     setRejection(undefined);
     onChange(null);
 
-    const contentType = contentTypeOf(file);
-    const problem = check({ contentType, sizeBytes: file.size });
+    const controller = new AbortController();
+    current.current = controller;
+
+    let file = picked;
+    let contentType = contentTypeOf(file);
+    let problem = check({ contentType, sizeBytes: file.size });
+
+    // Ticket 08: a large image is shrunk before anything else, so a 12 MB phone photo can still
+    // pass a 10 MB limit. Only a wrong type turns it away outright; a size problem is re-checked
+    // on the smaller file. The declared size and type below are those of the file actually sent.
+    if (reduce && problem?.path !== 'contentType' && shouldCompressImage({ contentType, sizeBytes: file.size })) {
+      setUpload({ file, status: 'compressing' });
+      onBusyChange(true);
+      try {
+        file = await compressImageForUpload({ file, contentType, signal: controller.signal });
+      } catch {
+        // Only an abort throws: the applicant removed or replaced the file meanwhile.
+        return;
+      }
+      if (controller.signal.aborted) return;
+      if (file !== picked) reducedFrom = picked.size;
+      contentType = contentTypeOf(file);
+      problem = check({ contentType, sizeBytes: file.size });
+    }
+
     if (problem) {
       setUpload(null);
       onBusyChange(false);
@@ -86,9 +118,7 @@ export function UploadControl({
       return;
     }
 
-    const controller = new AbortController();
-    current.current = controller;
-    setUpload({ file, status: 'sending', percent: 0 });
+    setUpload({ file, status: 'sending', percent: 0, reducedFrom });
     onBusyChange(true);
 
     try {
@@ -106,10 +136,10 @@ export function UploadControl({
         url: created.upload.url,
         file,
         contentType: created.upload.contentType,
-        onProgress: (percent) => setUpload({ file, status: 'sending', percent }),
+        onProgress: (percent) => setUpload({ file, status: 'sending', percent, reducedFrom }),
         signal: controller.signal,
       });
-      setUpload({ file, status: 'sent' });
+      setUpload({ file, status: 'sent', reducedFrom });
       onChange(created.upload.fileId);
     } catch (caught) {
       if (controller.signal.aborted) return;
@@ -117,6 +147,7 @@ export function UploadControl({
         file,
         status: 'failed',
         message: caught instanceof Error ? caught.message : 'The upload failed.',
+        reducedFrom,
       });
     }
     // Reached when this upload wasn't replaced or removed meanwhile (those return above).
@@ -171,7 +202,7 @@ export function UploadControl({
               <span className="min-w-0 flex-1 truncate font-medium">{shown.file.name}</span>
               <span className="shrink-0 text-muted-foreground">{formatFileSize(shown.file.size)}</span>
               {shown.status === 'failed' && (
-                <Button type="button" variant="outline" size="sm" onClick={() => void send(shown.file)}>
+                <Button type="button" variant="outline" size="sm" onClick={() => void send(shown.file, { reduce: false, reducedFrom: shown.reducedFrom })}>
                   <RotateCcwIcon data-icon="inline-start" />
                   Try again
                 </Button>
@@ -181,10 +212,19 @@ export function UploadControl({
               </Button>
             </div>
 
+            {shown.status === 'compressing' && (
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Spinner aria-hidden="true" role="presentation" />
+                Reducing the image size…
+              </p>
+            )}
             {shown.status === 'sending' && (
               <Progress value={shown.percent} aria-label="Upload progress">
                 <ProgressValue />
               </Progress>
+            )}
+            {shown.status !== 'compressing' && shown.reducedFrom !== undefined && (
+              <p className="text-sm text-muted-foreground">Reduced from {formatFileSize(shown.reducedFrom)}.</p>
             )}
             {shown.status === 'sent' && <p className="text-sm text-muted-foreground">Uploaded.</p>}
             {shown.status === 'failed' && <p className="text-sm text-destructive">{shown.message}</p>}
