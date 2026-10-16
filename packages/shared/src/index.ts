@@ -9,3 +9,4 @@ export * from './files.js';
 export * from './members.js';
 export * from './pipeline.js';
 export * from './phone.js';
+export * from './file-preview.js';
