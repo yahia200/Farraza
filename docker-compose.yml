@@ -28,7 +28,10 @@ services:
       - rustfs-data:/data
     command: ["/data"]
 
-  # One-shot: waits for RustFS, then creates the dev bucket, then exits.
+  # One-shot: waits for RustFS, creates the dev bucket, applies its CORS rules
+  # (browsers PUT applicant files straight to the bucket from the web app's origin,
+  # so the rules in docker/rustfs-cors.json must list that origin), then exits.
+  # Safe to re-run: `docker compose up createbuckets`.
   createbuckets:
     image: amazon/aws-cli:latest
     depends_on:
@@ -37,11 +40,14 @@ services:
       AWS_ACCESS_KEY_ID: khatwateen-dev
       AWS_SECRET_ACCESS_KEY: khatwateen-dev-secret
       AWS_DEFAULT_REGION: us-east-1
+    volumes:
+      - ./docker/rustfs-cors.json:/cors.json:ro
     entrypoint: ["/bin/sh", "-c"]
     command:
       - "until aws --endpoint-url http://rustfs:9000 s3 ls; do echo 'Waiting for RustFS...'; sleep 2; done; \
          aws --endpoint-url http://rustfs:9000 s3 mb s3://khatwateen-dev-bucket || true; \
-         echo 'Bucket created.'"
+         aws --endpoint-url http://rustfs:9000 s3api put-bucket-cors --bucket khatwateen-dev-bucket --cors-configuration file:///cors.json; \
+         echo 'Bucket ready.'"
 
 volumes:
   pgdata:
