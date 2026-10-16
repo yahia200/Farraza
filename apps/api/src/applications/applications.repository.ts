@@ -2,10 +2,33 @@ import { Injectable } from '@nestjs/common';
 import type { FormFields } from '@repo/shared';
 import { isUniqueViolation } from '../common/db-errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { NewApplication, NewPendingFile, OpenJob, SubmitResult } from './application.js';
+import type {
+  FileToVerify,
+  NewApplication,
+  NewPendingFile,
+  OpenJob,
+  SubmitResult,
+} from './application.js';
 
 /** Thrown inside the submit transaction to roll it back when a file can't be attached. */
 class FileConflict extends Error {}
+
+/** Maps a `files` row to the plain type the service works with (api.md, "Repository"). */
+function toFileToVerify(row: {
+  id: string;
+  purpose: 'cv' | 'answer';
+  fieldKey: string | null;
+  storageKey: string;
+  sizeBytes: number;
+}): FileToVerify {
+  return {
+    id: row.id,
+    purpose: row.purpose,
+    fieldKey: row.fieldKey,
+    storageKey: row.storageKey,
+    sizeBytes: row.sizeBytes,
+  };
+}
 
 @Injectable()
 export class ApplicationsRepository {
@@ -71,6 +94,40 @@ export class ApplicationsRepository {
   }
 
   /**
+   * The rows among `ids` that a submit to this job may still use: this company's and job's, pending
+   * and unattached (the same conditions the attach update demands). Others are simply absent, so a
+   * missing, foreign, or already-attached id looks identical to the caller.
+   */
+  async findFilesToVerify(
+    companyId: string,
+    jobId: string,
+    ids: string[],
+  ): Promise<FileToVerify[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.files
+      .where({ companyId, jobId, status: 'pending' })
+      .where((f) => f.applicationId.isNull())
+      .where((f) => f.id.in(ids))
+      .all();
+    return rows.map(toFileToVerify);
+  }
+
+  /**
+   * Removes a file row that failed its check. Conditional like every write here: only if it is still
+   * pending and unattached, so a concurrent submit that attached it first is never undone.
+   */
+  async deletePendingFile(
+    companyId: string,
+    jobId: string,
+    id: string,
+  ): Promise<void> {
+    await this.files
+      .where({ id, companyId, jobId, status: 'pending' })
+      .where((f) => f.applicationId.isNull())
+      .deleteAndCount();
+  }
+
+  /**
    * Creates the Application and attaches its files in one transaction. Returns 'duplicate' if this
    * person already applied to this job, and 'file_conflict' if a file can't be attached. Nothing is
    * saved in either case, so the files stay pending and can be sent again.
@@ -120,7 +177,13 @@ export class ApplicationsRepository {
           })
             .where((f) => f.applicationId.isNull())
             .where((f) => (file.fieldKey === null ? f.fieldKey.isNull() : f.fieldKey.eq(file.fieldKey)))
-            .update({ applicationId: application.id, status: 'uploaded', uploadedAt: attachedAt });
+            // The type is the one found in the bytes at the check, replacing the declared one.
+            .update({
+              applicationId: application.id,
+              status: 'uploaded',
+              uploadedAt: attachedAt,
+              mimeType: file.mimeType,
+            });
           if (!attached) throw new FileConflict();
         }
       });
