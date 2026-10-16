@@ -3,7 +3,7 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
-import { CV_DOCX_TYPE, CV_PDF_TYPE, type CvMode } from '@repo/shared';
+import { CV_DOCX_TYPE, CV_PDF_TYPE, type CvMode, type FormFields } from '@repo/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { SNIFF_BYTES } from '../storage/file-sniff.js';
 import type {
@@ -14,8 +14,12 @@ import type {
 import type { StorageService } from '../storage/storage.service.js';
 import {
   sampleDocx,
+  sampleJpeg,
   sampleLinuxExecutable,
   samplePdf,
+  samplePng,
+  sampleSvg,
+  sampleWebp,
   sampleWindowsExecutable,
   sampleZip,
 } from '../testing/sample-files.js';
@@ -50,9 +54,16 @@ class InMemoryApplicationsRepository implements PublicApi<ApplicationsRepository
   private readonly applied = new Set<string>();
   private nextApplicationId = 1;
   readonly applications: NewApplication[] = [];
+  /** Test setup: a file whose attach loses a race (another submit takes it between the check and the attach). */
+  raceOnFile: string | null = null;
 
   /** Test setup: an open job. Pass `open: false` for a closed one (applicants can't see it). */
-  seedJob(options: { slug: string; cvMode: CvMode; open?: boolean }): OpenJob {
+  seedJob(options: {
+    slug: string;
+    cvMode: CvMode;
+    open?: boolean;
+    fields?: FormFields;
+  }): OpenJob {
     const job: OpenJob = {
       company: {
         id: 'company-1',
@@ -66,7 +77,11 @@ class InMemoryApplicationsRepository implements PublicApi<ApplicationsRepository
         title: options.slug,
         description: null,
       },
-      form: { id: `form-${options.slug}`, fields: [], cvMode: options.cvMode },
+      form: {
+        id: `form-${options.slug}`,
+        fields: options.fields ?? [],
+        cvMode: options.cvMode,
+      },
       firstStageId: 'stage-applied',
       rejectedStageId: 'stage-rejected',
     };
@@ -75,12 +90,17 @@ class InMemoryApplicationsRepository implements PublicApi<ApplicationsRepository
   }
 
   /** Test setup: a file that was uploaded for a job but not yet submitted. */
-  seedPendingFile(jobId: string, id: string): void {
+  seedPendingFile(
+    jobId: string,
+    id: string,
+    options: { fieldKey?: string } = {},
+  ): void {
     this.files.set(id, {
       id,
       companyId: 'company-1',
       jobId,
-      purpose: 'cv',
+      purpose: options.fieldKey ? 'answer' : 'cv',
+      fieldKey: options.fieldKey ?? null,
       storageKey: `companies/company-1/jobs/${jobId}/files/${id}`,
       originalName: 'cv.pdf',
       mimeType: CV_PDF_TYPE,
@@ -170,9 +190,11 @@ class InMemoryApplicationsRepository implements PublicApi<ApplicationsRepository
         file.companyId === input.companyId &&
         file.jobId === input.jobId &&
         file.purpose === wanted.purpose &&
+        (file.fieldKey ?? null) === wanted.fieldKey &&
         file.status === 'pending' &&
-        file.applicationId === null;
-      if (!attachable) return 'file_conflict';
+        file.applicationId === null &&
+        wanted.id !== this.raceOnFile;
+      if (!attachable) return { status: 'file_conflict', fileId: wanted.id };
     }
 
     const applicationId = `application-${this.nextApplicationId++}`;
@@ -791,6 +813,473 @@ describe('ApplicationsService', () => {
 
       expect(errors[0]).toMatchObject({ path: 'cvFileId' });
       expect(repository.file(fileId)).toMatchObject({ status: 'pending' });
+    });
+  });
+
+  // File questions (Attachments): the answer to the question is the file's id, and the question's
+  // own limits decide what may be uploaded for it.
+  describe('Attachments', () => {
+    const SAMPLE = 'a1111111-1111-4111-8111-111111111111'; // required: documents and images, 2 MB
+    const PHOTO = 'b2222222-2222-4222-8222-222222222222'; // optional: images only, 1 MB
+    const ABOUT = 'c3333333-3333-4333-8333-333333333333'; // not a file question
+    const fields: FormFields = [
+      {
+        key: SAMPLE,
+        type: 'file',
+        label: 'Work sample',
+        helpText: null,
+        required: true,
+        config: { kinds: ['document', 'image'], maxSizeMb: 2, maxDurationSeconds: null },
+      },
+      {
+        key: PHOTO,
+        type: 'file',
+        label: 'Photo',
+        helpText: null,
+        required: false,
+        config: { kinds: ['image'], maxSizeMb: 1, maxDurationSeconds: null },
+      },
+      {
+        key: ABOUT,
+        type: 'short_text',
+        label: 'About you',
+        helpText: null,
+        required: false,
+        config: { maxLength: 100 },
+      },
+    ];
+
+    const image = (fieldKey: string, overrides: Record<string, unknown> = {}) =>
+      ({
+        purpose: 'answer',
+        fieldKey,
+        originalName: 'work.png',
+        contentType: 'image/png',
+        sizeBytes: 2048,
+        ...overrides,
+      }) as Parameters<ApplicationsService['createUpload']>[2];
+
+    /** What the apply page does for a file question: ask for an upload, then PUT the bytes. */
+    async function uploadAttachment(
+      fieldKey: string,
+      bytes: Uint8Array,
+      options: {
+        slug?: string;
+        contentType?: string;
+        name?: string;
+        declaredSize?: number;
+      } = {},
+    ): Promise<string> {
+      const { fileId } = await service.createUpload(
+        'acme',
+        options.slug ?? 'backend',
+        image(fieldKey, {
+          contentType: options.contentType ?? 'image/png',
+          originalName: options.name ?? 'work.png',
+          sizeBytes: options.declaredSize ?? bytes.length,
+        }),
+      );
+      storage.put(repository.file(fileId)!.storageKey, bytes);
+      return fileId;
+    }
+
+    async function createUploadError(slug: string, dto: Parameters<ApplicationsService['createUpload']>[2]) {
+      const error = await service.createUpload('acme', slug, dto).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect(storage.requests).toEqual([]);
+      return (error as BadRequestException).getResponse() as {
+        errors: Array<{ path: string; message: string }>;
+      };
+    }
+
+    beforeEach(() => {
+      repository.seedJob({ slug: 'backend', cvMode: 'off', fields });
+    });
+
+    describe('createUpload', () => {
+      it('hands the browser a file id and a URL for the file it declared, for that question', async () => {
+        const upload = await service.createUpload('acme', 'backend', image(SAMPLE));
+
+        expect(upload.contentType).toBe('image/png');
+        expect(storage.requests).toEqual([
+          {
+            target: { companyId: 'company-1', jobId: 'job-backend', fileId: upload.fileId },
+            declared: { contentType: 'image/png', sizeBytes: 2048 },
+          },
+        ]);
+        expect(repository.file(upload.fileId)).toMatchObject({
+          purpose: 'answer',
+          fieldKey: SAMPLE,
+          originalName: 'work.png',
+          status: 'pending',
+          applicationId: null,
+          storageKey: `companies/company-1/jobs/job-backend/files/${upload.fileId}`,
+        });
+      });
+
+      it('works when the form does not ask for a CV', async () => {
+        await expect(service.createUpload('acme', 'backend', image(SAMPLE))).resolves.toBeDefined();
+      });
+
+      it.each([
+        ['a PDF', 'application/pdf'],
+        ['a DOCX', CV_DOCX_TYPE],
+        ['a JPEG', 'image/jpeg'],
+        ['a WebP', 'image/webp'],
+      ])('accepts %s where documents and images are allowed', async (_name, contentType) => {
+        await expect(service.createUpload('acme', 'backend', image(SAMPLE, { contentType }))).resolves.toBeDefined();
+      });
+
+      it('accepts a file of exactly the limit', async () => {
+        await expect(
+          service.createUpload('acme', 'backend', image(SAMPLE, { sizeBytes: 2 * MB })),
+        ).resolves.toBeDefined();
+      });
+
+      it('refuses a file over the question limit, saying which property is wrong', async () => {
+        const { errors } = await createUploadError('backend', image(SAMPLE, { sizeBytes: 2 * MB + 1 }));
+
+        expect(errors).toEqual([{ path: 'sizeBytes', message: 'This file must be 2 MB or smaller.' }]);
+      });
+
+      it('uses the limit of the question it is for, not another one', async () => {
+        const { errors } = await createUploadError('backend', image(PHOTO, { sizeBytes: 1 * MB + 1 }));
+
+        expect(errors[0]).toMatchObject({ path: 'sizeBytes', message: 'This file must be 1 MB or smaller.' });
+      });
+
+      it.each(['video/mp4', 'audio/mpeg', 'image/svg+xml', 'image/gif', 'text/html', ''])(
+        'refuses the declared type %j',
+        async (contentType) => {
+          const { errors } = await createUploadError('backend', image(SAMPLE, { contentType }));
+
+          expect(errors).toMatchObject([{ path: 'contentType' }]);
+        },
+      );
+
+      it('refuses a type the question does not accept, though another question does', async () => {
+        const { errors } = await createUploadError('backend', image(PHOTO, { contentType: 'application/pdf' }));
+
+        expect(errors).toEqual([{ path: 'contentType', message: 'Upload a JPEG, PNG or WebP file.' }]);
+      });
+
+      it('refuses an empty file', async () => {
+        const { errors } = await createUploadError('backend', image(SAMPLE, { sizeBytes: 0 }));
+
+        expect(errors).toMatchObject([{ path: 'sizeBytes' }]);
+      });
+
+      it.each([
+        ['a question that is not on the form', 'd4444444-4444-4444-8444-444444444444'],
+        ['a question that is not a file question', ABOUT],
+      ])('refuses %s', async (_name, fieldKey) => {
+        const { errors } = await createUploadError('backend', image(fieldKey));
+
+        expect(errors).toMatchObject([{ path: 'fieldKey' }]);
+      });
+
+      it("refuses another job's question", async () => {
+        repository.seedJob({ slug: 'design', cvMode: 'off', fields: [] });
+
+        const { errors } = await createUploadError('design', image(SAMPLE));
+
+        expect(errors).toMatchObject([{ path: 'fieldKey' }]);
+      });
+
+      it('refuses a closed job', async () => {
+        repository.seedJob({ slug: 'closed', cvMode: 'off', open: false, fields });
+
+        await expect(service.createUpload('acme', 'closed', image(SAMPLE))).rejects.toBeInstanceOf(NotFoundException);
+        expect(storage.requests).toEqual([]);
+      });
+    });
+
+    describe('submit', () => {
+      it('attaches the file to the Application and stores the file id as the answer', async () => {
+        const fileId = await uploadAttachment(SAMPLE, samplePng());
+
+        await service.submit('acme', 'backend', applicant({ answers: { [SAMPLE]: fileId } }));
+
+        expect(repository.applications).toHaveLength(1);
+        expect(repository.applications[0]).toMatchObject({
+          answers: { [SAMPLE]: fileId },
+          files: [{ id: fileId, purpose: 'answer', fieldKey: SAMPLE, mimeType: 'image/png' }],
+        });
+        expect(repository.file(fileId)).toMatchObject({
+          status: 'uploaded',
+          applicationId: expect.stringMatching(/^application-/),
+          fieldKey: SAMPLE,
+          mimeType: 'image/png',
+        });
+      });
+
+      it('attaches an Attachment and the CV together', async () => {
+        repository.seedJob({ slug: 'both', cvMode: 'required', fields });
+        const cvBytes = samplePdf();
+        const { fileId: cv } = await service.createUpload('acme', 'both', { ...pdf, sizeBytes: cvBytes.length });
+        storage.put(repository.file(cv)!.storageKey, cvBytes);
+        const sample = await uploadAttachment(SAMPLE, samplePng(), { slug: 'both' });
+
+        await service.submit('acme', 'both', applicant({ cvFileId: cv, answers: { [SAMPLE]: sample } }));
+
+        expect(repository.file(cv)).toMatchObject({ status: 'uploaded', purpose: 'cv', fieldKey: null });
+        expect(repository.file(sample)).toMatchObject({ status: 'uploaded', purpose: 'answer', fieldKey: SAMPLE });
+      });
+
+      it('records the type found in the bytes, whatever the browser declared', async () => {
+        // Declared as a PNG, but the bytes are a real JPEG.
+        const fileId = await uploadAttachment(SAMPLE, sampleJpeg(), { contentType: 'image/png' });
+
+        await service.submit('acme', 'backend', applicant({ answers: { [SAMPLE]: fileId } }));
+
+        expect(repository.file(fileId)?.mimeType).toBe('image/jpeg');
+      });
+
+      it.each([
+        ['a JPEG', sampleJpeg, 'image/jpeg'],
+        ['a WebP', sampleWebp, 'image/webp'],
+        ['a PDF', samplePdf, 'application/pdf'],
+        ['a DOCX', sampleDocx, CV_DOCX_TYPE],
+      ])('accepts %s where documents and images are allowed', async (_name, make, mimeType) => {
+        const fileId = await uploadAttachment(SAMPLE, make(), { contentType: mimeType });
+
+        await service.submit('acme', 'backend', applicant({ answers: { [SAMPLE]: fileId } }));
+
+        expect(repository.file(fileId)).toMatchObject({ status: 'uploaded', mimeType });
+      });
+
+      describe('required and optional questions', () => {
+        it('refuses a missing required file with a field error on the question', async () => {
+          const error = await service.submit('acme', 'backend', applicant()).catch((e: unknown) => e);
+
+          expect(error).toBeInstanceOf(BadRequestException);
+          expect((error as BadRequestException).getResponse()).toMatchObject({
+            errors: [{ path: SAMPLE, message: 'This question needs an answer.' }],
+          });
+          expect(repository.applications).toHaveLength(0);
+        });
+
+        it('lets an optional file question stay empty', async () => {
+          const fileId = await uploadAttachment(SAMPLE, samplePng());
+
+          await service.submit('acme', 'backend', applicant({ answers: { [SAMPLE]: fileId } }));
+
+          expect(repository.applications[0]!.files.map((f) => f.fieldKey)).toEqual([SAMPLE]);
+        });
+
+        it('refuses an answer that is not a file id', async () => {
+          const error = await service
+            .submit('acme', 'backend', applicant({ answers: { [SAMPLE]: 'my-portfolio.pdf' } }))
+            .catch((e: unknown) => e);
+
+          expect((error as BadRequestException).getResponse()).toMatchObject({
+            errors: [{ path: SAMPLE, message: 'Upload a file.' }],
+          });
+        });
+      });
+
+      describe("a file that doesn't belong as the answer", () => {
+        const refusedFor = async (answers: Record<string, unknown>) => {
+          const error = await service.submit('acme', 'backend', applicant({ answers })).catch((e: unknown) => e);
+          expect(error).toBeInstanceOf(ConflictException);
+          expect(repository.applications).toHaveLength(0);
+          return (error as ConflictException).getResponse() as { errors: Array<{ path: string }> };
+        };
+
+        it("is refused when it was uploaded for a different question, pointing at the answer's question", async () => {
+          const photo = await uploadAttachment(PHOTO, samplePng());
+
+          const { errors } = await refusedFor({ [SAMPLE]: photo });
+
+          expect(errors).toEqual([{ path: SAMPLE, message: expect.any(String) }]);
+          expect(repository.file(photo)?.status).toBe('pending');
+        });
+
+        it("is refused when it belongs to another job's form", async () => {
+          const other = repository.seedJob({ slug: 'design', cvMode: 'off', fields });
+          repository.seedPendingFile(other.job.id, 'e5555555-5555-4555-8555-555555555555', { fieldKey: SAMPLE });
+
+          const { errors } = await refusedFor({ [SAMPLE]: 'e5555555-5555-4555-8555-555555555555' });
+
+          expect(errors[0]!.path).toBe(SAMPLE);
+          expect(repository.file('e5555555-5555-4555-8555-555555555555')?.status).toBe('pending');
+          expect(storage.deleted).toEqual([]);
+        });
+
+        it('is refused when it is this job\'s CV', async () => {
+          repository.seedJob({ slug: 'both', cvMode: 'optional', fields });
+          const { fileId: cv } = await service.createUpload('acme', 'both', pdf);
+
+          const error = await service
+            .submit('acme', 'both', applicant({ answers: { [SAMPLE]: cv } }))
+            .catch((e: unknown) => e);
+
+          expect(error).toBeInstanceOf(ConflictException);
+          expect(repository.applications).toHaveLength(0);
+        });
+
+        it('is refused when the id does not exist', async () => {
+          await refusedFor({ [SAMPLE]: 'f6666666-6666-4666-8666-666666666666' });
+        });
+
+        it('is refused when one file is given as the answer to two questions', async () => {
+          const fileId = await uploadAttachment(PHOTO, samplePng());
+
+          await refusedFor({ [SAMPLE]: fileId, [PHOTO]: fileId });
+        });
+
+        it('is refused when it already belongs to another Application', async () => {
+          const fileId = await uploadAttachment(SAMPLE, samplePng());
+          await service.submit('acme', 'backend', applicant({ answers: { [SAMPLE]: fileId } }));
+
+          await expect(
+            service.submit(
+              'acme',
+              'backend',
+              applicant({ email: 'grace@example.com', phone: '+201001234568', answers: { [SAMPLE]: fileId } }),
+            ),
+          ).rejects.toBeInstanceOf(ConflictException);
+          expect(repository.applications).toHaveLength(1);
+          expect(storage.deleted).toEqual([]);
+        });
+
+        it('is refused, naming the right question, when another submit takes it first', async () => {
+          const fileId = await uploadAttachment(SAMPLE, samplePng());
+          repository.raceOnFile = fileId;
+
+          const { errors } = await refusedFor({ [SAMPLE]: fileId });
+
+          expect(errors).toEqual([{ path: SAMPLE, message: expect.any(String) }]);
+        });
+
+        it('leaves the CV pending when an Attachment cannot be attached, so nothing is half-saved', async () => {
+          repository.seedJob({ slug: 'both', cvMode: 'optional', fields });
+          const { fileId: cv } = await service.createUpload('acme', 'both', { ...pdf, sizeBytes: samplePdf().length });
+          storage.put(repository.file(cv)!.storageKey, samplePdf());
+          const photo = await uploadAttachment(PHOTO, samplePng(), { slug: 'both' });
+
+          await expect(
+            service.submit('acme', 'both', applicant({ cvFileId: cv, answers: { [SAMPLE]: photo } })),
+          ).rejects.toBeInstanceOf(ConflictException);
+
+          expect(repository.applications).toHaveLength(0);
+          expect(repository.file(cv)?.status).toBe('pending');
+        });
+      });
+
+      describe('checking the uploaded file against the question', () => {
+        async function submitRefused(fileId: string) {
+          const error = await service
+            .submit('acme', 'backend', applicant({ answers: { [SAMPLE]: fileId } }))
+            .catch((e: unknown) => e);
+          expect(error).toBeInstanceOf(BadRequestException);
+          return (error as BadRequestException).getResponse() as {
+            errors: Array<{ path: string; message: string }>;
+          };
+        }
+
+        it.each([
+          ['a Windows program', sampleWindowsExecutable],
+          ['a Linux program', sampleLinuxExecutable],
+          ['a zip that is not a Word document', sampleZip],
+          ['an SVG with script in it', sampleSvg],
+          ['plain text', () => Buffer.from('I am definitely a picture, trust me.')],
+        ])('refuses %s renamed to work.png, with a field error on the question', async (_name, make) => {
+          const fileId = await uploadAttachment(SAMPLE, make());
+          const storageKey = repository.file(fileId)!.storageKey;
+
+          const { errors } = await submitRefused(fileId);
+
+          expect(errors).toEqual([{ path: SAMPLE, message: expect.stringContaining('PDF, DOCX, JPEG, PNG or WebP') }]);
+          expect(repository.file(fileId)).toBeUndefined();
+          expect(storage.deleted).toEqual([storageKey]);
+          expect(repository.applications).toHaveLength(0);
+        });
+
+        it('refuses bytes of a kind this question does not accept, even though the browser declared an allowed type', async () => {
+          // PHOTO takes images only; a real PDF declared as a PNG is not one.
+          const fileId = await uploadAttachment(PHOTO, samplePdf(), { contentType: 'image/png' });
+          const storageKey = repository.file(fileId)!.storageKey;
+
+          const sample = await uploadAttachment(SAMPLE, samplePng());
+          const refused = await service
+            .submit('acme', 'backend', applicant({ answers: { [SAMPLE]: sample, [PHOTO]: fileId } }))
+            .catch((e: unknown) => e);
+
+          expect(refused).toBeInstanceOf(BadRequestException);
+          expect((refused as BadRequestException).getResponse()).toMatchObject({
+            errors: [{ path: PHOTO, message: expect.stringContaining('JPEG, PNG or WebP') }],
+          });
+          expect(storage.deleted).toEqual([storageKey]);
+          expect(repository.file(sample)?.status).toBe('pending');
+        });
+
+        it('refuses an object cut short, declared at its full size', async () => {
+          const png = samplePng();
+          const fileId = await uploadAttachment(SAMPLE, png.subarray(0, png.length - 5), {
+            declaredSize: png.length,
+          });
+          const storageKey = repository.file(fileId)!.storageKey;
+
+          const { errors } = await submitRefused(fileId);
+
+          expect(errors).toEqual([{ path: SAMPLE, message: expect.stringContaining('upload') }]);
+          expect(storage.deleted).toEqual([storageKey]);
+        });
+
+        it('refuses an upload that never reached the bucket', async () => {
+          const { fileId } = await service.createUpload('acme', 'backend', image(SAMPLE));
+
+          const { errors } = await submitRefused(fileId);
+
+          expect(errors[0]).toMatchObject({ path: SAMPLE });
+          expect(repository.file(fileId)).toBeUndefined();
+        });
+
+        it('lets the applicant upload again and apply after a refusal', async () => {
+          const bad = await uploadAttachment(SAMPLE, sampleWindowsExecutable());
+          await submitRefused(bad);
+
+          const good = await uploadAttachment(SAMPLE, samplePng());
+          await service.submit('acme', 'backend', applicant({ answers: { [SAMPLE]: good } }));
+
+          expect(repository.file(good)?.status).toBe('uploaded');
+        });
+
+        it('leaves the file pending when the person already applied, so a retry can reuse it', async () => {
+          const first = await uploadAttachment(SAMPLE, samplePng());
+          await service.submit('acme', 'backend', applicant({ answers: { [SAMPLE]: first } }));
+          const second = await uploadAttachment(SAMPLE, samplePng());
+
+          await expect(
+            service.submit('acme', 'backend', applicant({ answers: { [SAMPLE]: second } })),
+          ).rejects.toBeInstanceOf(ConflictException);
+          expect(repository.file(second)?.status).toBe('pending');
+          expect(storage.has(repository.file(second)!.storageKey)).toBe(true);
+        });
+
+        it('leaves the file pending when other answers are invalid', async () => {
+          const fileId = await uploadAttachment(SAMPLE, samplePng());
+
+          await expect(
+            service.submit('acme', 'backend', applicant({ answers: { [SAMPLE]: fileId, [ABOUT]: 'x'.repeat(101) } })),
+          ).rejects.toBeInstanceOf(BadRequestException);
+
+          expect(repository.file(fileId)?.status).toBe('pending');
+          expect(storage.reads).toEqual([]);
+        });
+      });
+    });
+
+    describe('getPublicJob', () => {
+      it('shows applicants the limits of a file question, so their browser can check files first', async () => {
+        const job = await service.getPublicJob('acme', 'backend');
+
+        expect(job.fields.filter((f) => f.type === 'file')).toMatchObject([
+          { key: SAMPLE, config: { kinds: ['document', 'image'], maxSizeMb: 2, maxDurationSeconds: null } },
+          { key: PHOTO, config: { kinds: ['image'], maxSizeMb: 1, maxDurationSeconds: null } },
+        ]);
+      });
     });
   });
 

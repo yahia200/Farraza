@@ -11,7 +11,11 @@ import type {
 } from './application.js';
 
 /** Thrown inside the submit transaction to roll it back when a file can't be attached. */
-class FileConflict extends Error {}
+class FileConflict extends Error {
+  constructor(readonly fileId: string) {
+    super(`File ${fileId} could not be attached`);
+  }
+}
 
 /** Maps a `files` row to the plain type the service works with (api.md, "Repository"). */
 function toFileToVerify(row: {
@@ -129,8 +133,8 @@ export class ApplicationsRepository {
 
   /**
    * Creates the Application and attaches its files in one transaction. Returns 'duplicate' if this
-   * person already applied to this job, and 'file_conflict' if a file can't be attached. Nothing is
-   * saved in either case, so the files stay pending and can be sent again.
+   * person already applied to this job, and a `file_conflict` (naming the file) if a file can't be
+   * attached. Nothing is saved in either case, so the files stay pending and can be sent again.
    */
   async submit(input: NewApplication): Promise<SubmitResult> {
     try {
@@ -184,13 +188,13 @@ export class ApplicationsRepository {
               uploadedAt: attachedAt,
               mimeType: file.mimeType,
             });
-          if (!attached) throw new FileConflict();
+          if (!attached) throw new FileConflict(file.id);
         }
       });
       return 'created';
     } catch (error) {
       if (error instanceof FileConflict) {
-        return 'file_conflict';
+        return { status: 'file_conflict', fileId: error.fileId };
       }
       if (isUniqueViolation(error)) {
         return 'duplicate';

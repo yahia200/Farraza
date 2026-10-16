@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { AuthorizationService } from '@nestjs/authorization';
-import { FILE_UNSUPPORTED, parseFormFields, type CvMode } from '@repo/shared';
+import { parseFormFields, type CvMode } from '@repo/shared';
 import type { Membership } from '../companies/company.js';
 import { JobPolicy } from '../jobs/job.policy.js';
 import { JobsService } from '../jobs/jobs.service.js';
@@ -79,11 +79,6 @@ export class FormsService {
     if (!draft) {
       throw new ConflictException('There is no draft to publish.');
     }
-    // Drafts saved before file questions were refused could still contain one.
-    if (draft.fields.some((field) => field.type === 'file')) {
-      throw new ConflictException(FILE_UNSUPPORTED);
-    }
-
     const published = await this.forms.publish(draft.id, new Date());
     if (!published) {
       throw new ConflictException('This draft was already published.');

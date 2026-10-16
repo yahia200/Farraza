@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   sampleDocx,
+  sampleJpeg,
   sampleLinuxExecutable,
   samplePdf,
+  samplePng,
+  sampleSvg,
+  sampleWebp,
   sampleWindowsExecutable,
   sampleZip,
 } from '../testing/sample-files.js';
@@ -33,6 +37,16 @@ describe('sniffFileType', () => {
     expect(await sniffFileType(sampleDocx().subarray(0, 100))).toBe(
       'application/zip',
     );
+  });
+
+  it('recognises JPEG, PNG and WebP images by their bytes', async () => {
+    expect(await sniffFileType(sampleJpeg())).toBe('image/jpeg');
+    expect(await sniffFileType(samplePng())).toBe('image/png');
+    expect(await sniffFileType(sampleWebp())).toBe('image/webp');
+  });
+
+  it('never calls an SVG an image: it is text that can carry script', async () => {
+    expect((await sniffFileType(sampleSvg())) ?? '').not.toMatch(/^image\//);
   });
 
   it('does not take a plain zip for a DOCX', async () => {

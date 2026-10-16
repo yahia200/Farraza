@@ -3,7 +3,7 @@
 // part of the build (see tsconfig.build.json).
 
 import { randomBytes } from 'node:crypto';
-import { crc32, deflateRawSync } from 'node:zlib';
+import { crc32, deflateRawSync, deflateSync } from 'node:zlib';
 
 const text = (value: string) => Buffer.from(value, 'utf8');
 
@@ -121,6 +121,54 @@ export function sampleDocx(options: { extraBytes?: number } = {}): Buffer {
 /** A zip that is not a Word document (what a renamed archive looks like). */
 export function sampleZip(): Buffer {
   return zip([{ name: 'notes.txt', data: text('not a document') }]);
+}
+
+function pngChunk(type: string, data: Buffer): Buffer {
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length, 0);
+  const body = Buffer.concat([text(type), data]);
+  const checksum = Buffer.alloc(4);
+  checksum.writeUInt32BE(crc32(body), 0);
+  return Buffer.concat([length, body, checksum]);
+}
+
+/** A 1x1 PNG: signature, IHDR, one IDAT and IEND, as every PNG encoder writes them. */
+export function samplePng(): Buffer {
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(1, 0); // width
+  header.writeUInt32BE(1, 4); // height
+  header[8] = 8; // bit depth
+  header[9] = 2; // colour type: RGB
+  const pixel = Buffer.from([0, 255, 0, 0]); // filter byte + one red pixel
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk('IHDR', header),
+    pngChunk('IDAT', deflateSync(pixel)),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
+/** The start and end of a JPEG: SOI, a JFIF header and EOI (enough for its signature, not a picture). */
+export function sampleJpeg(): Buffer {
+  return Buffer.from([
+    0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01,
+    0x00, 0x01, 0x00, 0x00, 0xff, 0xd9,
+  ]);
+}
+
+/** A RIFF container holding a WebP: `RIFF`, the size, `WEBP` and a `VP8L` chunk header. */
+export function sampleWebp(): Buffer {
+  const body = Buffer.concat([text('WEBP'), text('VP8L'), Buffer.alloc(4), Buffer.alloc(8)]);
+  const size = Buffer.alloc(4);
+  size.writeUInt32LE(body.length, 0);
+  return Buffer.concat([text('RIFF'), size, body]);
+}
+
+/** An SVG that runs script when opened: what an image upload must never let through. */
+export function sampleSvg(): Buffer {
+  return text(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><script>alert(document.cookie)</script></svg>',
+  );
 }
 
 /** The start of a Windows program: the `MZ` header, the DOS stub and a PE header. */
