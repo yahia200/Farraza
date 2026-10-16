@@ -4,6 +4,9 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
+  DeleteObjectCommand,
+  NotFound,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
@@ -71,6 +74,52 @@ export class StorageService {
     });
     return { key, url };
   }
+
+  // --- Verification and cleanup of uploaded objects (ticket 04) -------------------------------
+  // Server-side calls with the API's own credentials; nothing here is presigned.
+  // Docs: apps/api/node_modules/@aws-sdk/client-s3/dist-types/commands/
+  // {HeadObjectCommand,GetObjectCommand,DeleteObjectCommand}.d.ts
+
+  /**
+   * What the bucket holds under `key`: its size in bytes, or null if there is no such object.
+   * HeadObject answers a missing key with a `NotFound` error (HeadObjectCommand.d.ts, "@throws");
+   * that is the one error turned into null, so an unreachable bucket still surfaces as a failure.
+   */
+  async headObject(key: string): Promise<{ sizeBytes: number } | null> {
+    try {
+      const head = await this.client.send(
+        new HeadObjectCommand({ Bucket: this.bucket, Key: key }),
+      );
+      return { sizeBytes: head.ContentLength ?? 0 };
+    } catch (error) {
+      if (error instanceof NotFound) return null;
+      throw error;
+    }
+  }
+
+  /**
+   * The first `length` bytes of the object (fewer if it is shorter), fetched as an HTTP range so a
+   * large file is never downloaded whole. Docs: GetObjectCommand.d.ts, "To retrieve a byte range of
+   * an object" (`Range: "bytes=0-9"` returns 10 bytes; the end of the range is inclusive).
+   */
+  async readLeadingBytes(key: string, length: number): Promise<Uint8Array> {
+    const response = await this.client.send(
+      new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Range: `bytes=0-${length - 1}`,
+      }),
+    );
+    return (await response.Body?.transformToByteArray()) ?? new Uint8Array(0);
+  }
+
+  /** Deletes the object. Deleting a key that is already gone is not an error in S3. */
+  async deleteObject(key: string): Promise<void> {
+    await this.client.send(
+      new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+    );
+  }
+  // --- end of verification and cleanup ---------------------------------------------------------
 
   // --- Recruiter downloads (ticket 05) ---
 
