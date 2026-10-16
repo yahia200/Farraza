@@ -46,7 +46,7 @@ services:
     command:
       - "until aws --endpoint-url http://rustfs:9000 s3 ls; do echo 'Waiting for RustFS...'; sleep 2; done; \
          aws --endpoint-url http://rustfs:9000 s3 mb s3://khatwateen-dev-bucket || true; \
-         aws --endpoint-url http://rustfs:9000 s3api put-bucket-cors --bucket khatwateen-dev-bucket --cors-configuration file:///cors.json; \
+         aws --endpoint-url http://rustfs:9000 s3api put-bucket-cors --bucket khatwateen-dev-bucket --cors-configuration file:///cors.json && \
          echo 'Bucket ready.'"
 
 volumes:
