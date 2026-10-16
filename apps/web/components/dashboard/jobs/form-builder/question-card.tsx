@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Controller, useWatch, type Path, type UseFormReturn } from 'react-hook-form';
 import { ArrowDownIcon, ArrowUpIcon, ChevronRightIcon, Trash2Icon } from 'lucide-react';
-import type { FormField, FormFields } from '@repo/shared';
+import type { CvMode, FormField, FormFields } from '@repo/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import { errorAt, FIELD_TYPES, typeLabel } from './field-types';
 import { OptionsEditor } from './options-editor';
 
-export type BuilderValues = { fields: FormFields };
+export type BuilderValues = { fields: FormFields; cvMode: CvMode };
 type Form = UseFormReturn<BuilderValues>;
 
 /**
