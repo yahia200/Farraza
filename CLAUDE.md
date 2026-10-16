@@ -106,7 +106,7 @@ If you're reasoning about cross-cutting work before touching files, open the rel
 
 - **Commit messages** follow Conventional Commits: `<type>(<scope>): <subject>`.
   - Type is one of `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `build`.
-  - Scope is the app or feature touched: `jobs`, `auth`, `forms`, `applications`, `pipeline`, `companies`, `web`, `api`, `shared`, `db`, `deps`. Examples: `feat(jobs): add status filter`, `fix(auth): relay session cookie on sign-out`.
+  - Scope is the app or feature touched: `jobs`, `auth`, `forms`, `applications`, `pipeline`, `companies`, `web`, `api`, `shared`, `db`, `storage`, `deps`. Examples: `feat(jobs): add status filter`, `fix(auth): relay session cookie on sign-out`.
   - One logical change per commit; keep the subject in the imperative and under ~72 chars.
 - **Worktrees per session.** Each parallel desktop session runs in its own git worktree under `.claude/worktrees/` on its own branch, so sessions don't collide. A worktree is a fresh checkout: `.worktreeinclude` copies the `.env` files in automatically, but you must run `pnpm install` in a new worktree before `pnpm dev` works. Two sessions can't both bind ports 3000/3001, so only run dev servers in one at a time.
 - `AGENTS.md` (root) and `apps/web/AGENTS.md` contain blocks managed by `turbo` and `next dev` that get re-added automatically. Leave them in place.
