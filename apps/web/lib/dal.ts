@@ -369,3 +369,52 @@ export async function getApplication(
     })),
   };
 }
+
+/** Mirrors ApplicationFile in apps/api/src/pipeline/pipeline.ts. No storage key, no link. */
+export interface ApplicationFileView {
+  id: string;
+  /** `cv` for the CV slot, `answer` for the answer to the file question `fieldKey`. */
+  purpose: 'cv' | 'answer';
+  fieldKey: string | null;
+  /** The applicant's own name for the file (untrusted text). */
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  /** What the browser declared for video and audio. */
+  durationSeconds: number | null;
+}
+
+/**
+ * The files an application's applicant sent (GET .../applications/:id/files). Cached like the
+ * rest of the detail because a submitted application's files never change, but it holds
+ * metadata only: a download link lasts minutes, so it is minted per click by the
+ * `getFileDownloadUrl` action and must never be created in a cached function. Throws when the
+ * files can't be loaded, so a failure isn't cached; the caller decides how to show it.
+ */
+export async function getApplicationFiles(
+  companySlug: string,
+  jobSlug: string,
+  applicationId: string,
+): Promise<ApplicationFileView[]> {
+  'use cache: private';
+
+  const response = await apiFetch(
+    `${jobsPath(companySlug, jobSlug)}/applications/${encodeURIComponent(applicationId)}/files`,
+  );
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (!response.ok) {
+    throw new Error(`Could not load the application's files (HTTP ${response.status}).`);
+  }
+  const files = (await response.json()) as ApplicationFileView[];
+  return files.map(({ id, purpose, fieldKey, originalName, mimeType, sizeBytes, durationSeconds }) => ({
+    id,
+    purpose,
+    fieldKey,
+    originalName,
+    mimeType,
+    sizeBytes,
+    durationSeconds,
+  }));
+}
