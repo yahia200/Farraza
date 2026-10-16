@@ -137,7 +137,8 @@ export class ApplicationsService {
     }
 
     const parsed = parseAnswers(found.form.fields, dto.answers);
-    const errors: FieldError[] = parsed.ok ? [] : parsed.errors;
+    // A copy: the CV checks below push onto it, and the parser's own array must stay as it was.
+    const errors: FieldError[] = parsed.ok ? [] : [...parsed.errors];
     // The form version says whether a CV is asked for; the id's validity is checked when attaching.
     const { cvMode } = found.form;
     if (cvMode === 'off' && dto.cvFileId) {
