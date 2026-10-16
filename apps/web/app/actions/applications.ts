@@ -5,8 +5,10 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import {
   createNoteSchema,
+  createUploadSchema,
   moveApplicationSchema,
   submitApplicationSchema,
+  type CreateUploadInput,
   type FieldError,
   type SubmitApplicationInput,
 } from '@repo/shared';
@@ -61,10 +63,57 @@ export async function submitApplication(
       return body.errors?.length ? { fieldErrors: body.errors } : { formError: message };
     case 404:
       return { formError: 'This job just stopped accepting applications.' };
-    case 409: // "You have already applied for this job."
-      return { formError: message };
+    case 409:
+      // "You've already applied for this job", or a CV that couldn't be attached (with `errors`).
+      return body.errors?.length ? { fieldErrors: body.errors } : { formError: message };
     case 429: // ThrottlerGuard: 5 applications per 10 minutes per visitor.
       return { formError: 'Too many attempts. Wait a few minutes and try again.' };
+    default:
+      return { formError: 'Something went wrong. Please try again.' };
+  }
+}
+
+export interface CreateUploadResult {
+  /** Where to PUT the file, and the id to send with the application. Valid for a few minutes. */
+  upload?: { fileId: string; url: string; contentType: string };
+  /** One message the upload control shows as it is. */
+  formError?: string;
+}
+
+/**
+ * Starts a CV upload, calling POST /api/public/:companySlug/:jobSlug/uploads
+ * (apps/api/src/applications). The browser can't call the API, so the apply form
+ * asks this action for a presigned URL, then PUTs the file straight to the bucket.
+ * It is an action rather than part of the cached job (lib/public-jobs.ts) because
+ * a presigned URL is bound to one object and must never be shared between visitors.
+ */
+export async function createUpload(
+  companySlug: string,
+  jobSlug: string,
+  input: CreateUploadInput,
+): Promise<CreateUploadResult> {
+  const parsed = createUploadSchema.safeParse(input);
+  if (!parsed.success) {
+    return { formError: parsed.error.issues[0]?.message ?? 'Choose your file again.' };
+  }
+
+  const response = await apiFetch(
+    `/api/public/${encodeURIComponent(companySlug)}/${encodeURIComponent(jobSlug)}/uploads`,
+    { method: 'POST', body: JSON.stringify(parsed.data) },
+  );
+  if (response.ok) {
+    return { upload: (await response.json()) as NonNullable<CreateUploadResult['upload']> };
+  }
+
+  const body = await readApiError(response);
+  const message = Array.isArray(body.message) ? body.message.join(' ') : body.message;
+  switch (response.status) {
+    case 400: // The file broke the job's rules; the message says which.
+      return { formError: body.errors?.[0]?.message ?? message };
+    case 404:
+      return { formError: 'This job just stopped accepting applications.' };
+    case 429: // ThrottlerGuard: 20 uploads per 10 minutes per visitor.
+      return { formError: 'Too many uploads. Wait a few minutes and try again.' };
     default:
       return { formError: 'Something went wrong. Please try again.' };
   }

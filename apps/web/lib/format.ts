@@ -29,3 +29,11 @@ const dateTimeFormat = new Intl.DateTimeFormat('en-GB', {
 export function formatDateTime(iso: string): string {
   return `${dateTimeFormat.format(new Date(iso))} UTC`;
 }
+
+/** "840 KB", "2.4 MB": file sizes in the UI (binary units, one decimal from MB). */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024 * 1024) {
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}

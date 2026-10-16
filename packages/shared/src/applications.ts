@@ -21,6 +21,11 @@ export const submitApplicationSchema = z.strictObject({
   answers: z.record(z.string(), z.unknown(), {
     error: 'Something went wrong sending your answers. Reload the page and try again.',
   }),
+  /**
+   * The id of the CV the applicant uploaded (a `files` row), if the job's form asks for one.
+   * Whether it is missing, allowed or required is the service's call: it needs the form version.
+   */
+  cvFileId: z.uuid({ error: 'Upload your CV again.' }).optional(),
   /** Set from the link's `utm_source`, not typed by the applicant. */
   source: z.string().max(100).optional(),
   /** Honeypot: hidden in the page, so people leave it empty and bots fill it in. */
