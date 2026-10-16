@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
-import type { FormFields } from '@repo/shared';
+import type { CvMode, FormFields } from '@repo/shared';
 
 /**
  * A local copy of unsaved builder changes, in localStorage, in case the tab
@@ -18,6 +18,8 @@ import type { FormFields } from '@repo/shared';
 export interface FormBackup {
   savedAt: string;
   fields: FormFields;
+  /** Missing in backups written before the CV setting existed; those mean "unchanged". */
+  cvMode?: CvMode;
 }
 
 const listeners = new Set<() => void>();
@@ -40,7 +42,17 @@ function read(key: string): string | null {
   }
 }
 
-export function useFormBackup({ key, fields, isDirty }: { key: string; fields: FormFields; isDirty: boolean }) {
+export function useFormBackup({
+  key,
+  fields,
+  cvMode,
+  isDirty,
+}: {
+  key: string;
+  fields: FormFields;
+  cvMode: CvMode;
+  isDirty: boolean;
+}) {
   // The raw string is the snapshot: equal strings compare equal, so React
   // only re-renders when the stored backup actually changes.
   const raw = useSyncExternalStore(
@@ -84,9 +96,9 @@ export function useFormBackup({ key, fields, isDirty }: { key: string; fields: F
       return;
     }
     editedRef.current = true;
-    const timer = window.setTimeout(() => write({ savedAt: new Date().toISOString(), fields }), 500);
+    const timer = window.setTimeout(() => write({ savedAt: new Date().toISOString(), fields, cvMode }), 500);
     return () => window.clearTimeout(timer);
-  }, [fields, isDirty, write]);
+  }, [fields, cvMode, isDirty, write]);
 
   return { backup, clear: useCallback(() => write(null), [write]) };
 }

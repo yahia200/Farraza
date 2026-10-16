@@ -28,6 +28,9 @@ Sections 1–7 describe what is built. Section 8 lists designed tables and const
 | `PublicLabel` | `stages.public_label` | `received`, `in_review`, `interview`, `offer`, `closed` |
 | `ApplicationStatus` | `applications.status` | `active`, `rejected`, `hired`, `withdrawn` |
 | `ApplicationEventType` | `application_events.type` | `applied`, `auto_rejected`, `stage_changed`, `rejected`, `hired`, `withdrawn`, `note_added` |
+| `CvMode` | `form_versions.cv_mode` | `off`, `optional`, `required` |
+| `FilePurpose` | `files.purpose` | `cv`, `answer` |
+| `FileStatus` | `files.status` | `pending`, `uploaded` |
 | `SessionMfa` | `sessions.mfa` | `pending`, `verified` |
 
 No code writes `withdrawn` yet, either as a status or as an event type.
@@ -127,6 +130,7 @@ One row per version of a job's application form. A published version is never ed
 | `job_id` | `jobId` | `uuid` | NOT NULL, FK → `jobs.id` ON DELETE CASCADE |
 | `version` | `version` | `integer` | NOT NULL |
 | `fields` | `fields` | `jsonb` | NOT NULL, DEFAULT `'[]'` (shape in §4.1) |
+| `cv_mode` | `cvMode` | `text` (`CvMode`) | NOT NULL, DEFAULT `'off'` |
 | `published_at` | `publishedAt` | `timestamptz` | NULL (NULL means draft) |
 | `created_by` | `createdById` | `uuid` | NULL, **no FK** |
 | `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
@@ -137,6 +141,7 @@ One row per version of a job's application form. A published version is never ed
 - INDEX (`company_id`)
 - CHECK `form_versions_version_positive`: `version > 0`
 - A new draft gets `version` = latest published version + 1. Immutability after publishing is enforced in the application.
+- `cv_mode` says whether the form asks for a CV (ADR-0002): `off`, `optional` or `required`. The CV is not an entry in `fields` and never appears in `applications.answers`; it is a `files` row with `purpose = 'cv'`. The column defaults to `off`, so versions that existed before it keep asking for no CV. The form builder starts a brand-new job's first draft at `optional` (`DEFAULT_CV_MODE` in `packages/shared/src/cv-mode.ts`), and every save sends the mode explicitly. Because published versions are immutable, changing the mode after publishing creates a new version like any other edit.
 
 ### 3.7 `stages` (model `Stage`)
 Pipeline stages, owned by a job. Created from a default set when the job is created.
@@ -248,6 +253,33 @@ Append-only history of everything that happens to an application. The applicatio
 - CHECK `notes_body_not_blank`: `length(trim(body)) > 0`
 - Adding a note also writes a `note_added` event in the same transaction.
 
+### 3.12 `files` (model `File`)
+An applicant's uploaded files: the CV, and the answers to file questions. A row is created before the upload starts, so it usually exists before the application does. Enums: `FilePurpose`, `FileStatus` (§2).
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK |
+| `company_id` | `companyId` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
+| `job_id` | `jobId` | `uuid` | NOT NULL, FK → `jobs.id` ON DELETE CASCADE |
+| `application_id` | `applicationId` | `uuid` | NULL, FK → `applications.id` ON DELETE CASCADE (set when the form is submitted) |
+| `purpose` | `purpose` | `text` (`FilePurpose`) | NOT NULL |
+| `field_key` | `fieldKey` | `uuid` | NULL (the file question's key) |
+| `storage_key` | `storageKey` | `text` | NOT NULL, UNIQUE |
+| `original_name` | `originalName` | `text` | NOT NULL |
+| `mime_type` | `mimeType` | `text` | NOT NULL (the real type detected from the file's bytes, not the browser's claim) |
+| `size_bytes` | `sizeBytes` | `bigint` (`int8`, read as a JS `number`) | NOT NULL, CHECK `size_bytes > 0` |
+| `duration_seconds` | `durationSeconds` | `integer` | NULL, CHECK `duration_seconds IS NULL OR duration_seconds > 0` (declared by the browser for video and audio; the server does not re-measure it) |
+| `status` | `status` | `text` (`FileStatus`) | NOT NULL, DEFAULT `'pending'` |
+| `uploaded_at` | `uploadedAt` | `timestamptz` | NULL |
+| `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+
+- CHECK `files_field_key_matches_purpose`: `(purpose = 'answer') = (field_key IS NOT NULL)`
+- UNIQUE INDEX `files_one_cv_per_application` (`application_id`) WHERE `purpose = 'cv'`: one CV per application
+- INDEX (`application_id`), INDEX (`company_id`), INDEX (`job_id`), and INDEX (`status`, `created_at`) for cleaning up uploads that were never finished or never attached
+- `size_bytes` uses the contract type `BigIntNumber`, so it is an `int8` column that the ORM reads as a plain `number` (file sizes are far below 2^53). Use `BigInt` instead if a value could ever exceed that.
+- Deleting a row does not delete the object in storage. The application must delete the object as well.
+- Nothing parsing-specific is stored. A later parse table would reference the CV's row.
+
 ## 4. JSONB shapes
 
 The database does not validate these. The application does, using the Zod schemas and parsers in `packages/shared` (`@repo/shared`).
@@ -328,11 +360,11 @@ A knocked-out application is created directly in the Rejected stage with `status
 
 These are the relations declared in `contract.prisma`. Columns marked "no FK" above are not relations.
 
-- A `company` has many `memberships`, `jobs`, `stages`, `form_versions`, `candidates`, and `applications`.
+- A `company` has many `memberships`, `jobs`, `stages`, `form_versions`, `candidates`, `applications`, and `files`.
 - A `user` has many `memberships` and `sessions`, and is referenced by `jobs.created_by` and `notes.author_id`.
-- A `job` has many `form_versions`, `stages`, and `applications`.
+- A `job` has many `form_versions`, `stages`, `applications`, and `files`.
 - A `candidate` has many `applications`.
-- An `application` belongs to one `job`, one `candidate`, one `form_version`, and one `stage`, and has many `application_events` and `notes`.
+- An `application` belongs to one `job`, one `candidate`, one `form_version`, and one `stage`, and has many `application_events`, `notes`, and `files`.
 
 ## 6. Changing the schema
 
@@ -354,6 +386,8 @@ The database cannot check these, so the services must:
 - `applications.stage_id` belongs to the same job as the application. A move is rejected unless the target is one of the job's stages.
 - `applications.form_version_id` is the job's latest published version at submit time, and `applications.answers` is valid against its fields.
 - A published `form_versions` row is never modified. Draft updates and publishing are conditional on `published_at IS NULL`.
+- `form_versions.cv_mode` is saved together with `fields`, and publishing keeps it. A published version's `cv_mode` is never changed.
+- A `files` row is attached to an application (and becomes `uploaded`) only if it belongs to the same job, matches the purpose and field key, is still unattached and `pending`, and is attached in the same transaction that creates the application. A CV id is accepted only when the form version's `cv_mode` is not `off`, and is required when it is `required`. `file` answers in `applications.answers` must reference such a row. (Not built yet: the upload and submit code arrives with the file-upload tickets.)
 - A job can be opened only if it has a published form version. Opening and closing are conditional on the current `status`.
 - On every stage move, `applications.status` follows the target stage's kind (`normal` → `active`, `hired` → `hired`, `rejected` → `rejected`). It is updated in the same transaction as `stage_id`, together with an `application_events` row. The update is conditional on the application still being in its source stage, so concurrent moves get a 409 instead of overwriting each other.
 - Every state change writes its `application_events` row in the same transaction. Events are never updated or deleted.
@@ -390,32 +424,6 @@ It also adds `candidates.account_id uuid NULL` (FK → `candidate_accounts.id` O
 | `expires_at` | `timestamptz` | NOT NULL, INDEX (for the cleanup job) |
 | `used_at` | `timestamptz` | NULL |
 | `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
-
-**`files`**: uploaded CVs and file-type answers. Rows are created before the upload starts, often before the application exists. New enums: `FilePurpose` (`cv`, `answer`) and `FileStatus` (`pending`, `uploaded`).
-
-| Column | Type | Constraints |
-|---|---|---|
-| `id` | `uuid` | PK |
-| `company_id` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
-| `job_id` | `uuid` | NOT NULL, FK → `jobs.id` ON DELETE CASCADE |
-| `application_id` | `uuid` | NULL, FK → `applications.id` ON DELETE CASCADE (set when the form is submitted) |
-| `purpose` | `text` (`FilePurpose`) | NOT NULL |
-| `field_key` | `uuid` | NULL |
-| `storage_key` | `text` | NOT NULL, UNIQUE |
-| `original_name` | `text` | NOT NULL |
-| `mime_type` | `text` | NOT NULL |
-| `size_bytes` | `bigint` | NOT NULL, CHECK `size_bytes > 0` |
-| `status` | `text` (`FileStatus`) | NOT NULL, DEFAULT `'pending'` |
-| `uploaded_at` | `timestamptz` | NULL |
-| `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
-
-Constraints and notes for `files`:
-
-- CHECK `(purpose = 'answer') = (field_key IS NOT NULL)`
-- UNIQUE (`application_id`) WHERE `purpose = 'cv'`: one CV per application
-- INDEX (`application_id`), and INDEX (`status`, `created_at`) for cleaning up uploads that never finished or were never attached
-- `file` answers in `applications.answers` would then have to reference an `uploaded` row for the same job and field.
-- Deleting a row does not delete the object in storage. The application must delete the object as well.
 
 **`scores`**: a reviewer's rating of an application overall, or of one answer. Adds `score_added` (`{ "scoreId": "uuid", "value": 4 }`) to `ApplicationEventType`.
 

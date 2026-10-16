@@ -46,7 +46,7 @@ A global `ThrottlerGuard` allows 100 requests/min. The public apply endpoint is 
 
 1. **Company**: created together with an `owner` membership in one transaction. Members are added and removed under `MemberPolicy` rank rules.
 2. **Job**: created in `draft` with six default stages (Applied, Screening, Interview, Offer, Hired, Rejected; see `DEFAULT_STAGES`). Stage `kind` is `normal`, `hired`, or `rejected`.
-3. **Form** (`form_versions`): at most one draft per job, enforced by a partial unique index. Published versions are **immutable**: editing after publish creates a new draft with `version + 1`, and applicants always get the latest published version. A job can't be opened until a published form exists.
+3. **Form** (`form_versions`): at most one draft per job, enforced by a partial unique index. Published versions are **immutable**: editing after publish creates a new draft with `version + 1`, and applicants always get the latest published version. A job can't be opened until a published form exists. Each version also has `cv_mode` (off, optional, required; ADR-0002), saved with `fields` (`saveFormSchema` takes both) and part of the public job payload.
 4. **Public apply** (`GET/POST /api/public/:companySlug/:jobSlug[/applications]`, in `applications/`):
    - Only `open` jobs are served. Fields go through `toPublicFields()`, which strips knockout rules; never send raw `fields` to applicants.
    - Answers are validated with `parseAnswers()`. If `findKnockout()` matches, the application is auto-placed in the Rejected stage.

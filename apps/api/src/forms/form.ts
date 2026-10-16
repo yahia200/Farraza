@@ -1,9 +1,11 @@
-import type { FormFields } from '@repo/shared';
+import type { CvMode, FormFields } from '@repo/shared';
 
 export interface FormVersion {
   id: string;
   version: number;
   fields: FormFields;
+  /** Whether the form asks for a CV. It sits beside `fields`, not in it (ADR-0002). */
+  cvMode: CvMode;
   publishedAt: Date | null;
   updatedAt: Date;
 }

@@ -1,9 +1,9 @@
-import type { Answers, FormFields } from '@repo/shared';
+import type { Answers, CvMode, FormFields } from '@repo/shared';
 
 export interface OpenJob {
   company: { id: string; name: string; slug: string; logoUrl: string | null; brandColor: string | null };
   job: { id: string; title: string; description: string | null };
-  form: { id: string; fields: FormFields };
+  form: { id: string; fields: FormFields; cvMode: CvMode };
   firstStageId: string;
   rejectedStageId: string;
 }

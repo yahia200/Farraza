@@ -20,6 +20,10 @@
       "model": "Company",
       "namespace": "public"
     },
+    "files": {
+      "model": "File",
+      "namespace": "public"
+    },
     "form_versions": {
       "model": "FormVersion",
       "namespace": "public"
@@ -104,6 +108,49 @@
               {
                 "name": "Withdrawn",
                 "value": "withdrawn"
+              }
+            ]
+          },
+          "CvMode": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "Off",
+                "value": "off"
+              },
+              {
+                "name": "Optional",
+                "value": "optional"
+              },
+              {
+                "name": "Required",
+                "value": "required"
+              }
+            ]
+          },
+          "FilePurpose": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "Cv",
+                "value": "cv"
+              },
+              {
+                "name": "Answer",
+                "value": "answer"
+              }
+            ]
+          },
+          "FileStatus": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "Pending",
+                "value": "pending"
+              },
+              {
+                "name": "Uploaded",
+                "value": "uploaded"
               }
             ]
           },
@@ -759,6 +806,218 @@
               "table": "companies"
             }
           },
+          "File": {
+            "fields": {
+              "applicationId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "companyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              },
+              "durationSeconds": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "fieldKey": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "jobId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "mimeType": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "originalName": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "purpose": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "FilePurpose",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "sizeBytes": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int8number@1",
+                  "kind": "scalar"
+                }
+              },
+              "status": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "FileStatus",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "storageKey": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "uploadedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "application": {
+                "cardinality": "N:1",
+                "nullable": true,
+                "on": {
+                  "localFields": [
+                    "applicationId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Application",
+                  "namespace": "public"
+                }
+              },
+              "company": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "companyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Company",
+                  "namespace": "public"
+                }
+              },
+              "job": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "jobId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Job",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "applicationId": {
+                  "column": "application_id"
+                },
+                "companyId": {
+                  "column": "company_id"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "durationSeconds": {
+                  "column": "duration_seconds"
+                },
+                "fieldKey": {
+                  "column": "field_key"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "jobId": {
+                  "column": "job_id"
+                },
+                "mimeType": {
+                  "column": "mime_type"
+                },
+                "originalName": {
+                  "column": "original_name"
+                },
+                "purpose": {
+                  "column": "purpose"
+                },
+                "sizeBytes": {
+                  "column": "size_bytes"
+                },
+                "status": {
+                  "column": "status"
+                },
+                "storageKey": {
+                  "column": "storage_key"
+                },
+                "uploadedAt": {
+                  "column": "uploaded_at"
+                }
+              },
+              "namespaceId": "public",
+              "table": "files"
+            }
+          },
           "FormVersion": {
             "fields": {
               "companyId": {
@@ -780,6 +1039,19 @@
                 "type": {
                   "codecId": "pg/uuid@1",
                   "kind": "scalar"
+                }
+              },
+              "cvMode": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "CvMode",
+                  "namespaceId": "public",
+                  "plane": "domain"
                 }
               },
               "fields": {
@@ -869,6 +1141,9 @@
                 },
                 "createdById": {
                   "column": "created_by"
+                },
+                "cvMode": {
+                  "column": "cv_mode"
                 },
                 "fields": {
                   "column": "fields"
@@ -2203,8 +2478,247 @@
                 }
               ]
             },
+            "files": {
+              "checks": [
+                {
+                  "expression": "duration_seconds IS NULL OR duration_seconds > 0",
+                  "name": "files_duration_positive_e3f8f01a",
+                  "prefix": "files_duration_positive"
+                },
+                {
+                  "expression": "(purpose = 'answer') = (field_key IS NOT NULL)",
+                  "name": "files_field_key_matches_purpose_03ee4fec",
+                  "prefix": "files_field_key_matches_purpose"
+                },
+                {
+                  "expression": "\"purpose\" IN ('cv', 'answer')",
+                  "name": "files_purpose_check_516c1cf0",
+                  "prefix": "files_purpose_check"
+                },
+                {
+                  "expression": "size_bytes > 0",
+                  "name": "files_size_positive_782a1626",
+                  "prefix": "files_size_positive"
+                },
+                {
+                  "expression": "\"status\" IN ('pending', 'uploaded')",
+                  "name": "files_status_check_ec3383ef",
+                  "prefix": "files_status_check"
+                }
+              ],
+              "columns": {
+                "application_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": true
+                },
+                "company_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "created_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "duration_seconds": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": true
+                },
+                "field_key": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": true
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "default": {
+                    "expression": "gen_random_uuid()",
+                    "kind": "function"
+                  },
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "job_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "mime_type": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "original_name": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "purpose": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "FilePurpose",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "size_bytes": {
+                  "codecId": "pg/int8number@1",
+                  "nativeType": "int8",
+                  "nullable": false
+                },
+                "status": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "pending"
+                  },
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "FileStatus",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "storage_key": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "uploaded_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "company_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "files"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "companies"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "job_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "files"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "jobs"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "application_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "files"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "applications"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "application_id"
+                  ],
+                  "name": "files_application_id_idx_e32e1f6e",
+                  "prefix": "files_application_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "company_id"
+                  ],
+                  "name": "files_company_id_idx_1303a718",
+                  "prefix": "files_company_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "job_id"
+                  ],
+                  "name": "files_job_id_idx_58a5bbdd",
+                  "prefix": "files_job_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "application_id"
+                  ],
+                  "name": "files_one_cv_per_application_9da9e29c",
+                  "prefix": "files_one_cv_per_application",
+                  "unique": true,
+                  "where": "(purpose = 'cv')"
+                },
+                {
+                  "columns": [
+                    "status",
+                    "created_at"
+                  ],
+                  "name": "files_status_created_at_idx_1bbe8adf",
+                  "prefix": "files_status_created_at_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "storage_key"
+                  ]
+                }
+              ]
+            },
             "form_versions": {
               "checks": [
+                {
+                  "expression": "\"cv_mode\" IN ('off', 'optional', 'required')",
+                  "name": "form_versions_cv_mode_check_5797f468",
+                  "prefix": "form_versions_cv_mode_check"
+                },
                 {
                   "expression": "version > 0",
                   "name": "form_versions_version_positive_341aaa74",
@@ -2230,6 +2744,21 @@
                   "codecId": "pg/uuid@1",
                   "nativeType": "uuid",
                   "nullable": true
+                },
+                "cv_mode": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "off"
+                  },
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "CvMode",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
                 },
                 "fields": {
                   "codecId": "pg/jsonb@1",
@@ -3096,6 +3625,28 @@
                 "withdrawn"
               ]
             },
+            "CvMode": {
+              "kind": "valueSet",
+              "values": [
+                "off",
+                "optional",
+                "required"
+              ]
+            },
+            "FilePurpose": {
+              "kind": "valueSet",
+              "values": [
+                "cv",
+                "answer"
+              ]
+            },
+            "FileStatus": {
+              "kind": "valueSet",
+              "values": [
+                "pending",
+                "uploaded"
+              ]
+            },
             "JobStatus": {
               "kind": "valueSet",
               "values": [
@@ -3144,7 +3695,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "2087fdf542a4d13c1e168e5178548535357534c7ddc9ff9a2da740c9c66da498"
+    "storageHash": "4db2ac6290228e9d567107ad6661dfcd73131e11a049874f490c58312540fc74"
   },
   "execution": {
     "executionHash": "c19b53563967fe1cdc97d45552456039c34d42f7b292484a823348d6f653f142",

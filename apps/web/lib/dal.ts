@@ -1,6 +1,6 @@
 import 'server-only';
 import { notFound, redirect } from 'next/navigation';
-import type { ActivityEvent, ActivityNote, Answers, ApplicationStatus, FormFields } from '@repo/shared';
+import type { ActivityEvent, ActivityNote, Answers, ApplicationStatus, CvMode, FormFields } from '@repo/shared';
 import { apiFetch } from './api';
 import { formatDate } from './format';
 
@@ -197,6 +197,7 @@ export async function hasPublishedForm(companySlug: string, jobSlug: string): Pr
 export interface FormVersionView {
   version: number;
   fields: FormFields;
+  cvMode: CvMode;
   publishedAt: string | null;
   updatedAt: string;
 }
@@ -220,7 +221,7 @@ export async function getJobForm(
   }
   const form = (await response.json()) as { draft: FormVersionView | null; published: FormVersionView | null };
   const pick = (v: FormVersionView | null) =>
-    v && { version: v.version, fields: v.fields, publishedAt: v.publishedAt, updatedAt: v.updatedAt };
+    v && { version: v.version, fields: v.fields, cvMode: v.cvMode, publishedAt: v.publishedAt, updatedAt: v.updatedAt };
   return { draft: pick(form.draft), published: pick(form.published) };
 }
 

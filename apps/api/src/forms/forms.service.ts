@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { AuthorizationService } from '@nestjs/authorization';
-import { FILE_UNSUPPORTED, parseFormFields } from '@repo/shared';
+import { FILE_UNSUPPORTED, parseFormFields, type CvMode } from '@repo/shared';
 import type { Membership } from '../companies/company.js';
 import { JobPolicy } from '../jobs/job.policy.js';
 import { JobsService } from '../jobs/jobs.service.js';
@@ -30,11 +30,11 @@ export class FormsService {
     user: User,
     membership: Membership,
     jobSlug: string,
-    input: unknown,
+    input: { fields: unknown; cvMode: CvMode },
   ): Promise<FormVersion> {
     await this.authorization.authorize(JobPolicy, 'update', user, membership);
 
-    const parsed = parseFormFields(input);
+    const parsed = parseFormFields(input.fields);
     if (!parsed.ok) {
       throw new BadRequestException({ message: 'Some questions in this form need attention.', errors: parsed.errors });
     }
@@ -43,7 +43,10 @@ export class FormsService {
     const draft = await this.forms.findDraft(job.id);
 
     if (draft) {
-      const updated = await this.forms.updateDraftFields(draft.id, parsed.fields);
+      const updated = await this.forms.updateDraft(draft.id, {
+        fields: parsed.fields,
+        cvMode: input.cvMode,
+      });
       if (!updated) {
         throw new ConflictException('This draft was just published. Reload and try again.');
       }
@@ -57,6 +60,7 @@ export class FormsService {
         jobId: job.id,
         version: (published?.version ?? 0) + 1,
         fields: parsed.fields,
+        cvMode: input.cvMode,
         createdById: user.id,
       });
     } catch (error) {

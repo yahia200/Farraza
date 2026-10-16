@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cvModeSchema } from './cv-mode.js';
 import { MAX_FIELDS } from './form-fields.js';
 
 /** Request bodies for the API's /companies/:companySlug/jobs endpoints. */
@@ -22,12 +23,13 @@ export const updateJobSchema = z.strictObject({ title: title.optional(), descrip
 export type UpdateJobInput = z.infer<typeof updateJobSchema>;
 
 /**
- * Saving a form draft. The array's items are left unchecked here: the
+ * Saving a form draft: the questions plus the CV setting. The array's items are left unchecked here: the
  * service validates them with `parseFormFields()`, which reports every issue.
  */
 export const saveFormSchema = z.strictObject({
   fields: z
     .array(z.unknown())
     .max(MAX_FIELDS, { error: `A form can have at most ${MAX_FIELDS} questions.` }),
+  cvMode: cvModeSchema,
 });
 export type SaveFormInput = z.infer<typeof saveFormSchema>;

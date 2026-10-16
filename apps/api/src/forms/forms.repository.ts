@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { FormFields } from '@repo/shared';
+import type { CvMode, FormFields } from '@repo/shared';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { FormVersion } from './form.js';
 
@@ -33,6 +33,7 @@ export class FormsRepository {
     jobId: string;
     version: number;
     fields: FormFields;
+    cvMode: CvMode;
     createdById: string;
   }): Promise<FormVersion> {
     const row = await this.versions.create(input);
@@ -40,11 +41,11 @@ export class FormsRepository {
   }
 
   /** Returns null if the version is no longer a draft. */
-  async updateDraftFields(id: string, fields: FormFields): Promise<FormVersion | null> {
+  async updateDraft(id: string, input: { fields: FormFields; cvMode: CvMode }): Promise<FormVersion | null> {
     const row = await this.versions
       .where({ id })
       .where((version) => version.publishedAt.isNull())
-      .update({ fields });
+      .update(input);
     return row ? toFormVersion(row) : null;
   }
 
@@ -62,6 +63,7 @@ function toFormVersion(row: {
   id: string;
   version: number;
   fields: unknown;
+  cvMode: CvMode;
   publishedAt: Date | null;
   updatedAt: Date;
 }): FormVersion {
@@ -69,6 +71,7 @@ function toFormVersion(row: {
     id: row.id,
     version: row.version,
     fields: row.fields as FormFields,
+    cvMode: row.cvMode,
     publishedAt: row.publishedAt,
     updatedAt: row.updatedAt,
   };

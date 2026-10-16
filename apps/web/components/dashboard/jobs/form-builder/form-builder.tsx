@@ -5,7 +5,7 @@ import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ArchiveRestoreIcon, PlusIcon } from 'lucide-react';
-import { formFieldsSchema, MAX_FIELDS, type FieldError, type FormFields } from '@repo/shared';
+import { cvModeSchema, formFieldsSchema, MAX_FIELDS, type CvMode, type FieldError, type FormFields } from '@repo/shared';
 import { publishForm, saveFormDraft } from '@/app/actions/forms';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
@@ -30,12 +30,13 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Spinner } from '@/components/ui/spinner';
 import { toast } from '@/components/ui/toast';
+import { CvCard } from './cv-card';
 import { BUILDER_TYPES, FIELD_TYPES, newField, type BuilderFieldType } from './field-types';
 import { QuestionCard, type BuilderValues } from './question-card';
 import { useFormBackup } from './use-form-backup';
 
-/** The builder validates with the same shared schema the API uses (packages/shared/src/form-fields.ts). */
-const builderSchema = z.object({ fields: formFieldsSchema });
+/** The builder validates with the same shared schemas the API uses (packages/shared/src/form-fields.ts, cv-mode.ts). */
+const builderSchema = z.object({ fields: formFieldsSchema, cvMode: cvModeSchema });
 
 export interface FormStatus {
   /** Latest published version number, if any. */
@@ -45,30 +46,33 @@ export interface FormStatus {
 }
 
 /**
- * The application form builder. One React Hook Form for the whole question
- * list (useFieldArray), validated by zodResolver(formFieldsSchema), with
+ * The application form builder. One React Hook Form for the CV setting and the whole question
+ * list (useFieldArray), validated by zodResolver(builderSchema), with
  * explicit "Save draft" and "Publish" and a local backup of unsaved changes.
  */
 export function FormBuilder({
   companySlug,
   jobSlug,
   initialFields,
+  initialCvMode,
   status,
   canEdit,
 }: {
   companySlug: string;
   jobSlug: string;
   initialFields: FormFields;
+  initialCvMode: CvMode;
   status: FormStatus;
   canEdit: boolean;
 }) {
   const form = useForm<BuilderValues>({
     resolver: zodResolver(builderSchema),
-    defaultValues: { fields: initialFields },
+    defaultValues: { fields: initialFields, cvMode: initialCvMode },
   });
   // RHF gives each row its own `id` for React keys; questions use `key`, so the two don't clash.
   const { fields: rows, append, move, remove, replace } = useFieldArray({ control: form.control, name: 'fields' });
   const values = useWatch({ control: form.control, name: 'fields' });
+  const cvMode = useWatch({ control: form.control, name: 'cvMode' });
   const { isDirty } = form.formState;
 
   const [justAdded, setJustAdded] = useState<string>();
@@ -80,19 +84,25 @@ export function FormBuilder({
   const { backup, clear } = useFormBackup({
     key: `khatwateen:form-backup:${companySlug}/${jobSlug}`,
     fields: values,
+    cvMode,
     isDirty,
   });
   const [backupHandled, setBackupHandled] = useState(false);
   const backupDiffers = useMemo(
-    () => backup !== null && JSON.stringify(backup.fields) !== JSON.stringify(initialFields),
-    [backup, initialFields],
+    () =>
+      backup !== null &&
+      (JSON.stringify(backup.fields) !== JSON.stringify(initialFields) ||
+        (backup.cvMode ?? initialCvMode) !== initialCvMode),
+    [backup, initialFields, initialCvMode],
   );
   // Only offered before you start editing; editing is locked until you choose.
   const offerRestore = canEdit && !backupHandled && !isDirty && backupDiffers;
 
   function restoreBackup() {
     if (!backup) return;
-    replace(backup.fields); // Differs from the saved version, so the form becomes dirty.
+    replace(backup.fields);
+    // Either call may be the only difference from the saved version; each marks the form dirty.
+    form.setValue('cvMode', backup.cvMode ?? initialCvMode, { shouldDirty: true });
     setBackupHandled(true);
   }
 
@@ -113,7 +123,7 @@ export function FormBuilder({
   const save = form.handleSubmit((data) =>
     startSaving(async () => {
       setFormError(undefined);
-      const result = await saveFormDraft(companySlug, jobSlug, data.fields);
+      const result = await saveFormDraft(companySlug, jobSlug, { fields: data.fields, cvMode: data.cvMode });
       if (result.ok) {
         form.reset(data); // The saved version is the new baseline.
         clear();
@@ -130,11 +140,11 @@ export function FormBuilder({
   function publish() {
     startSaving(async () => {
       setFormError(undefined);
-      const fields = form.getValues('fields');
-      const result = await publishForm(companySlug, jobSlug, isDirty ? fields : null);
+      const content = form.getValues();
+      const result = await publishForm(companySlug, jobSlug, isDirty ? content : null);
       setConfirmPublish(false);
       if (result.ok) {
-        form.reset({ fields });
+        form.reset(content);
         clear();
         toast.add({ type: 'success', title: 'Form published', description: 'New applicants will see this version.' });
         return;
@@ -204,6 +214,9 @@ export function FormBuilder({
         Every application also asks for the candidate&apos;s name, email and phone number.{' '}
         {canEdit ? 'Add the questions specific to this job below.' : 'Below are the questions specific to this job.'}
       </p>
+
+      {/* The CV step comes before the questions in the apply form, so its card does too. */}
+      <CvCard control={form.control} readOnly={!canEdit} disabled={offerRestore} />
 
       {/* The questions */}
       <fieldset className="flex flex-col gap-2">

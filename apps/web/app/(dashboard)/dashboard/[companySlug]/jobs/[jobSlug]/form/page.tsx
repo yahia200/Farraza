@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { canManageJobs } from '@repo/shared';
+import { canManageJobs, DEFAULT_CV_MODE } from '@repo/shared';
 import { FormBuilder } from '@/components/dashboard/jobs/form-builder/form-builder';
 import { JobPage } from '@/components/dashboard/jobs/job-page';
 import { getJobForm } from '@/lib/dal';
@@ -27,6 +27,8 @@ async function Builder({ companySlug, jobSlug, canEdit }: { companySlug: string;
       companySlug={companySlug}
       jobSlug={jobSlug}
       initialFields={(draft ?? published)?.fields ?? []}
+      // A brand-new job's form starts by asking for an optional CV; once a version exists, keep its setting.
+      initialCvMode={(draft ?? published)?.cvMode ?? DEFAULT_CV_MODE}
       status={{ publishedVersion: published?.version ?? null, hasDraft: draft !== null }}
       canEdit={canEdit}
     />
