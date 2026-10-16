@@ -150,6 +150,15 @@ export function fileFormatNames(kinds: readonly FileKind[]): string {
   return listWithOr([...new Set(names)]);
 }
 
+/**
+ * The formats as a noun phrase for a sentence: "a PDF or DOCX file", "an MP4, MOV or WebM file". The
+ * article follows how the first name is said aloud ("em-pee-four", "oh-gee-gee"), so M and O take "an".
+ */
+export function fileFormatPhrase(kinds: readonly FileKind[]): string {
+  const names = fileFormatNames(kinds);
+  return `${/^[MO]/.test(names) ? 'an' : 'a'} ${names} file`;
+}
+
 /** Shown before the applicant picks a file, like `CV_ACCEPT_HINT`. */
 export function attachmentHint(rules: AttachmentRules): string {
   const length =
@@ -194,7 +203,7 @@ export function declaredDuration(seconds: number): number | null {
 export function checkAttachmentFile(rules: AttachmentRules, file: DeclaredFile): FieldError | null {
   const type = matchAllowedType(allowedContentTypes(rules.kinds), file.contentType);
   if (type === null) {
-    return { path: 'contentType', message: `Upload a ${fileFormatNames(rules.kinds)} file.` };
+    return { path: 'contentType', message: `Upload ${fileFormatPhrase(rules.kinds)}.` };
   }
   if (file.sizeBytes <= 0) {
     return { path: 'sizeBytes', message: 'That file is empty. Choose another one.' };

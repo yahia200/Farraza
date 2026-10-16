@@ -348,7 +348,18 @@ describe('files on an Application (recruiter side)', () => {
     const PDF = 'application/pdf';
     const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
-    it.each([PDF, DOCX])('returns a short-lived inline link for a %s file', async (mimeType) => {
+    it.each([
+      PDF,
+      DOCX,
+      'video/mp4',
+      'video/quicktime',
+      'video/webm',
+      'audio/mpeg',
+      'audio/mp4',
+      'audio/wav',
+      'audio/ogg',
+      'audio/webm',
+    ])('returns a short-lived inline link for a %s file', async (mimeType) => {
       repository.seedFile({ id: 'file-cv', originalName: 'Mona Ali – CV', mimeType });
 
       const link = await service.viewLink(
@@ -369,7 +380,7 @@ describe('files on an Application (recruiter side)', () => {
       expect(storage.requests).toEqual([]);
     });
 
-    it.each(['text/html', 'image/svg+xml', 'application/octet-stream', 'video/mp4', 'application/msword'])(
+    it.each(['text/html', 'image/svg+xml', 'application/octet-stream', 'video/x-matroska', 'audio/flac', 'application/msword'])(
       'refuses to show a %s file inline and signs nothing',
       async (mimeType) => {
         repository.seedFile({ id: 'file-odd', mimeType });

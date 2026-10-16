@@ -11,8 +11,10 @@ import {
   allowedContentTypes,
   checkAttachmentFile,
   checkCvFile,
-  fileFormatNames,
+  fileFormatPhrase,
   findKnockout,
+  isMediaContentType,
+  matchAllowedType,
   parseAnswers,
   toPublicFields,
   type Answers,
@@ -63,6 +65,11 @@ export class ApplicationsService {
       throw new NotFoundException();
     }
 
+    // What to pin on the presigned URL and record on the row, and, for video and audio, the length
+    // the browser read from the file. Both are decided by the form version, not taken as sent.
+    let contentType = dto.contentType;
+    let durationSeconds: number | null = null;
+
     if (dto.purpose === 'cv') {
       if (found.form.cvMode === 'off') {
         throw fieldErrors([
@@ -88,12 +95,19 @@ export class ApplicationsService {
       if (problem) {
         throw fieldErrors([problem]);
       }
+      // The check passed, so the declared type stands for one of the question's types. Use that one
+      // (`audio/x-m4a` is `audio/mp4`; a WebM declared as video is audio in an audio question).
+      contentType =
+        matchAllowedType(allowedContentTypes(question.config.kinds), dto.contentType) ?? dto.contentType;
+      // The server does not re-measure the length; it keeps what the browser declared, which the
+      // check above required and compared with the limit. A document has no length.
+      if (isMediaContentType(contentType)) durationSeconds = dto.durationSeconds ?? null;
     }
 
     const fileId = randomUUID();
     const target = { companyId: found.company.id, jobId: found.job.id, fileId };
     const { key, url } = await this.storage.createUpload(target, {
-      contentType: dto.contentType,
+      contentType,
       sizeBytes: dto.sizeBytes,
     });
     await this.applications.createPendingFile({
@@ -104,10 +118,11 @@ export class ApplicationsService {
       fieldKey: dto.purpose === 'answer' ? dto.fieldKey : null,
       storageKey: key,
       originalName: dto.originalName,
-      mimeType: dto.contentType,
+      mimeType: contentType,
       sizeBytes: dto.sizeBytes,
+      durationSeconds,
     });
-    return { fileId, url, contentType: dto.contentType };
+    return { fileId, url, contentType };
   }
 
   async submit(companySlug: string, jobSlug: string, dto: SubmitApplicationDto) {
@@ -245,13 +260,16 @@ export class ApplicationsService {
       };
     }
     const bytes = await this.storage.readLeadingBytes(row.storageKey, SNIFF_BYTES);
-    const mimeType = await sniffFileType(bytes);
-    if (!mimeType || !wanted.allowedTypes.includes(mimeType)) {
+    // `file-type` answers `video/webm` for any WebM and `audio/x-m4a` for an M4A, so the allowed
+    // type it stands for is what gets stored (`matchAllowedType`).
+    const sniffed = await sniffFileType(bytes);
+    const mimeType = sniffed === null ? null : matchAllowedType(wanted.allowedTypes, sniffed);
+    if (mimeType === null) {
       return {
         message:
           wanted.purpose === 'cv'
             ? NOT_THE_CLAIMED_TYPE_CV
-            : `That file isn't really the kind it claims to be. Upload a ${wanted.formats} file.`,
+            : `That file isn't really the kind it claims to be. Upload ${wanted.formats}.`,
       };
     }
     return { mimeType };
@@ -288,7 +306,7 @@ const NOT_THE_CLAIMED_TYPE_CV =
 interface WantedFile extends Omit<FileToAttach, 'mimeType'> {
   /** The types the bytes may turn out to be. */
   allowedTypes: readonly string[];
-  /** The same, for messages: "PDF or DOCX". */
+  /** The same, for messages: "a PDF or DOCX file". */
   formats: string;
 }
 
@@ -305,7 +323,7 @@ function wantedFiles(found: OpenJob, dto: SubmitApplicationDto, answers: Answers
       purpose: 'cv',
       fieldKey: null,
       allowedTypes: CV_CONTENT_TYPES,
-      formats: 'PDF or DOCX',
+      formats: 'a PDF or DOCX file',
     });
   }
   for (const field of found.form.fields) {
@@ -316,7 +334,7 @@ function wantedFiles(found: OpenJob, dto: SubmitApplicationDto, answers: Answers
         purpose: 'answer',
         fieldKey: field.key,
         allowedTypes: allowedContentTypes(field.config.kinds),
-        formats: fileFormatNames(field.config.kinds),
+        formats: fileFormatPhrase(field.config.kinds),
       });
     }
   }

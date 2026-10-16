@@ -8,6 +8,7 @@ import {
   createUploadSchema,
   declaredDuration,
   fileAccept,
+  fileFormatPhrase,
   formatClock,
   formatDuration,
   isMediaContentType,
@@ -43,6 +44,15 @@ describe('video and audio Attachments', () => {
       expect(attachmentHint(audio)).toBe('MP3, M4A, WAV, OGG or WebM, up to 25 MB and 1 minute 30 seconds');
       expect(attachmentHint({ ...mixed, kinds: ['video', 'audio'] })).toBe(
         'MP4, MOV, WebM, MP3, M4A, WAV or OGG, up to 100 MB and 2 minutes',
+      );
+    });
+
+    it('writes "an MP4", not "a MP4", and "a WAV", in the sentence that names the formats', () => {
+      expect(fileFormatPhrase(['video'])).toBe('an MP4, MOV or WebM file');
+      expect(fileFormatPhrase(['audio'])).toBe('an MP3, M4A, WAV, OGG or WebM file');
+      expect(fileFormatPhrase(['document'])).toBe('a PDF or DOCX file');
+      expect(checkAttachmentFile(video, { contentType: 'audio/mpeg', sizeBytes: MB })?.message).toBe(
+        'Upload an MP4, MOV or WebM file.',
       );
     });
 
