@@ -19,6 +19,9 @@ export const CV_MAX_SIZE_BYTES = CV_MAX_SIZE_MB * 1024 * 1024;
 /** Shown before the applicant picks a file. */
 export const CV_ACCEPT_HINT = `PDF or DOCX, up to ${CV_MAX_SIZE_MB} MB`;
 
+/** What an uploaded file is for: the CV slot, or the answer to a file question. Matches `files.purpose`. */
+export type FilePurpose = 'cv' | 'answer';
+
 // --- Attachments: what a file question can ask for ---------------------------------------------
 
 /** The kinds of file a question can accept (spec: .scratch/file-uploads/spec.md, Domain model). */
@@ -135,6 +138,20 @@ const TYPE_LABELS: Record<string, string> = {
   'audio/webm': 'WebM',
 };
 
+/**
+ * A stored type as people read it, for the candidate sheet: the format's name plus, for pictures
+ * and media, what it is ("PDF", "JPEG image", "MP4 video", "M4A audio"). Takes the aliases of
+ * `TYPE_ALIASES` and ignores case; a type that is none of the allowed ones is shown as it is rather
+ * than guessed at. The messages above use the plain names (`TYPE_LABELS`) instead.
+ */
+export function fileTypeLabel(mimeType: string): string {
+  const type = mimeType.toLowerCase();
+  const name = TYPE_LABELS[TYPE_ALIASES[type] ?? type];
+  if (name === undefined) return mimeType;
+  const noun = /^(image|video|audio)\//.exec(TYPE_ALIASES[type] ?? type)?.[1];
+  return noun === undefined ? name : `${name} ${noun}`;
+}
+
 /** "A", "A or B", "A, B or C". */
 function listWithOr(items: readonly string[]): string {
   if (items.length <= 1) return items.join('');
@@ -190,7 +207,7 @@ export function declaredDuration(seconds: number): number | null {
   return Math.max(1, Math.ceil(seconds));
 }
 
-/** The first problem with a file for this question, or null. `path` names the request property. */
+/** The first problem with a file for this question, or null. */
 export function checkAttachmentFile(rules: AttachmentRules, file: DeclaredFile): FieldError | null {
   const type = matchAllowedType(allowedContentTypes(rules.kinds), file.contentType);
   if (type === null) {

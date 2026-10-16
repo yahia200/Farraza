@@ -10,6 +10,7 @@ import {
   contentTypeOf,
   createUploadSchema,
   fileAccept,
+  fileTypeLabel,
   suggestedMaxSizeMb,
   type FileKind,
 } from './files.js';
@@ -207,5 +208,36 @@ describe('Attachment rules', () => {
       expect(suggestedMaxSizeMb(['audio'])).toBe(25);
       expect(suggestedMaxSizeMb(['video', 'document'])).toBe(100);
     });
+  });
+});
+
+describe('fileTypeLabel', () => {
+  it.each([
+    [CV_PDF_TYPE, 'PDF'],
+    [CV_DOCX_TYPE, 'DOCX'],
+    ['image/jpeg', 'JPEG image'],
+    ['image/png', 'PNG image'],
+    ['image/webp', 'WebP image'],
+    ['video/mp4', 'MP4 video'],
+    ['video/quicktime', 'MOV video'],
+    ['video/webm', 'WebM video'],
+    ['audio/mpeg', 'MP3 audio'],
+    ['audio/mp4', 'M4A audio'],
+    ['audio/wav', 'WAV audio'],
+    ['audio/ogg', 'OGG audio'],
+    ['audio/webm', 'WebM audio'],
+  ])('names %s as %s', (type, label) => {
+    expect(fileTypeLabel(type)).toBe(label);
+  });
+
+  it('knows the aliases the sniffer and browsers use, and ignores case', () => {
+    expect(fileTypeLabel('audio/x-m4a')).toBe('M4A audio');
+    expect(fileTypeLabel('audio/x-wav')).toBe('WAV audio');
+    expect(fileTypeLabel('IMAGE/PNG')).toBe('PNG image');
+  });
+
+  it('shows an unknown type as it is rather than guessing', () => {
+    expect(fileTypeLabel('application/x-tar')).toBe('application/x-tar');
+    expect(fileTypeLabel('')).toBe('');
   });
 });

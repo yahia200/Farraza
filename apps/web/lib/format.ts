@@ -37,3 +37,12 @@ export function formatFileSize(bytes: number): string {
   }
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+/** "0:42", "12:05", "1:02:03": the length of a video or audio file. */
+export function formatDuration(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
+}

@@ -1,4 +1,4 @@
-import type { Answers, FormFields } from '@repo/shared';
+import type { Answers, CvMode, FilePurpose, FormFields } from '@repo/shared';
 import type { StageKind } from '../jobs/job.js';
 
 export type ApplicationStatus = 'active' | 'rejected' | 'hired' | 'withdrawn';
@@ -45,6 +45,8 @@ export interface ApplicationDetail {
   stage: { id: string; name: string; kind: StageKind };
   candidate: { id: string; name: string; email: string; phone: string };
   fields: FormFields;
+  /** The CV setting of the form version the applicant saw, so the sheet knows whether a CV was asked for. */
+  cvMode: CvMode;
   answers: Answers;
   events: ApplicationEventView[];
   notes: NoteView[];
@@ -54,7 +56,7 @@ export interface ApplicationDetail {
 export interface ApplicationFile {
   id: string;
   /** `cv` for the built-in CV slot, `answer` for the answer to a file question. */
-  purpose: 'cv' | 'answer';
+  purpose: FilePurpose;
   /** The file question's key for an `answer`; null for the CV. */
   fieldKey: string | null;
   /** The applicant's own name for the file (untrusted text). */

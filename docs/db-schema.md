@@ -453,7 +453,8 @@ It also adds `candidates.account_id uuid NULL` (FK → `candidate_accounts.id` O
 
 - **Invitations** (inviting teammates by email): add with the team feature. For now, members are added directly by email.
 - **Emails sent to candidates:** adds `email_sent` (`{ "template": "application_received" }`) to `ApplicationEventType`, and uses `applications.rejection_notified_at`.
-- **Structured experience, timed questions, and video fields:** new field types in `form_versions.fields`. Video will also need transcoding columns on `files`.
+- **Structured experience and timed questions:** new field types in `form_versions.fields`.
+- **Server-side video processing:** video and audio Attachments already exist (§3.12, §9). What is not built is anything the server does to the media itself (transcoding, thumbnails), which would need extra columns on `files`.
 - **Billing and plans.**
 
 ## 9. Object storage for applicant files

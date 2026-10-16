@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Answers, FormFields } from '@repo/shared';
+import type { Answers, FilePurpose, FormFields } from '@repo/shared';
 import type { StageKind } from '../jobs/job.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
@@ -14,7 +14,7 @@ import { EVENT_FOR_STAGE, STATUS_FOR_STAGE } from './pipeline.js';
 
 function toApplicationFile(row: {
   id: string;
-  purpose: 'cv' | 'answer';
+  purpose: FilePurpose;
   fieldKey: string | null;
   originalName: string;
   mimeType: string;
@@ -110,6 +110,7 @@ export class PipelineRepository {
         phone: row.phone,
       },
       fields: row.formVersion.fields as FormFields,
+      cvMode: row.formVersion.cvMode,
       answers: row.answers as Answers,
       events: eventRows.map((event) => ({
         id: event.id,
