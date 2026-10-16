@@ -187,7 +187,7 @@ export async function getFileViewUrl(
   return { url };
 }
 
-export type AddNoteResult =ActionFailure<'body'> & { ok?: boolean };
+export type AddNoteResult = ActionFailure<'body'> & { ok?: boolean };
 
 /**
  * Adds a note to an application (POST .../applications/:id/notes). Every role
