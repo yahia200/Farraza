@@ -39,8 +39,6 @@ export function buildObjectKey(target: UploadTarget): string {
   return `companies/${target.companyId}/jobs/${target.jobId}/files/${target.fileId}`;
 }
 
-// --- Recruiter downloads (ticket 05) ---
-
 /**
  * The `Content-Disposition` value that makes a browser save a file under the applicant's name.
  *
@@ -81,8 +79,6 @@ function encodeExtValue(value: string): string {
     (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
   );
 }
-
-// --- Inline viewing (ticket 06) ---
 
 /**
  * The `Content-Disposition` value for a file the candidate sheet shows in place: `inline`, with the

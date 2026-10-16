@@ -75,9 +75,9 @@ export class StorageService {
     return { key, url };
   }
 
-  // --- Verification and cleanup of uploaded objects (ticket 04) -------------------------------
-  // Server-side calls with the API's own credentials; nothing here is presigned.
-  // Docs: apps/api/node_modules/@aws-sdk/client-s3/dist-types/commands/
+  // The next three methods (headObject, readLeadingBytes, deleteObject) verify and clean up
+  // uploaded objects. They are server-side calls with the API's own credentials; nothing is
+  // presigned. Docs: apps/api/node_modules/@aws-sdk/client-s3/dist-types/commands/
   // {HeadObjectCommand,GetObjectCommand,DeleteObjectCommand}.d.ts
 
   /**
@@ -119,9 +119,6 @@ export class StorageService {
       new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
     );
   }
-  // --- end of verification and cleanup ---------------------------------------------------------
-
-  // --- Recruiter downloads (ticket 05) ---
 
   /**
    * Mints a presigned GET URL that downloads a file under the applicant's original file name.
