@@ -10,6 +10,14 @@ describe('previewKindOf', () => {
     expect(previewKindOf(CV_DOCX_TYPE)).toBe('docx');
   });
 
+  it.each(['video/mp4', 'video/quicktime', 'video/webm'])('plays %s as video', (type) => {
+    expect(previewKindOf(type)).toBe('video');
+  });
+
+  it.each(['audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/ogg', 'audio/webm'])('plays %s as audio', (type) => {
+    expect(previewKindOf(type)).toBe('audio');
+  });
+
   it('ignores the case of the type', () => {
     expect(previewKindOf('Application/PDF')).toBe('pdf');
   });
@@ -21,6 +29,15 @@ describe('previewKindOf', () => {
     'application/javascript',
     'application/msword',
     'application/octet-stream',
+    // Video and audio the sheet does not play: Matroska, AVI, MP2T, 3GP, Ogg video, FLAC, AAC.
+    'video/x-matroska',
+    'video/vnd.avi',
+    'video/mp2t',
+    'video/3gpp',
+    'video/ogg',
+    'audio/flac',
+    'audio/aac',
+    'video/mp4; codecs=avc1',
     // Only an exact type counts: no parameters, no look-alikes.
     'application/pdf; charset=utf-8',
     'application/pdfx',
