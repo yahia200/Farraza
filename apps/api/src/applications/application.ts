@@ -14,6 +14,21 @@ export interface FileToAttach {
   purpose: 'cv' | 'answer';
   /** The file question's key for an `answer`; null for the CV. */
   fieldKey: string | null;
+  /** The type found in the object's bytes (not the browser's claim); stored on the row when attached. */
+  mimeType: string;
+}
+
+/**
+ * A pending, unattached `files` row of this job that a submit refers to, with what the check at
+ * submit compares the bucket object against.
+ */
+export interface FileToVerify {
+  id: string;
+  purpose: 'cv' | 'answer';
+  fieldKey: string | null;
+  storageKey: string;
+  /** The size declared when the upload was created, which the presigned URL pinned. */
+  sizeBytes: number;
 }
 
 /** A `files` row created when an upload starts, before any bytes exist and before the Application does. */

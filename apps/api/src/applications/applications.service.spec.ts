@@ -5,13 +5,22 @@ import {
 } from '@nestjs/common';
 import { CV_DOCX_TYPE, CV_PDF_TYPE, type CvMode } from '@repo/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { SNIFF_BYTES } from '../storage/file-sniff.js';
 import type {
   PresignedUpload,
   UploadDeclaration,
   UploadTarget,
 } from '../storage/storage.js';
 import type { StorageService } from '../storage/storage.service.js';
+import {
+  sampleDocx,
+  sampleLinuxExecutable,
+  samplePdf,
+  sampleWindowsExecutable,
+  sampleZip,
+} from '../testing/sample-files.js';
 import type {
+  FileToVerify,
   NewApplication,
   NewPendingFile,
   OpenJob,
@@ -87,6 +96,45 @@ class InMemoryApplicationsRepository implements PublicApi<ApplicationsRepository
     return file && { ...file };
   }
 
+  /** The SQL's rule for a file that can still be checked, attached or removed: this job's, pending, unattached. */
+  private isOpenFile(file: StoredFile, companyId: string, jobId: string) {
+    return (
+      file.companyId === companyId &&
+      file.jobId === jobId &&
+      file.status === 'pending' &&
+      file.applicationId === null
+    );
+  }
+
+  async findFilesToVerify(
+    companyId: string,
+    jobId: string,
+    ids: string[],
+  ): Promise<FileToVerify[]> {
+    return ids.flatMap((id) => {
+      const file = this.files.get(id);
+      if (!file || !this.isOpenFile(file, companyId, jobId)) return [];
+      return [
+        {
+          id: file.id,
+          purpose: file.purpose,
+          fieldKey: file.fieldKey ?? null,
+          storageKey: file.storageKey,
+          sizeBytes: file.sizeBytes,
+        },
+      ];
+    });
+  }
+
+  async deletePendingFile(
+    companyId: string,
+    jobId: string,
+    id: string,
+  ): Promise<void> {
+    const file = this.files.get(id);
+    if (file && this.isOpenFile(file, companyId, jobId)) this.files.delete(id);
+  }
+
   async findOpenJob(
     companySlug: string,
     jobSlug: string,
@@ -128,11 +176,12 @@ class InMemoryApplicationsRepository implements PublicApi<ApplicationsRepository
     }
 
     const applicationId = `application-${this.nextApplicationId++}`;
-    for (const { file } of toAttach) {
+    for (const { wanted, file } of toAttach) {
       Object.assign(file!, {
         applicationId,
         status: 'uploaded',
         uploadedAt: new Date(),
+        mimeType: wanted.mimeType,
       });
     }
     this.applied.add(person);
@@ -141,11 +190,49 @@ class InMemoryApplicationsRepository implements PublicApi<ApplicationsRepository
   }
 }
 
-class FakeStorage implements Pick<PublicApi<StorageService>, 'createUpload'> {
+class FakeStorage
+  implements
+    Pick<
+      PublicApi<StorageService>,
+      'createUpload' | 'headObject' | 'readLeadingBytes' | 'deleteObject'
+    >
+{
   readonly requests: Array<{
     target: UploadTarget;
     declared: UploadDeclaration;
   }> = [];
+  /** The bucket's contents: what the browser's PUT leaves behind. */
+  private readonly objects = new Map<string, Uint8Array>();
+  readonly reads: Array<{ key: string; length: number }> = [];
+  readonly deleted: string[] = [];
+  /** Test setup: make deleting fail, as an unreachable bucket would. */
+  failDeletes = false;
+
+  /** Test setup: the browser has PUT these bytes. */
+  put(key: string, bytes: Uint8Array): void {
+    this.objects.set(key, bytes);
+  }
+
+  has(key: string): boolean {
+    return this.objects.has(key);
+  }
+
+  async headObject(key: string) {
+    const object = this.objects.get(key);
+    return object ? { sizeBytes: object.length } : null;
+  }
+
+  /** Like a ranged GET: the first `length` bytes, or the whole object if it is shorter. */
+  async readLeadingBytes(key: string, length: number) {
+    this.reads.push({ key, length });
+    return (this.objects.get(key) ?? new Uint8Array(0)).subarray(0, length);
+  }
+
+  async deleteObject(key: string) {
+    if (this.failDeletes) throw new Error('bucket unreachable');
+    this.deleted.push(key);
+    this.objects.delete(key);
+  }
 
   async createUpload(
     target: UploadTarget,
@@ -190,6 +277,24 @@ describe('ApplicationsService', () => {
       storage as unknown as StorageService,
     );
   });
+
+  /**
+   * What the apply page does: ask for an upload declaring a size, then PUT bytes. The bucket would
+   * refuse bytes of another length (the URL signs it), but a truncated or swapped object is exactly
+   * what the submit-time check exists for, so `declaredSize` may differ from the bytes.
+   */
+  async function uploadCv(
+    bytes: Uint8Array,
+    options: { declaredSize?: number; contentType?: string } = {},
+  ): Promise<string> {
+    const { fileId } = await service.createUpload('acme', 'backend', {
+      ...pdf,
+      contentType: options.contentType ?? CV_PDF_TYPE,
+      sizeBytes: options.declaredSize ?? bytes.length,
+    });
+    storage.put(repository.file(fileId)!.storageKey, bytes);
+    return fileId;
+  }
 
   describe('createUpload', () => {
     it('hands the browser a file id and a URL for exactly the file it declared', async () => {
@@ -307,7 +412,7 @@ describe('ApplicationsService', () => {
   describe('submit', () => {
     it('attaches the CV in the same step as creating the Application', async () => {
       const job = repository.seedJob({ slug: 'backend', cvMode: 'optional' });
-      const { fileId } = await service.createUpload('acme', 'backend', pdf);
+      const fileId = await uploadCv(samplePdf());
 
       await service.submit('acme', 'backend', applicant({ cvFileId: fileId }));
 
@@ -450,7 +555,7 @@ describe('ApplicationsService', () => {
 
     it('refuses a file that already belongs to another Application', async () => {
       repository.seedJob({ slug: 'backend', cvMode: 'optional' });
-      const { fileId } = await service.createUpload('acme', 'backend', pdf);
+      const fileId = await uploadCv(samplePdf());
       await service.submit('acme', 'backend', applicant({ cvFileId: fileId }));
 
       await expect(
@@ -465,17 +570,21 @@ describe('ApplicationsService', () => {
         ),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(repository.applications).toHaveLength(1);
+      // The first Application's CV is untouched: its object was never a candidate for cleanup.
+      expect(storage.deleted).toEqual([]);
+      expect(repository.file(fileId)?.status).toBe('uploaded');
     });
 
     it('leaves the file pending when the person already applied, so a retry can reuse it', async () => {
       repository.seedJob({ slug: 'backend', cvMode: 'optional' });
       await service.submit('acme', 'backend', applicant());
-      const { fileId } = await service.createUpload('acme', 'backend', pdf);
+      const fileId = await uploadCv(samplePdf());
 
       await expect(
         service.submit('acme', 'backend', applicant({ cvFileId: fileId })),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(repository.file(fileId)?.status).toBe('pending');
+      expect(storage.has(repository.file(fileId)!.storageKey)).toBe(true);
 
       await service.submit(
         'acme',
@@ -491,7 +600,7 @@ describe('ApplicationsService', () => {
 
     it('leaves the file pending when the answers are invalid', async () => {
       repository.seedJob({ slug: 'backend', cvMode: 'optional' });
-      const { fileId } = await service.createUpload('acme', 'backend', pdf);
+      const fileId = await uploadCv(samplePdf());
 
       await expect(
         service.submit(
@@ -501,6 +610,12 @@ describe('ApplicationsService', () => {
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(repository.file(fileId)?.status).toBe('pending');
+      // Nothing was wrong with the file, so it is not even looked at, let alone removed.
+      expect(storage.reads).toEqual([]);
+      expect(storage.deleted).toEqual([]);
+
+      await service.submit('acme', 'backend', applicant({ cvFileId: fileId }));
+      expect(repository.file(fileId)?.status).toBe('uploaded');
     });
 
     it('does not save a bot submission or touch its file', async () => {
@@ -515,6 +630,167 @@ describe('ApplicationsService', () => {
 
       expect(repository.applications).toHaveLength(0);
       expect(repository.file(fileId)?.status).toBe('pending');
+    });
+  });
+
+  // The browser's word about a file (name, type, size) is not trusted: at submit the bucket object
+  // is checked against what was declared and against its own leading bytes (ticket 04).
+  describe('submit: checking the uploaded file', () => {
+    const DOCX =
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+    /** Submits and returns what the applicant is told, as the Nest exception it becomes. */
+    async function submitRefused(fileId: string) {
+      const error = await service
+        .submit('acme', 'backend', applicant({ cvFileId: fileId }))
+        .catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(BadRequestException);
+      return (error as BadRequestException).getResponse() as {
+        errors: Array<{ path: string; message: string }>;
+      };
+    }
+
+    /** The refusal every failed check ends in: gone from the bucket, gone from the table, no Application. */
+    function expectRemoved(fileId: string, storageKey: string) {
+      expect(repository.file(fileId)).toBeUndefined();
+      expect(storage.has(storageKey)).toBe(false);
+      expect(storage.deleted).toEqual([storageKey]);
+      expect(repository.applications).toHaveLength(0);
+    }
+
+    beforeEach(() => {
+      repository.seedJob({ slug: 'backend', cvMode: 'optional' });
+    });
+
+    it('stores the type found in the bytes, not the one the browser declared', async () => {
+      // Declared (and named) as a PDF, but the bytes are a real DOCX: both are allowed, and the row says what it is.
+      const fileId = await uploadCv(sampleDocx(), { contentType: CV_PDF_TYPE });
+
+      await service.submit('acme', 'backend', applicant({ cvFileId: fileId }));
+
+      expect(repository.file(fileId)).toMatchObject({
+        status: 'uploaded',
+        mimeType: DOCX,
+        originalName: 'cv.pdf',
+      });
+    });
+
+    it('accepts a real PDF and records its type', async () => {
+      const fileId = await uploadCv(samplePdf());
+
+      await service.submit('acme', 'backend', applicant({ cvFileId: fileId }));
+
+      expect(repository.file(fileId)).toMatchObject({
+        status: 'uploaded',
+        mimeType: CV_PDF_TYPE,
+      });
+    });
+
+    it('recognises a big DOCX after reading only its first bytes', async () => {
+      const docx = sampleDocx({ extraBytes: 4 * SNIFF_BYTES });
+      const fileId = await uploadCv(docx, { contentType: DOCX });
+
+      await service.submit('acme', 'backend', applicant({ cvFileId: fileId }));
+
+      expect(repository.file(fileId)?.mimeType).toBe(DOCX);
+      expect(storage.reads).toEqual([
+        { key: repository.file(fileId)!.storageKey, length: SNIFF_BYTES },
+      ]);
+    });
+
+    it.each([
+      ['a Windows program', sampleWindowsExecutable],
+      ['a Linux program', sampleLinuxExecutable],
+      ['a zip that is not a Word document', sampleZip],
+      ['plain text', () => Buffer.from('I am definitely a PDF, trust me.')],
+    ])(
+      'refuses %s renamed to cv.pdf, with a field error on the CV',
+      async (_name, make) => {
+        const fileId = await uploadCv(make());
+        const storageKey = repository.file(fileId)!.storageKey;
+
+        const { errors } = await submitRefused(fileId);
+
+        expect(errors).toEqual([
+          {
+            path: 'cvFileId',
+            message: expect.stringContaining('PDF or DOCX'),
+          },
+        ]);
+        expectRemoved(fileId, storageKey);
+      },
+    );
+
+    it('refuses an object cut short, declared at its full size', async () => {
+      const pdfBytes = samplePdf();
+      const fileId = await uploadCv(pdfBytes.subarray(0, pdfBytes.length - 20), {
+        declaredSize: pdfBytes.length,
+      });
+      const storageKey = repository.file(fileId)!.storageKey;
+
+      const { errors } = await submitRefused(fileId);
+
+      expect(errors).toEqual([
+        { path: 'cvFileId', message: expect.stringContaining('upload') },
+      ]);
+      expectRemoved(fileId, storageKey);
+    });
+
+    it('refuses an object bigger than declared, though its bytes are a real PDF', async () => {
+      const pdfBytes = samplePdf();
+      const fileId = await uploadCv(pdfBytes, {
+        declaredSize: pdfBytes.length - 1,
+      });
+      const storageKey = repository.file(fileId)!.storageKey;
+
+      await submitRefused(fileId);
+
+      expectRemoved(fileId, storageKey);
+    });
+
+    it('refuses an upload that never reached the bucket', async () => {
+      const { fileId } = await service.createUpload('acme', 'backend', pdf);
+      const storageKey = repository.file(fileId)!.storageKey;
+
+      const { errors } = await submitRefused(fileId);
+
+      expect(errors[0]).toMatchObject({ path: 'cvFileId' });
+      expect(repository.file(fileId)).toBeUndefined();
+      expect(storage.reads).toEqual([]);
+      expect(repository.applications).toHaveLength(0);
+      expect(storage.has(storageKey)).toBe(false);
+    });
+
+    it('refuses a required CV that fails the check, so no Application is made without one', async () => {
+      repository.seedJob({ slug: 'strict', cvMode: 'required' });
+      const { fileId } = await service.createUpload('acme', 'strict', pdf);
+      storage.put(repository.file(fileId)!.storageKey, sampleWindowsExecutable());
+
+      await expect(
+        service.submit('acme', 'strict', applicant({ cvFileId: fileId })),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(repository.applications).toHaveLength(0);
+    });
+
+    it('lets the applicant upload again and apply after a refusal', async () => {
+      const bad = await uploadCv(sampleWindowsExecutable());
+      await submitRefused(bad);
+
+      const good = await uploadCv(samplePdf());
+      await service.submit('acme', 'backend', applicant({ cvFileId: good }));
+
+      expect(repository.applications).toHaveLength(1);
+      expect(repository.file(good)?.status).toBe('uploaded');
+    });
+
+    it('still tells the applicant when the bucket cannot delete, and keeps the row so it can be found later', async () => {
+      const fileId = await uploadCv(sampleWindowsExecutable());
+      storage.failDeletes = true;
+
+      const { errors } = await submitRefused(fileId);
+
+      expect(errors[0]).toMatchObject({ path: 'cvFileId' });
+      expect(repository.file(fileId)).toMatchObject({ status: 'pending' });
     });
   });
 
