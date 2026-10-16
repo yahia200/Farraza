@@ -10,3 +10,4 @@ export * from './members.js';
 export * from './pipeline.js';
 export * from './phone.js';
 export * from './file-preview.js';
+export * from './image-upload.js';
