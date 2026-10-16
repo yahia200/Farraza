@@ -7,6 +7,7 @@ import {
   HeadObjectCommand,
   DeleteObjectCommand,
   NotFound,
+  type GetObjectCommandInput,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
@@ -129,14 +130,7 @@ export class StorageService {
    * in apps/api/node_modules/@aws-sdk/client-s3/dist-types/models/models_0.d.ts.
    */
   async createDownloadUrl(key: string, originalName: string): Promise<string> {
-    const command = new GetObjectCommand({
-      Bucket: this.bucket,
-      Key: key,
-      ResponseContentDisposition: attachmentDisposition(originalName),
-    });
-    return getSignedUrl(this.client, command, {
-      expiresIn: DOWNLOAD_URL_TTL_SECONDS,
-    });
+    return this.presignGet(key, { ResponseContentDisposition: attachmentDisposition(originalName) });
   }
 
   // --- Inline viewing (ticket 06) ---
@@ -153,14 +147,18 @@ export class StorageService {
    * render as a page on the bucket's origin.
    */
   async createViewUrl(key: string, originalName: string, contentType: string): Promise<string> {
-    const command = new GetObjectCommand({
-      Bucket: this.bucket,
-      Key: key,
+    return this.presignGet(key, {
       ResponseContentDisposition: inlineDisposition(originalName),
       ResponseContentType: contentType,
     });
-    return getSignedUrl(this.client, command, {
-      expiresIn: DOWNLOAD_URL_TTL_SECONDS,
-    });
+  }
+
+  /** A presigned GET for `key` that lasts `DOWNLOAD_URL_TTL_SECONDS`, with the given signed response overrides. */
+  private presignGet(
+    key: string,
+    overrides: Pick<GetObjectCommandInput, 'ResponseContentDisposition' | 'ResponseContentType'>,
+  ): Promise<string> {
+    const command = new GetObjectCommand({ Bucket: this.bucket, Key: key, ...overrides });
+    return getSignedUrl(this.client, command, { expiresIn: DOWNLOAD_URL_TTL_SECONDS });
   }
 }
