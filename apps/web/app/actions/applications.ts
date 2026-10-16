@@ -81,7 +81,8 @@ export interface CreateUploadResult {
 }
 
 /**
- * Starts a CV upload, calling POST /api/public/:companySlug/:jobSlug/uploads
+ * Starts an upload for the CV or for a file question's answer (`purpose`), calling
+ * POST /api/public/:companySlug/:jobSlug/uploads
  * (apps/api/src/applications). The browser can't call the API, so the apply form
  * asks this action for a presigned URL, then PUTs the file straight to the bucket.
  * It is an action rather than part of the cached job (lib/public-jobs.ts) because

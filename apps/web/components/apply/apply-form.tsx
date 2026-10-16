@@ -52,6 +52,7 @@ import {
   type AnswerInput,
   type ApplyValues,
 } from "./apply-values";
+import { AttachmentStep } from "./attachment-step";
 import { CvStep } from "./cv-step";
 import { QuestionStep } from "./question-step";
 import type { PublicJob } from "@/lib/public-jobs";
@@ -153,8 +154,19 @@ export function ApplyForm({
   const [formError, setFormError] = useState<string>();
   const [sent, setSent] = useState(false);
   const [started, setStarted] = useState(false);
-  // True while the CV is being sent: the step can't be left, skipped or submitted until it is done.
-  const [uploading, setUploading] = useState(false);
+  // The steps (the CV and file questions) whose file is being sent. While any is, the form can't be
+  // left, skipped or submitted. A list rather than a flag, so each upload control only reports its own.
+  const [uploadingSteps, setUploadingSteps] = useState<string[]>([]);
+  const uploading = uploadingSteps.length > 0;
+  function setStepUploading(step: string, busy: boolean) {
+    setUploadingSteps((current) =>
+      busy
+        ? current.includes(step)
+          ? current
+          : [...current, step]
+        : current.filter((name) => name !== step),
+    );
+  }
 
   // Multiple-choice options locked at their question's limit, as a string of ids.
   // Updated in answer() (every change goes through it) rather than by watching all
@@ -244,6 +256,8 @@ export function ApplyForm({
       if (path === CV_STEP) {
         // The API refused this file id, so the upload no longer counts: the step asks for it again.
         form.setValue("cvFileId", null);
+      } else if (fields.some((field) => field.key === path && field.type === "file")) {
+        form.setValue(`answers.${path}`, null);
       }
       if (order.includes(path)) {
         form.setError(pathFor(path), { type: "server", message });
@@ -387,7 +401,7 @@ export function ApplyForm({
                   value={field.value}
                   error={fieldState.error?.message}
                   onChange={(fileId) => answer("cvFileId", fileId)}
-                  onBusyChange={setUploading}
+                  onBusyChange={(busy) => setStepUploading(CV_STEP, busy)}
                 />
               )}
             />
@@ -429,14 +443,26 @@ export function ApplyForm({
             />
           ))}
 
-          {fields.map((field) => (
-            <QuestionStep
-              key={field.key}
-              form={form}
-              field={field}
-              onAnswer={answer}
-            />
-          ))}
+          {fields.map((field) =>
+            field.type === "file" ? (
+              <AttachmentStep
+                key={field.key}
+                form={form}
+                field={field}
+                companySlug={company.slug}
+                jobSlug={jobSlug}
+                onAnswer={answer}
+                onBusyChange={(busy) => setStepUploading(field.key, busy)}
+              />
+            ) : (
+              <QuestionStep
+                key={field.key}
+                form={form}
+                field={field}
+                onAnswer={answer}
+              />
+            ),
+          )}
 
           {/* Honeypot. People never see it, so it stays empty; bots that fill in every
           input give themselves away, and the API quietly drops their application.
