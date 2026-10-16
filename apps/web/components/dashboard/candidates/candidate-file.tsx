@@ -4,10 +4,20 @@ import type { ApplicationFileView } from '@/lib/dal';
 import { formatDuration, formatFileSize } from '@/lib/format';
 import { FileCard } from './file-card';
 
+/** "PDF · 1.2 MB · 2 min": what the sheet's row and the preview page's header say under the name. */
+export function fileDetails(file: ApplicationFileView): string {
+  return [
+    fileTypeLabel(file.mimeType).split(' ')[0], // "PDF" from "PDF document"
+    formatFileSize(file.sizeBytes),
+    ...(file.durationSeconds ? [formatDuration(file.durationSeconds)] : []),
+  ].join(' · ');
+}
+
 /**
  * One file an applicant sent: its name, type, size (and length, for video and audio), a download
- * button, and a preview for the types the sheet can show inline. A Server Component; the card around
- * it (`FileCard`) is the client part, so the name and details are rendered on the server.
+ * button, and a link to the file's preview page for the types the browser can show. A Server
+ * Component; the card around it (`FileCard`) is the client part, so the name and details are
+ * rendered on the server.
  */
 export function CandidateFile({
   file,
@@ -20,12 +30,6 @@ export function CandidateFile({
   jobSlug: string;
   applicationId: string;
 }) {
-  const details = [
-    fileTypeLabel(file.mimeType),
-    formatFileSize(file.sizeBytes),
-    ...(file.durationSeconds ? [formatDuration(file.durationSeconds)] : []),
-  ];
-
   return (
     <FileCard
       kind={previewKindOf(file.mimeType)}
@@ -44,7 +48,7 @@ export function CandidateFile({
         <span className="truncate font-medium text-foreground" title={file.originalName}>
           {file.originalName}
         </span>
-        <span className="text-sm text-muted-foreground">{details.join(' · ')}</span>
+        <span className="text-sm text-muted-foreground">{fileDetails(file)}</span>
       </div>
     </FileCard>
   );

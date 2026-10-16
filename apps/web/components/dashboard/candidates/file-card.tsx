@@ -1,21 +1,24 @@
 'use client';
 
-import { EyeIcon, EyeOffIcon } from 'lucide-react';
-import { useId, useState, type ReactNode } from 'react';
+import { EyeIcon } from 'lucide-react';
+import Link from 'next/link';
+import type { ReactNode } from 'react';
 import type { PreviewKind } from '@repo/shared';
-import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { usePdfPreviewSupported } from '@/hooks/use-pdf-preview-supported';
 import { DownloadFileButton } from './download-file-button';
-import { DocxViewer, ImageViewer, MediaViewer, PdfViewer, type ViewerFile } from './file-viewers';
+import { filePreviewHref } from './file-preview-href';
+import type { ViewerFile } from './file-viewers';
 
 /**
  * One file's card: the row the server renders (`children`: icon, name, details), a Download button
- * that is always there, and, for a file the sheet can show inline, a Preview toggle that opens the
- * viewer under the row.
+ * that is always there, and, for a file the browser can show, a Preview link that opens the file's
+ * own page (app/(viewer)/…) in a new tab.
  *
- * The viewer opens on request, not with the sheet: the link is minted and the bytes are fetched only
- * for a CV someone actually wants to read. To teach it a new kind, add the
- * kind to `previewKindOf` in @repo/shared and a case in `Viewer` below.
+ * Nothing is fetched here: the preview page mints the view link and loads the bytes when it opens, so
+ * the sheet stays light however many files an application has. To teach it a new kind, see
+ * `FileViewer` in file-viewers.tsx.
  */
 export function FileCard({
   kind,
@@ -27,10 +30,6 @@ export function FileCard({
   file: ViewerFile;
   children: ReactNode;
 }) {
-  // An image is cheap and is what the recruiter wants to see at a glance, so it opens with the card
-  // (Hide is still there); a PDF or DOCX opens on request.
-  const [open, setOpen] = useState(kind === 'image');
-  const panelId = useId();
   const pdfSupported = usePdfPreviewSupported();
   // Where the browser can't show PDFs, Download is the only action (and the visible fallback).
   const canPreview =
@@ -41,20 +40,20 @@ export function FileCard({
       {/* The buttons drop under the name when the sheet is narrow, instead of squeezing it. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="flex min-w-0 flex-1 basis-44 items-center gap-3">{children}</div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2 text-primary">
           {canPreview && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setOpen((value) => !value)}
-              aria-expanded={open}
-              aria-controls={panelId}
-              aria-label={`${open ? 'Hide preview of' : 'Preview'} ${file.fileName}`}
+            // A real link, so "open in new tab" and middle-click work. `target="_blank"` already
+            // implies `rel="noopener"` in current browsers; the explicit rel keeps older ones safe.
+            <Link
+              href={filePreviewHref(file)}
+              target="_blank"
+              rel="noopener"
+              className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
+              aria-label={`Preview ${file.fileName} (opens in a new tab)`}
             >
-              {open ? <EyeOffIcon data-icon="inline-start" /> : <EyeIcon data-icon="inline-start" />}
-              {open ? 'Hide' : 'Preview'}
-            </Button>
+              <EyeIcon data-icon="inline-start" />
+              Preview
+            </Link>
           )}
           <DownloadFileButton
             companySlug={file.companySlug}
@@ -65,27 +64,6 @@ export function FileCard({
           />
         </div>
       </div>
-      {canPreview && open && (
-        <div id={panelId}>
-          <Viewer kind={kind} file={file} />
-        </div>
-      )}
     </div>
   );
-}
-
-function Viewer({ kind, file }: { kind: PreviewKind | null; file: ViewerFile }) {
-  switch (kind) {
-    case 'pdf':
-      return <PdfViewer file={file} />;
-    case 'docx':
-      return <DocxViewer file={file} />;
-    case 'image':
-      return <ImageViewer file={file} />;
-    case 'video':
-    case 'audio':
-      return <MediaViewer file={file} kind={kind} />;
-    default:
-      return null;
-  }
 }

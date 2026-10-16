@@ -2,6 +2,7 @@
 
 import { FileWarningIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import type { PreviewKind } from '@repo/shared';
 import { getFileViewUrl } from '@/app/actions/applications';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,15 +19,20 @@ export interface ViewerFile {
   sizeBytes: number;
 }
 
-const VIEWER_HEIGHT = 'h-[70vh] min-h-80';
+/**
+ * The viewers fill the file preview page (app/(viewer)/…): the viewport minus the slim header
+ * (3.5rem) and the page padding (2rem). `dvh` follows a phone's collapsing address bar.
+ */
+const VIEWER_HEIGHT = 'h-[calc(100dvh-5.5rem)] min-h-80';
+const VIEWER_MAX_HEIGHT = 'max-h-[calc(100dvh-5.5rem)]';
 
 type ViewerState =
   { status: 'loading' } | { status: 'ready'; url: string } | { status: 'failed'; message: string };
 
 /**
- * Asks the API for an inline link once, when the viewer mounts. A new link on every open (the card
- * unmounts the viewer when it closes): links last minutes, and they must never be cached or rendered
- * into the page (the DAL and the sheet are cached).
+ * Asks the API for an inline link once, when the viewer mounts. A new link on every visit to the
+ * preview page: links last minutes, and they must never be cached or rendered into the page (the DAL
+ * is cached, and so is the page's shell).
  */
 function useViewUrl(file: ViewerFile) {
   const { companySlug, jobSlug, applicationId, fileId } = file;
@@ -62,6 +68,27 @@ function useViewUrl(file: ViewerFile) {
   return state;
 }
 
+/**
+ * Picks the viewer for a file's preview kind (`previewKindOf` in @repo/shared). To teach the preview
+ * page a new kind, extend `previewKindOf` and add a case here and a viewer below. A null kind is a
+ * type that can only be downloaded (someone opened the page's address by hand).
+ */
+export function FileViewer({ kind, file }: { kind: PreviewKind | null; file: ViewerFile }) {
+  switch (kind) {
+    case 'pdf':
+      return <PdfViewer file={file} />;
+    case 'docx':
+      return <DocxViewer file={file} />;
+    case 'image':
+      return <ImageViewer file={file} />;
+    case 'video':
+    case 'audio':
+      return <MediaViewer file={file} kind={kind} />;
+    default:
+      return <ViewerFailure message="This type of file can't be previewed." />;
+  }
+}
+
 function ViewerFailure({ message }: { message: string }) {
   return (
     <Alert>
@@ -90,8 +117,9 @@ function ViewerLoading({ label }: { label: string }) {
  * The link answers `Content-Type: application/pdf` and `Content-Disposition: inline` (both signed,
  * see StorageService.createViewUrl), so the browser opens its PDF viewer rather than saving it, and
  * the bytes sit on another origin than the dashboard: a PDF can't reach our cookies or pages. No
- * `sandbox` here on purpose: Chrome's PDF viewer refuses to run in a sandboxed frame. The caller
- * only renders this where `usePdfPreviewSupported()` is true. `referrerPolicy="no-referrer"` keeps
+ * `sandbox` here on purpose: Chrome's PDF viewer refuses to run in a sandboxed frame. `FileCard`
+ * only links to the preview page where `usePdfPreviewSupported()` is true; the page itself doesn't
+ * check again (that hook is false until hydrated, which would flash a wrong message). `referrerPolicy="no-referrer"` keeps
  * the dashboard address (company, job and application ids) out of the bucket's logs.
  * https://developer.mozilla.org/docs/Web/HTML/Reference/Elements/iframe#referrerpolicy
  */
@@ -214,7 +242,7 @@ export function MediaViewer({ file, kind }: { file: ViewerFile; kind: 'video' | 
     onError: () => setUnplayable(true),
   };
   return kind === 'video' ? (
-    <video {...player} playsInline className="max-h-[70vh] w-full rounded-xl border bg-black" />
+    <video {...player} playsInline className={`${VIEWER_MAX_HEIGHT} w-full rounded-xl border bg-black`} />
   ) : (
     <audio {...player} className="w-full" />
   );
@@ -230,7 +258,7 @@ export function MediaViewer({ file, kind }: { file: ViewerFile; kind: 'video' | 
  * never runs script, even from a file that lied about being an image. A cross-origin `<img>` needs
  * no CORS headers (unlike the DOCX `fetch`). `referrerPolicy="no-referrer"` keeps the dashboard
  * address (company, job and application ids) out of the bucket's logs. The picture is scaled to fit
- * the sheet (the original is a Download away); a failure to load falls back to the same alert as the
+ * the page (the original is a Download away); a failure to load falls back to the same alert as the
  * other viewers.
  * https://developer.mozilla.org/docs/Web/HTML/Reference/Elements/img#referrerpolicy
  */
@@ -260,7 +288,9 @@ export function ImageViewer({ file }: { file: ViewerFile }) {
           decoding="async"
           onLoad={() => setImage('loaded')}
           onError={() => setImage('failed')}
-          className={image === 'loaded' ? 'mx-auto max-h-[70vh] max-w-full rounded-xl border object-contain' : 'hidden'}
+          className={
+            image === 'loaded' ? `mx-auto ${VIEWER_MAX_HEIGHT} max-w-full rounded-xl border object-contain` : 'hidden'
+          }
         />
       )}
     </div>
