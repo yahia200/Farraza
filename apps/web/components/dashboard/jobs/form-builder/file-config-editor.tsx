@@ -5,7 +5,8 @@ import {
   FILE_KINDS,
   MAX_FILE_SIZE_MB,
   MIN_FILE_SIZE_MB,
-  isFileKindAvailable,
+  formatDurationInWords,
+  kindsNeedDuration,
   suggestedMaxSizeMb,
   type FileKind,
 } from '@repo/shared';
@@ -20,8 +21,9 @@ import type { BuilderValues } from './question-card';
  * The settings of a file question (an Attachment): which kinds of file it accepts and the largest
  * size, with the size following the builder's suggestion for the chosen kinds until it is edited.
  *
- * Only kinds with known formats are offered (`isFileKindAvailable`); video and audio appear here
- * when their formats are added in @repo/shared. The length limit for those arrives with them.
+ * The length limit is shown only while video or audio is allowed (`kindsNeedDuration`): it is
+ * required then, and is cleared to null when the last of them is unticked, which is what the shared
+ * schema expects. The size suggestion for a mix of kinds is the largest of them (`suggestedMaxSizeMb`).
  * `readOnly` / `disabled` are set on each control, as in the other editors (see QuestionCard).
  */
 export function FileConfigEditor({
@@ -30,6 +32,7 @@ export function FileConfigEditor({
   idPrefix,
   kinds,
   maxSizeMb,
+  maxDurationSeconds,
   kindsError,
   readOnly,
   disabled,
@@ -40,12 +43,14 @@ export function FileConfigEditor({
   /** The question's live settings, so toggling a kind can compare the size with its suggestion. */
   kinds: readonly FileKind[];
   maxSizeMb: number;
+  maxDurationSeconds: number | null;
   kindsError?: string;
   readOnly: boolean;
   disabled: boolean;
 }) {
   const kindsPath = `fields.${index}.config.kinds` as Path<BuilderValues>;
   const sizePath = `fields.${index}.config.maxSizeMb` as Path<BuilderValues>;
+  const durationPath = `fields.${index}.config.maxDurationSeconds` as Path<BuilderValues>;
   const suggested = kinds.length > 0 ? suggestedMaxSizeMb(kinds) : undefined;
 
   function toggle(kind: FileKind, checked: boolean, onChange: (next: FileKind[]) => void) {
@@ -58,6 +63,12 @@ export function FileConfigEditor({
         shouldValidate: form.formState.isSubmitted,
       });
     }
+    // The length limit belongs to video and audio only: drop it when neither is allowed any more.
+    if (!kindsNeedDuration(next) && maxDurationSeconds !== null) {
+      form.setValue(durationPath, null, { shouldDirty: true, shouldValidate: form.formState.isSubmitted });
+    } else if (form.formState.isSubmitted) {
+      void form.trigger(durationPath);
+    }
   }
 
   return (
@@ -68,7 +79,7 @@ export function FileConfigEditor({
         render={({ field: input }) => (
           <fieldset className="grid gap-2" aria-describedby={kindsError ? `${idPrefix}-kinds-error` : undefined}>
             <legend className="mb-1 text-sm font-medium">Accepted files</legend>
-            {FILE_KINDS.filter((kind) => isFileKindAvailable(kind) || kinds.includes(kind)).map((kind) => (
+            {FILE_KINDS.map((kind) => (
               <Label key={kind} className="font-normal">
                 <Checkbox
                   checked={kinds.includes(kind)}
@@ -115,6 +126,40 @@ export function FileConfigEditor({
           </Field>
         )}
       />
+
+      {kindsNeedDuration(kinds) && (
+        <Controller
+          name={durationPath}
+          control={form.control}
+          render={({ field: input, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor={`${idPrefix}-duration`}>Maximum length of video and audio (seconds)</FieldLabel>
+              <Input
+                id={`${idPrefix}-duration`}
+                readOnly={readOnly}
+                disabled={disabled}
+                type="number"
+                inputMode="numeric"
+                min={1}
+                className="w-32"
+                value={input.value === null || input.value === undefined ? '' : String(input.value)}
+                // Empty is null, which the schema refuses while video or audio is allowed.
+                onChange={(event) => input.onChange(event.target.value === '' ? null : event.target.valueAsNumber)}
+                onBlur={input.onBlur}
+                aria-describedby={`${idPrefix}-duration-help`}
+                aria-invalid={fieldState.invalid}
+              />
+              <FieldDescription id={`${idPrefix}-duration-help`}>
+                Required. Longer files are turned away before they upload.
+                {Number.isInteger(maxDurationSeconds) && (maxDurationSeconds ?? 0) >= 1 && (
+                  <> That is {formatDurationInWords(maxDurationSeconds as number)}.</>
+                )}
+              </FieldDescription>
+              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+            </Field>
+          )}
+        />
+      )}
     </>
   );
 }

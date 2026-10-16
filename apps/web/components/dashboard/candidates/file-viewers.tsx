@@ -175,3 +175,47 @@ export function DocxViewer({ file }: { file: ViewerFile }) {
 }
 
 class TooLarge extends Error {}
+
+/**
+ * A video or audio file in the browser's own player (`<video controls>` / `<audio controls>`), fed
+ * the inline link from the Server Action. `preload="metadata"` fetches only the start (enough for
+ * the length and first frame); the bucket answers range requests, so seeking works without
+ * downloading the whole file (https://developer.mozilla.org/docs/Web/HTML/Reference/Elements/video).
+ *
+ * `<video>` and `<audio>` have no `referrerpolicy` attribute, unlike the iframe above, so the
+ * request carries the browser's default policy (`strict-origin-when-cross-origin`): the dashboard's
+ * origin, never its path with the company, job and application ids. The link's pinned `Content-Type`
+ * and inline disposition come from `StorageService.createViewUrl`, and the type is one of the
+ * stored video or audio types, never a page, so nothing here can run script.
+ *
+ * Not every browser plays every accepted format (a MOV holding HEVC, say): the player's `error`
+ * event shows the same fallback as the other viewers, which points at Download.
+ */
+export function MediaViewer({ file, kind }: { file: ViewerFile; kind: 'video' | 'audio' }) {
+  const view = useViewUrl(file);
+  const [unplayable, setUnplayable] = useState(false);
+
+  if (view.status === 'failed') return <ViewerFailure message={view.message} />;
+  if (unplayable) return <ViewerFailure message="Your browser can't play this file." />;
+  if (view.status === 'loading') {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground" aria-busy="true">
+        <Spinner />
+        Opening the {kind}…
+      </div>
+    );
+  }
+
+  const player = {
+    src: view.url,
+    controls: true,
+    preload: 'metadata' as const,
+    'aria-label': `Player for ${file.fileName}`,
+    onError: () => setUnplayable(true),
+  };
+  return kind === 'video' ? (
+    <video {...player} playsInline className="max-h-[70vh] w-full rounded-xl border bg-black" />
+  ) : (
+    <audio {...player} className="w-full" />
+  );
+}
