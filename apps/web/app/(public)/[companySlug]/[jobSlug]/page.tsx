@@ -54,7 +54,7 @@ async function Apply({ params, searchParams }: PageProps<'/[companySlug]/[jobSlu
   if (!data) {
     notFound();
   }
-  const { company, job, fields } = data;
+  const { company, job, cvMode, fields } = data;
   const { utm_source } = await searchParams;
 
   return (
@@ -66,6 +66,7 @@ async function Apply({ params, searchParams }: PageProps<'/[companySlug]/[jobSlu
             jobSlug={jobSlug}
             jobTitle={job.title}
             jobDescription={job.description}
+            cvMode={cvMode}
             fields={fields}
             source={typeof utm_source === 'string' ? utm_source : undefined}
           />
