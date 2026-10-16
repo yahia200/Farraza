@@ -46,6 +46,9 @@ Use the local docs first: they match the installed version. Paths are relative t
 | Base UI (`@base-ui/react`) | 1.8.0 | `apps/web/node_modules/@base-ui/react/docs/` | https://base-ui.com |
 | docx-preview | 0.4.1 | `apps/web/node_modules/docx-preview/README.md` (API and options), `dist/docx-preview.d.ts`, readable source `dist/docx-preview.mjs` | https://github.com/VolodymyrBaydalka/docxjs |
 | shadcn | 4.21.3 | `apps/web/node_modules/shadcn/README.md` | https://ui.shadcn.com/docs |
+| `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner` | 3.1151.0 / 3.1151.0 | `apps/api/node_modules/@aws-sdk/client-s3/README.md` and `dist-types/` (commands in `dist-types/commands/`, request shapes in `dist-types/models/models_0.d.ts`); `apps/api/node_modules/@aws-sdk/s3-request-presigner/README.md` and `dist-types/index.d.ts` | https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/ |
+| `file-type` | 22.2.0 | `apps/api/node_modules/file-type/readme.md`, `apps/api/node_modules/file-type/source/index.d.ts` | https://github.com/sindresorhus/file-type |
+| `browser-image-compression` | 2.0.2 | `apps/web/node_modules/browser-image-compression/README.md`, `apps/web/node_modules/browser-image-compression/dist/browser-image-compression.d.ts` | https://github.com/Donaldcwl/browser-image-compression#readme |
 
 Prisma 8 differs most from older knowledge: there is no `PrismaClient`, no `prisma generate`, and no `schema.prisma`. See the "Database" section below.
 
