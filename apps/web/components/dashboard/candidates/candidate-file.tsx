@@ -1,12 +1,14 @@
 import { FileTextIcon } from 'lucide-react';
+import { previewKindOf } from '@repo/shared';
 import type { ApplicationFileView } from '@/lib/dal';
 import { formatFileSize } from '@/lib/format';
-import { DownloadFileButton } from './download-file-button';
+import { FileCard } from './file-card';
 import { fileTypeLabel, formatDuration } from './file-type-label';
 
 /**
- * One file an applicant sent: its name, type, size (and length, for video and audio) with a
- * download button. A Server Component; only the button is a client component.
+ * One file an applicant sent: its name, type, size (and length, for video and audio), a download
+ * button, and a preview for the types the sheet can show inline. A Server Component; the card around
+ * it (`FileCard`) is the client part, so the name and details are rendered on the server.
  */
 export function CandidateFile({
   file,
@@ -26,7 +28,17 @@ export function CandidateFile({
   ];
 
   return (
-    <div className="flex items-center gap-3 rounded-2xl border p-3">
+    <FileCard
+      kind={previewKindOf(file.mimeType)}
+      file={{
+        companySlug,
+        jobSlug,
+        applicationId,
+        fileId: file.id,
+        fileName: file.originalName,
+        sizeBytes: file.sizeBytes,
+      }}
+    >
       <FileTextIcon className="size-5 shrink-0 text-muted-foreground" aria-hidden />
       <div className="flex min-w-0 flex-1 flex-col">
         {/* The name is the applicant's own text: React escapes it, and it can be long. */}
@@ -35,13 +47,6 @@ export function CandidateFile({
         </span>
         <span className="text-sm text-muted-foreground">{details.join(' · ')}</span>
       </div>
-      <DownloadFileButton
-        companySlug={companySlug}
-        jobSlug={jobSlug}
-        applicationId={applicationId}
-        fileId={file.id}
-        fileName={file.originalName}
-      />
-    </div>
+    </FileCard>
   );
 }

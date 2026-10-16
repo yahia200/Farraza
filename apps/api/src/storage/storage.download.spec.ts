@@ -1,6 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { describe, expect, it } from 'vitest';
-import { attachmentDisposition, DOWNLOAD_URL_TTL_SECONDS } from './storage.js';
+import { attachmentDisposition, DOWNLOAD_URL_TTL_SECONDS, inlineDisposition } from './storage.js';
 import { StorageService } from './storage.service.js';
 
 // RFC 6266 section 4.1 and 4.3 (https://www.rfc-editor.org/rfc/rfc6266): `filename` is a quoted
@@ -77,6 +77,49 @@ describe('StorageService.createDownloadUrl', () => {
     );
     expect(url.searchParams.get('X-Amz-Expires')).toBe(String(DOWNLOAD_URL_TTL_SECONDS));
     // The override is signed, so changing it on the way invalidates the URL.
+    expect(url.searchParams.get('X-Amz-SignedHeaders')).toBe('host');
+    expect(url.searchParams.get('X-Amz-Signature')).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+// --- Inline viewing (ticket 06) ---
+
+describe('inlineDisposition', () => {
+  it("asks the browser to display the file, keeping the applicant's name for \"save as\"", () => {
+    expect(inlineDisposition('cv.pdf')).toBe(`inline; filename="cv.pdf"; filename*=UTF-8''cv.pdf`);
+    expect(inlineDisposition('Mona Élie – CV.pdf')).toBe(
+      `inline; filename="Mona _lie _ CV.pdf"; filename*=UTF-8''Mona%20%C3%89lie%20%E2%80%93%20CV.pdf`,
+    );
+  });
+
+  it('cleans the name exactly like an attachment does, so a name cannot inject a header line', () => {
+    const name = 'a\r\nSet-Cookie: x=1\u0000".pdf';
+    expect(inlineDisposition(name)).toBe(attachmentDisposition(name).replace(/^attachment/, 'inline'));
+    expect(inlineDisposition(name)).not.toMatch(/\p{Cc}/u);
+  });
+});
+
+describe('StorageService.createViewUrl', () => {
+  const config = new ConfigService({
+    S3_BUCKET: 'test-bucket',
+    S3_ENDPOINT: 'http://localhost:9000',
+    S3_REGION: 'us-east-1',
+    S3_ACCESS_KEY: 'test-access-key',
+    S3_SECRET_KEY: 'test-secret-key',
+  });
+
+  it('signs an inline disposition and the content type to serve, with the download TTL', async () => {
+    const storage = new StorageService(config);
+
+    const url = new URL(
+      await storage.createViewUrl('companies/c/jobs/j/files/f', 'Mona CV.pdf', 'application/pdf'),
+    );
+
+    expect(url.pathname).toBe('/test-bucket/companies/c/jobs/j/files/f');
+    expect(url.searchParams.get('response-content-disposition')).toBe(inlineDisposition('Mona CV.pdf'));
+    // The type is forced by the signed URL, whatever metadata the object was uploaded with.
+    expect(url.searchParams.get('response-content-type')).toBe('application/pdf');
+    expect(url.searchParams.get('X-Amz-Expires')).toBe(String(DOWNLOAD_URL_TTL_SECONDS));
     expect(url.searchParams.get('X-Amz-SignedHeaders')).toBe('host');
     expect(url.searchParams.get('X-Amz-Signature')).toMatch(/^[0-9a-f]{64}$/);
   });

@@ -12,6 +12,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
   attachmentDisposition,
   buildObjectKey,
+  inlineDisposition,
   UPLOAD_URL_TTL_SECONDS,
   DOWNLOAD_URL_TTL_SECONDS,
   type PresignedUpload,
@@ -135,6 +136,31 @@ export class StorageService {
       Bucket: this.bucket,
       Key: key,
       ResponseContentDisposition: attachmentDisposition(originalName),
+    });
+    return getSignedUrl(this.client, command, {
+      expiresIn: DOWNLOAD_URL_TTL_SECONDS,
+    });
+  }
+
+  // --- Inline viewing (ticket 06) ---
+
+  /**
+   * Mints a presigned GET URL for showing a file in the candidate sheet: an `inline` disposition
+   * and a forced `Content-Type`.
+   *
+   * Both are signed query overrides (`ResponseContentDisposition`, `ResponseContentType`; see
+   * `GetObjectRequest` in apps/api/node_modules/@aws-sdk/client-s3/dist-types/models/models_0.d.ts),
+   * so the bucket answers with the type the caller passes, whatever metadata the object was
+   * uploaded with, and it can't be changed in transit. The caller must pass only a type from the
+   * preview allowlist (`previewKindOf` in `@repo/shared`): an inline response of `text/html` would
+   * render as a page on the bucket's origin.
+   */
+  async createViewUrl(key: string, originalName: string, contentType: string): Promise<string> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      ResponseContentDisposition: inlineDisposition(originalName),
+      ResponseContentType: contentType,
     });
     return getSignedUrl(this.client, command, {
       expiresIn: DOWNLOAD_URL_TTL_SECONDS,

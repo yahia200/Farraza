@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { AuthorizationService } from '@nestjs/authorization';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { MemberRole, Membership } from '../companies/company.js';
@@ -114,12 +114,18 @@ class InMemoryPipelineRepository
   }
 }
 
-class FakeStorage implements Pick<PublicApi<StorageService>, 'createDownloadUrl'> {
+class FakeStorage implements Pick<PublicApi<StorageService>, 'createDownloadUrl' | 'createViewUrl'> {
   readonly requests: Array<{ key: string; fileName: string }> = [];
+  readonly viewRequests: Array<{ key: string; fileName: string; contentType: string }> = [];
 
   async createDownloadUrl(key: string, fileName: string): Promise<string> {
     this.requests.push({ key, fileName });
     return `https://bucket.test/${key}?signed=1`;
+  }
+
+  async createViewUrl(key: string, fileName: string, contentType: string): Promise<string> {
+    this.viewRequests.push({ key, fileName, contentType });
+    return `https://bucket.test/${key}?signed=inline`;
   }
 }
 
@@ -333,6 +339,81 @@ describe('files on an Application (recruiter side)', () => {
       await expect(
         service.downloadLink(member('company-1', 'owner'), 'engineer', 'application-1', 'nope'),
       ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  // Ticket 06: the same files, shown in place. The link is inline and pins the content type, so it
+  // is only ever minted for the types the candidate sheet renders (previewKindOf in @repo/shared).
+  describe('view link', () => {
+    const PDF = 'application/pdf';
+    const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+    it.each([PDF, DOCX])('returns a short-lived inline link for a %s file', async (mimeType) => {
+      repository.seedFile({ id: 'file-cv', originalName: 'Mona Ali – CV', mimeType });
+
+      const link = await service.viewLink(
+        member('company-1', 'recruiter'),
+        'engineer',
+        'application-1',
+        'file-cv',
+      );
+
+      expect(link).toEqual({
+        url: 'https://bucket.test/companies/company-1/jobs/job-1/files/file-cv?signed=inline',
+        expiresInSeconds: DOWNLOAD_URL_TTL_SECONDS,
+      });
+      // The bucket is told the stored type, not whatever the object's own metadata says.
+      expect(storage.viewRequests).toEqual([
+        { key: 'companies/company-1/jobs/job-1/files/file-cv', fileName: 'Mona Ali – CV', contentType: mimeType },
+      ]);
+      expect(storage.requests).toEqual([]);
+    });
+
+    it.each(['text/html', 'image/svg+xml', 'application/octet-stream', 'video/mp4', 'application/msword'])(
+      'refuses to show a %s file inline and signs nothing',
+      async (mimeType) => {
+        repository.seedFile({ id: 'file-odd', mimeType });
+
+        await expect(
+          service.viewLink(member('company-1', 'owner'), 'engineer', 'application-1', 'file-odd'),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(storage.viewRequests).toEqual([]);
+      },
+    );
+
+    it('gives interviewers the same access as recruiters', async () => {
+      repository.seedFile({ id: 'file-cv' });
+
+      const link = await service.viewLink(
+        member('company-1', 'interviewer'),
+        'engineer',
+        'application-1',
+        'file-cv',
+      );
+
+      expect(link.url).toContain('file-cv');
+    });
+
+    it('answers 404 for a member of another company and signs nothing', async () => {
+      repository.seedFile({ id: 'file-cv' });
+
+      await expect(
+        service.viewLink(member('company-2', 'owner'), 'engineer', 'application-1', 'file-cv'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(storage.viewRequests).toEqual([]);
+    });
+
+    it('answers 404 for a file of another Application, another company, or one still pending', async () => {
+      repository.seedFile({ id: 'file-other', applicationId: 'application-2' });
+      repository.seedFile({ id: 'file-foreign', companyId: 'company-2', jobId: 'job-2', applicationId: 'application-9' });
+      repository.seedFile({ id: 'file-pending', status: 'pending', applicationId: null });
+
+      for (const fileId of ['file-other', 'file-foreign', 'file-pending', 'nope']) {
+        await expect(
+          service.viewLink(member('company-1', 'owner'), 'engineer', 'application-1', fileId),
+        ).rejects.toBeInstanceOf(NotFoundException);
+      }
+      expect(storage.viewRequests).toEqual([]);
     });
   });
 });

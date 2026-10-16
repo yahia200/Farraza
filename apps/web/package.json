@@ -17,6 +17,7 @@
     "@tanstack/react-table": "^9.2.8",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
+    "docx-preview": "0.4.1",
     "lucide-react": "^1.52.0",
     "next": "16.4.0",
     "react": "19.3.0",

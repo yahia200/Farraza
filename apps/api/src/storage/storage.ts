@@ -53,10 +53,14 @@ export function buildObjectKey(target: UploadTarget): string {
  * header is safe whatever the recipient does).
  */
 export function attachmentDisposition(originalName: string): string {
+  return contentDisposition('attachment', originalName);
+}
+
+function contentDisposition(type: 'attachment' | 'inline', originalName: string): string {
   const name = safeFileName(originalName);
   // Quoted-string: no quote or backslash; `%` is replaced because some old clients decode it.
   const fallback = name.replace(/[^\x20-\x7e]|["\\%]/g, '_');
-  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeExtValue(name)}`;
+  return `${type}; filename="${fallback}"; filename*=UTF-8''${encodeExtValue(name)}`;
 }
 
 const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
@@ -76,4 +80,15 @@ function encodeExtValue(value: string): string {
     /['()*]/g,
     (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
   );
+}
+
+// --- Inline viewing (ticket 06) ---
+
+/**
+ * The `Content-Disposition` value for a file the candidate sheet shows in place: `inline`, with the
+ * applicant's name kept (cleaned exactly like `attachmentDisposition`) so a browser's "save as" in
+ * its PDF viewer proposes a readable name rather than the file id.
+ */
+export function inlineDisposition(originalName: string): string {
+  return contentDisposition('inline', originalName);
 }
