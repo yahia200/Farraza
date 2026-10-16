@@ -98,6 +98,48 @@ describe('FormsService', () => {
     expect(published.fields).toMatchObject([{ type: 'file', config }]);
   });
 
+  describe('CV setting', () => {
+    it('saves cvMode with the draft and keeps it when the draft is published', async () => {
+      const draft = await service.saveDraft(user, membership, 'backend', { fields: [], cvMode: 'required' });
+      expect(draft.cvMode).toBe('required');
+
+      // Saving again updates the same draft, cvMode included.
+      const resaved = await service.saveDraft(user, membership, 'backend', { fields: [], cvMode: 'off' });
+      expect(resaved.id).toBe(draft.id);
+      expect(resaved.cvMode).toBe('off');
+
+      const published = await service.publish(user, membership, 'backend');
+      expect(published.cvMode).toBe('off');
+      expect((await service.get(membership, 'backend')).published?.cvMode).toBe('off');
+    });
+
+    it('lets a new draft after publishing change cvMode without touching the published version', async () => {
+      await service.saveDraft(user, membership, 'backend', { fields: [], cvMode: 'required' });
+      await service.publish(user, membership, 'backend');
+
+      const draft = await service.saveDraft(user, membership, 'backend', { fields: [], cvMode: 'off' });
+      expect(draft.version).toBe(2);
+      expect(draft.cvMode).toBe('off');
+
+      const form = await service.get(membership, 'backend');
+      expect(form.published).toMatchObject({ version: 1, cvMode: 'required' });
+      expect(form.draft).toMatchObject({ version: 2, cvMode: 'off' });
+    });
+
+    it('lets a new draft after publishing keep the same cvMode', async () => {
+      await service.saveDraft(user, membership, 'backend', { fields: [], cvMode: 'optional' });
+      await service.publish(user, membership, 'backend');
+
+      await service.saveDraft(user, membership, 'backend', { fields: [], cvMode: 'optional' });
+      const republished = await service.publish(user, membership, 'backend');
+
+      expect(republished).toMatchObject({ version: 2, cvMode: 'optional' });
+      const form = await service.get(membership, 'backend');
+      expect(form.published).toMatchObject({ version: 2, cvMode: 'optional' });
+      expect(form.draft).toBeNull();
+    });
+  });
+
   it('refuses a file question without kinds, pointing at them', async () => {
     const error = await service
       .saveDraft(user, membership, 'backend', {
