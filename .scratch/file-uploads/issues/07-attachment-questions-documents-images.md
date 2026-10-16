@@ -17,10 +17,12 @@ This replaces the old file config (pdf, image, document) with kinds (document, i
 - [x] A file from a different question or job cannot be used as the answer.
 - [x] The sheet lists Attachments under their question with a download button.
 - [x] API service tests cover Attachment limits, field-key matching and required handling; shared tests cover the schema and answer rules.
-- [ ] Manually verified: build a form with a document and an image question, apply, download both.
+- [x] Manually verified: build a form with a document and an image question, apply, download both.
 
 ## Comments
 
 Resolved on integration branch `feat/file-uploads`: merge 6e5a3ee (feat 9e46f69).
 
 Confirmed read-only on the dev DB before replacing the old enum: 10 form versions, none with a file question, none with `allowedTypes`. Verified on a scratch stack (document + image question, apply, fake PNG refused at submit, three downloads). **Pending on the live stack:** the same flow, interviewer read-only builder, keyboard and screen-reader use of the file input.
+
+Live-stack verification (2026-10-16): the builder offers File upload with kinds and size (suggested size follows the kinds); a file question with all four kinds saved, published and appears in the public payload with its limits; applicants uploaded an image, a WAV and a WebM as the answer and PDF/DOCX as the CV, and all attached with sniffed MIME types. A PE executable declared as a PDF passed the browser but was refused at submit ("That file isn't really a PDF or DOCX"), the applicant returned to the CV step, its row and bucket object were deleted (6 objects remained for 6 attached files), and a retry reused the still-pending WAV and succeeded. Not tried live: a duplicate-email 409.

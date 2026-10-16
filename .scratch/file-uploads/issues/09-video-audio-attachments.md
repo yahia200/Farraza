@@ -13,7 +13,7 @@
 - [x] The sheet plays video and audio inline with the duration shown, and download remains available.
 - [x] API service tests cover duration limits and format acceptance; shared tests cover the config rule.
 - [x] The schema doc notes that the storage provider is a deploy-time choice and the egress trade-off.
-- [ ] Manually verified with a short video and a short audio file.
+- [x] Manually verified with a short video and a short audio file.
 
 ## Comments
 
@@ -22,3 +22,5 @@ Resolved on integration branch `feat/file-uploads`: merge a98e087 (feat 0821789)
 `file-type` 22.2.0 results: MP4 `video/mp4`; MOV `video/quicktime`; WebM `video/webm` for both video and audio-only (there is no `audio/webm`); MP3 `audio/mpeg`; M4A `audio/x-m4a` (an audio-only MP4 with brand mp42/isom gives `video/mp4`); WAV `audio/wav`; OGG Vorbis `audio/ogg`, Opus `audio/ogg; codecs=opus`. All detected from the first bytes, so the 64 KiB read is enough. `matchAllowedType` maps aliases so a WebM is accepted for either kind.
 
 Apply-side duration check browser-verified on a scratch stack. **Pending on the live stack:** inline video/audio playback on the candidate sheet and the real-bucket round trip. Owner decisions outstanding: declared duration rounds up, unreadable duration is rejected.
+
+Live-stack verification (2026-10-16): the builder hides the duration field until video or audio is ticked, shows "Set a length limit for video and audio files." when it is empty, and the suggested size moves to 100 MB with video; a 3 s WAV and a browser-recorded 2.2 s WebM uploaded with declared duration 3 stored, sniffed as audio/wav and video/webm; the sheet plays both inline (video 320x180, audio 3 s) with "0:03" shown (the rounded-up declared duration; the WebM is really 2.05 s). Not tried live: MP4, MOV, M4A, MP3, OGG, an over-long file and a file whose duration can't be read.

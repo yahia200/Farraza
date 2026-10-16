@@ -16,9 +16,9 @@ Behind it: a public create-upload endpoint (reached through a Server Action, nev
 - [x] A required CV that is missing fails the submit with a field error; an optional one does not.
 - [x] The apply form shows the CV step first only when the mode is not off; the upload control supports keyboard use and shows accepted types and size before picking.
 - [x] Wrong type or size is rejected in the browser before any request.
-- [ ] Dev bucket CORS lets the browser PUT from the web app origin after `docker compose up`.
+- [x] Dev bucket CORS lets the browser PUT from the web app origin after `docker compose up`.
 - [x] API service tests (in-memory fakes) cover the create-upload limits and the attach rules; shared tests cover the submit schema change.
-- [ ] Manually verified in the browser: apply with a CV, see an uploaded file row.
+- [x] Manually verified in the browser: apply with a CV, see an uploaded file row.
 
 ## Comments
 
@@ -27,3 +27,5 @@ Resolved on integration branch `feat/file-uploads`: merge a0478c7 (feat 76b6258)
 Bucket enforcement finding: RustFS enforces the signed content length and content type (a PUT with a different length or type gets 403 SignatureDoesNotMatch, no object). The presigner needs `signableHeaders` for `content-type` and `requestChecksumCalculation: 'WHEN_REQUIRED'`. AWS S3 and R2 were not tested; ticket 04's submit-time check is the backstop. Recorded in `docs/db-schema.md` §9.
 
 Browser-verified on a scratch stack (own API, web and RustFS), not on the live stack. **Pending on the live stack:** run `docker compose up createbuckets` (applies `docker/rustfs-cors.json`), then apply with a CV at https://localhost:3000.
+
+Live-stack verification (2026-10-16): `docker compose up createbuckets` applied the CORS rules (OPTIONS from https://localhost:3000 returns allow-origin and PUT, GET, HEAD). CV step is first with the hint shown before picking; a JPEG as CV is refused in the browser with no request sent; a real PDF uploads straight to http://localhost:9000 from the HTTPS page (Chrome did not block it), key has no file name; submit attaches it (row uploaded, attached, uploaded_at set).
