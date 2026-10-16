@@ -1034,6 +1034,56 @@ describe('ApplicationsService', () => {
         expect(repository.file(sample)).toMatchObject({ status: 'uploaded', purpose: 'answer', fieldKey: SAMPLE });
       });
 
+      it('still attaches the CV and the Attachments of an Application that is auto-rejected', async () => {
+        const WORKS_WEEKENDS = 'e5555555-5555-4555-8555-555555555555';
+        repository.seedJob({
+          slug: 'screened',
+          cvMode: 'required',
+          fields: [
+            {
+              key: WORKS_WEEKENDS,
+              type: 'yes_no',
+              label: 'Can you work weekends?',
+              helpText: null,
+              required: true,
+              config: { rejectWhen: false },
+            },
+            fields[0]!,
+          ],
+        });
+        const cvBytes = samplePdf();
+        const { fileId: cv } = await service.createUpload('acme', 'screened', { ...pdf, sizeBytes: cvBytes.length });
+        storage.put(repository.file(cv)!.storageKey, cvBytes);
+        const sample = await uploadAttachment(SAMPLE, samplePng(), { slug: 'screened' });
+
+        await service.submit(
+          'acme',
+          'screened',
+          applicant({ cvFileId: cv, answers: { [WORKS_WEEKENDS]: false, [SAMPLE]: sample } }),
+        );
+
+        // Rejected by the knockout rule...
+        expect(repository.applications).toHaveLength(1);
+        expect(repository.applications[0]).toMatchObject({
+          status: 'rejected',
+          stageId: 'stage-rejected',
+          events: [{ type: 'applied' }, { type: 'auto_rejected', data: { fieldKey: WORKS_WEEKENDS } }],
+        });
+        // ...yet the files are kept with it, so a recruiter can still open them.
+        expect(repository.applications[0]!.files.map((file) => file.id).sort()).toEqual([cv, sample].sort());
+        expect(repository.file(cv)).toMatchObject({
+          status: 'uploaded',
+          purpose: 'cv',
+          applicationId: expect.stringMatching(/^application-/),
+        });
+        expect(repository.file(sample)).toMatchObject({
+          status: 'uploaded',
+          purpose: 'answer',
+          applicationId: expect.stringMatching(/^application-/),
+        });
+        expect(storage.deleted).toEqual([]);
+      });
+
       it('records the type found in the bytes, whatever the browser declared', async () => {
         // Declared as a PNG, but the bytes are a real JPEG.
         const fileId = await uploadAttachment(SAMPLE, sampleJpeg(), { contentType: 'image/png' });
