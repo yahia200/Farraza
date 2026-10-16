@@ -53,7 +53,7 @@ export async function CandidateDetail({
     );
   }
 
-  const { candidate, stage, fields, answers, autoRejectedBy } = application;
+  const { candidate, stage, fields, cvMode, answers, autoRejectedBy } = application;
   const cv = files?.find((file) => file.purpose === 'cv');
 
   return (
@@ -112,18 +112,21 @@ export async function CandidateDetail({
           </dl>
         </section>
 
-        <section aria-labelledby="candidate-cv" className="flex flex-col gap-3">
-          <h3 id="candidate-cv" className="text-sm font-medium">
-            CV
-          </h3>
-          {files === null ? (
-            <p className="text-muted-foreground">Couldn&apos;t load the files. Reload the page to try again.</p>
-          ) : cv ? (
-            <CandidateFile file={cv} companySlug={companySlug} jobSlug={jobSlug} applicationId={application.id} />
-          ) : (
-            <p className="text-muted-foreground italic">No CV attached.</p>
-          )}
-        </section>
+        {/* A form that never asked for a CV (`cvMode` off) can't have one: show no CV section at all. */}
+        {(cv || cvMode !== 'off') && (
+          <section aria-labelledby="candidate-cv" className="flex flex-col gap-3">
+            <h3 id="candidate-cv" className="text-sm font-medium">
+              CV
+            </h3>
+            {files === null ? (
+              <p className="text-muted-foreground">Couldn&apos;t load the files. Reload the page to try again.</p>
+            ) : cv ? (
+              <CandidateFile file={cv} companySlug={companySlug} jobSlug={jobSlug} applicationId={application.id} />
+            ) : (
+              <p className="text-muted-foreground italic">No CV attached.</p>
+            )}
+          </section>
+        )}
 
         <section aria-labelledby="candidate-answers" className="flex flex-col gap-3">
           <h3 id="candidate-answers" className="text-sm font-medium">

@@ -110,6 +110,7 @@ export class PipelineRepository {
         phone: row.phone,
       },
       fields: row.formVersion.fields as FormFields,
+      cvMode: row.formVersion.cvMode,
       answers: row.answers as Answers,
       events: eventRows.map((event) => ({
         id: event.id,

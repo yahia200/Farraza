@@ -310,6 +310,8 @@ export interface ApplicationDetailView {
   candidate: { name: string; email: string; phone: string };
   /** The form version the candidate answered (with knockout rules: members only). */
   fields: FormFields;
+  /** That version's CV setting: whether the applicant was asked for a CV. */
+  cvMode: CvMode;
   answers: Answers;
   /** Set when an auto-reject rule moved the application to Rejected. */
   autoRejectedBy: { fieldKey: string; fieldLabel: string } | null;
@@ -349,6 +351,7 @@ export async function getApplication(
     stage: { id: detail.stage.id, name: detail.stage.name, kind: detail.stage.kind },
     candidate: { name: detail.candidate.name, email: detail.candidate.email, phone: detail.candidate.phone },
     fields: detail.fields,
+    cvMode: detail.cvMode,
     answers: detail.answers,
     autoRejectedBy: autoRejected ? (autoRejected.data as { fieldKey: string; fieldLabel: string }) : null,
     events: detail.events.map(({ id, type, fromStageId, toStageId, actorId, data, createdAt }) => ({
