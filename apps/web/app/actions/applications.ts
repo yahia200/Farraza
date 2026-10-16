@@ -129,6 +129,36 @@ const applicationPath = (companySlug: string, jobSlug: string, applicationId: st
 export type FileDownloadResult = ActionFailure<never> & { url?: string };
 
 /**
+ * Asks the API for a short-lived link to one of an application's files and returns it. `route` is
+ * the API's path segment after the file id; `badRequest` is what a 400 means to the person: the
+ * ids are checked by the API (ParseUUIDPipe, then the tenant lookup), and `view` also answers 400
+ * for a type that can't be shown inline.
+ */
+async function mintFileLink(
+  companySlug: string,
+  jobSlug: string,
+  applicationId: string,
+  fileId: string,
+  route: 'download' | 'view',
+  badRequest: string,
+): Promise<FileDownloadResult> {
+  const response = await apiFetch(
+    `${applicationPath(companySlug, jobSlug, applicationId)}/files/${encodeURIComponent(fileId)}/${route}`,
+  );
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (!response.ok) {
+    return failureFromResponse(response, [], {
+      400: () => ({ formError: badRequest }),
+      404: () => ({ formError: 'That file is no longer available. Reload the page.' }),
+    });
+  }
+  const { url } = (await response.json()) as { url: string; expiresInSeconds: number };
+  return { url };
+}
+
+/**
  * Mints a link that downloads one of an application's files, calling
  * GET .../applications/:id/files/:fileId/download (apps/api/src/pipeline). Every member
  * may, interviewers included. The link is valid for a few minutes, so it is minted on each
@@ -142,20 +172,14 @@ export async function getFileDownloadUrl(
   applicationId: string,
   fileId: string,
 ): Promise<FileDownloadResult> {
-  const response = await apiFetch(
-    `${applicationPath(companySlug, jobSlug, applicationId)}/files/${encodeURIComponent(fileId)}/download`,
+  return mintFileLink(
+    companySlug,
+    jobSlug,
+    applicationId,
+    fileId,
+    'download',
+    'That file could not be found. Reload the page.',
   );
-  if (response.status === 401) {
-    redirect('/sign-in');
-  }
-  if (!response.ok) {
-    return failureFromResponse(response, [], {
-      400: () => ({ formError: 'That file could not be found. Reload the page.' }),
-      404: () => ({ formError: 'That file is no longer available. Reload the page.' }),
-    });
-  }
-  const { url } = (await response.json()) as { url: string; expiresInSeconds: number };
-  return { url };
 }
 
 /**
@@ -171,20 +195,14 @@ export async function getFileViewUrl(
   applicationId: string,
   fileId: string,
 ): Promise<FileDownloadResult> {
-  const response = await apiFetch(
-    `${applicationPath(companySlug, jobSlug, applicationId)}/files/${encodeURIComponent(fileId)}/view`,
+  return mintFileLink(
+    companySlug,
+    jobSlug,
+    applicationId,
+    fileId,
+    'view',
+    "This file can't be previewed. Download it instead.",
   );
-  if (response.status === 401) {
-    redirect('/sign-in');
-  }
-  if (!response.ok) {
-    return failureFromResponse(response, [], {
-      400: () => ({ formError: "This file can't be previewed. Download it instead." }),
-      404: () => ({ formError: 'That file is no longer available. Reload the page.' }),
-    });
-  }
-  const { url } = (await response.json()) as { url: string; expiresInSeconds: number };
-  return { url };
 }
 
 export type AddNoteResult = ActionFailure<'body'> & { ok?: boolean };
