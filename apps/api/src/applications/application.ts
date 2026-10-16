@@ -1,4 +1,4 @@
-import type { Answers, CvMode, FormFields } from '@repo/shared';
+import type { Answers, CvMode, FilePurpose, FormFields } from '@repo/shared';
 
 export interface OpenJob {
   company: { id: string; name: string; slug: string; logoUrl: string | null; brandColor: string | null };
@@ -11,7 +11,7 @@ export interface OpenJob {
 /** A file the applicant uploaded for this submission, to be attached inside the Application's transaction. */
 export interface FileToAttach {
   id: string;
-  purpose: 'cv' | 'answer';
+  purpose: FilePurpose;
   /** The file question's key for an `answer`; null for the CV. */
   fieldKey: string | null;
   /** The type found in the object's bytes (not the browser's claim); stored on the row when attached. */
@@ -24,7 +24,7 @@ export interface FileToAttach {
  */
 export interface FileToVerify {
   id: string;
-  purpose: 'cv' | 'answer';
+  purpose: FilePurpose;
   fieldKey: string | null;
   storageKey: string;
   /** The size declared when the upload was created, which the presigned URL pinned. */
@@ -36,7 +36,7 @@ export interface NewPendingFile {
   id: string;
   companyId: string;
   jobId: string;
-  purpose: 'cv' | 'answer';
+  purpose: FilePurpose;
   fieldKey?: string | null;
   storageKey: string;
   /** The applicant's own name for the file: untrusted, shown to recruiters, never part of the key. */

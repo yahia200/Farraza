@@ -1,6 +1,14 @@
 import 'server-only';
 import { notFound, redirect } from 'next/navigation';
-import type { ActivityEvent, ActivityNote, Answers, ApplicationStatus, CvMode, FormFields } from '@repo/shared';
+import type {
+  ActivityEvent,
+  ActivityNote,
+  Answers,
+  ApplicationStatus,
+  CvMode,
+  FilePurpose,
+  FormFields,
+} from '@repo/shared';
 import { apiFetch } from './api';
 import { formatDate } from './format';
 
@@ -377,7 +385,7 @@ export async function getApplication(
 export interface ApplicationFileView {
   id: string;
   /** `cv` for the CV slot, `answer` for the answer to the file question `fieldKey`. */
-  purpose: 'cv' | 'answer';
+  purpose: FilePurpose;
   fieldKey: string | null;
   /** The applicant's own name for the file (untrusted text). */
   originalName: string;

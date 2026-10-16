@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { FormFields } from '@repo/shared';
+import type { FilePurpose, FormFields } from '@repo/shared';
 import { isUniqueViolation } from '../common/db-errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
@@ -20,7 +20,7 @@ class FileConflict extends Error {
 /** Maps a `files` row to the plain type the service works with (api.md, "Repository"). */
 function toFileToVerify(row: {
   id: string;
-  purpose: 'cv' | 'answer';
+  purpose: FilePurpose;
   fieldKey: string | null;
   storageKey: string;
   sizeBytes: number;
