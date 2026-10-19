@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { GoogleSignInButton } from '@/components/auth/google-sign-in-button';
 import { SignUpForm } from '@/components/auth/sign-up-form';
+import { FieldSeparator } from '@/components/ui/field';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 
 export const metadata: Metadata = { title: 'Create account · Khatwateen' };
@@ -13,6 +15,8 @@ export default function SignUpPage() {
         <CardDescription>Start building your hiring pipeline.</CardDescription>
       </CardHeader>
       <CardContent>
+        <GoogleSignInButton>Sign up with Google</GoogleSignInButton>
+        <FieldSeparator className="my-4 *:data-[slot=field-separator-content]:bg-card">or</FieldSeparator>
         <SignUpForm />
       </CardContent>
       <CardFooter className="justify-center text-sm text-muted-foreground">
