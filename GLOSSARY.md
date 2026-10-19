@@ -57,3 +57,17 @@ _Avoid_: Log, activity, audit record
 **Auto-reject rule**:
 A rule on a form question that sends an Application straight to the Rejected stage when the answer matches.
 _Avoid_: Knockout (the internal code term; say "auto-reject" in anything user-facing), filter
+
+## Accounts
+
+**Identity**:
+A sign-in from an outside provider (such as Google) linked to one User, named by the provider and the provider's own id for that person (its subject), never by email. A User can have several Identities; an Identity belongs to exactly one User.
+_Avoid_: Social login, connection, OAuth account
+
+**Account linking**:
+Attaching an Identity to an existing User, either by a signed-in User connecting the provider, or on a first provider sign-in whose email matches a User when both the provider and Khatwateen have verified that address.
+_Avoid_: Merging, connecting (as a noun)
+
+**Account pre-hijacking**:
+An attack where someone registers with another person's email before they do, then gains access once the real owner signs in with a provider and the two are linked by email. Account linking refuses to link to an unverified address to prevent it.
+_Avoid_: Account takeover (that is gaining access to an account the victim already uses)
