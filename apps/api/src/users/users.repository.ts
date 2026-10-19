@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { isUniqueViolation } from '../common/db-errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { User } from './user.js';
 
@@ -51,6 +52,57 @@ export class UsersRepository {
       .where({ id, email: normalize(email) })
       .updateAndCount({ emailVerified: true });
     return updated > 0;
+  }
+
+  // OIDC identities: a (provider, subject) pair linked to one user. Accounts
+  // are matched by it, never by email (emails change, subjects don't).
+
+  async findByIdentity(provider: string, subject: string): Promise<User | null> {
+    const row = await this.prisma.db.orm.public.Identity.where({ provider, subject })
+      .include('user')
+      .first();
+    return row ? toUser(row.user) : null;
+  }
+
+  /** Returns false when the identity is already linked (to anyone). */
+  async linkIdentity(userId: string, provider: string, subject: string): Promise<boolean> {
+    try {
+      await this.prisma.db.orm.public.Identity.create({ userId, provider, subject });
+      return true;
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * A new account whose address the provider verified, with no password, linked
+   * to the identity in the same transaction. Returns null when the email or the
+   * identity was taken meanwhile (a concurrent sign-in).
+   */
+  async createWithIdentity(
+    input: { email: string; name: string },
+    identity: { provider: string; subject: string },
+  ): Promise<User | null> {
+    try {
+      return await this.prisma.db.transaction(async (tx) => {
+        const row = await tx.orm.public.User.create({
+          email: normalize(input.email),
+          name: input.name,
+          emailVerified: true,
+          passwordHash: null,
+        });
+        await tx.orm.public.Identity.create({ userId: row.id, ...identity });
+        return toUser(row);
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        return null;
+      }
+      throw error;
+    }
   }
 }
 

@@ -18,6 +18,7 @@ import { StorageModule } from './storage/storage.module.js';
 import { validateEnv } from './config/env.schema.js';
 import { join } from 'node:path';
 import { FileTemplateEngine, LogMailTransport, MailModule, SmtpTransport } from '@nestjs/mail';
+import { oidcOptions } from './auth/oidc.options.js';
 @Module({
   // validateEnv stops boot with a list of every missing or malformed variable
   // (src/config/env.schema.ts).
@@ -29,6 +30,8 @@ import { FileTemplateEngine, LogMailTransport, MailModule, SmtpTransport } from 
       session: { absoluteTtl: '14d', idleTtl: '3d', trustedOrigins: [config.getOrThrow<string>('APP_URL'), "http://192.168.1.100:3000"] },
       // Links in verification emails open the web app's page, which POSTs the token back.
       emailVerification: { url: `${config.getOrThrow<string>('APP_URL')}/verify-email` },
+      // "Sign in with Google" (src/auth/oidc.options.ts).
+      oidc: oidcOptions(config),
     }),
   }),
   // Real email when SMTP_URL is set; otherwise LogMailTransport prints each

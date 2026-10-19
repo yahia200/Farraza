@@ -4,7 +4,7 @@ import { AuthenticationModule, PasswordHasher } from '@nestjs/authentication';
 import { FileTemplateEngine, InMemoryMailTransport, MailModule } from '@nestjs/mail';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { User } from '../users/user.js';
+import { InMemoryUsersRepository } from '../testing/in-memory-users.repository.js';
 import { UsersRepository } from '../users/users.repository.js';
 import { CredentialsService } from './credentials.service.js';
 import { EmailVerificationMailer, VerifyEmailMail } from './email-verification.mailer.js';
@@ -16,73 +16,7 @@ import { VerificationService } from './verification.service.js';
 // and session stores, which it uses outside production) and the REAL
 // @nestjs/mail module with an InMemoryMailTransport, so the email and the link
 // in it are the ones a user would get. Only the users repository is a
-// hand-written in-memory fake.
-
-/** The repository methods these flows use (a Pick, so new methods elsewhere don't break the fake). */
-type UsedRepositoryApi = Pick<
-  UsersRepository,
-  'create' | 'findById' | 'findByEmail' | 'findCredentials' | 'updatePasswordHash' | 'markEmailVerified'
->;
-
-const normalize = (email: string) => email.trim().normalize('NFC').toLowerCase();
-
-class InMemoryUsersRepository implements UsedRepositoryApi {
-  private readonly rows = new Map<string, User & { passwordHash: string | null }>();
-  private nextId = 1;
-
-  /** Test setup: the user changed their address (no verification flow involved). */
-  changeEmail(id: string, email: string): void {
-    const row = this.rows.get(id);
-    if (row) {
-      row.email = normalize(email);
-      row.emailVerified = false;
-    }
-  }
-
-  async create(input: { email: string; name: string; passwordHash: string | null }): Promise<User> {
-    const row = {
-      id: `00000000-0000-4000-8000-${String(this.nextId++).padStart(12, '0')}`,
-      email: normalize(input.email),
-      emailVerified: false,
-      name: input.name,
-      passwordHash: input.passwordHash,
-    };
-    this.rows.set(row.id, row);
-    return toUser(row);
-  }
-
-  async findById(id: string): Promise<User | null> {
-    const row = this.rows.get(id);
-    return row ? toUser(row) : null;
-  }
-
-  async findByEmail(email: string): Promise<User | null> {
-    const row = [...this.rows.values()].find((r) => r.email === normalize(email));
-    return row ? toUser(row) : null;
-  }
-
-  async findCredentials(email: string) {
-    const row = [...this.rows.values()].find((r) => r.email === normalize(email));
-    return row ? { user: toUser(row), passwordHash: row.passwordHash } : null;
-  }
-
-  async updatePasswordHash(id: string, passwordHash: string): Promise<void> {
-    const row = this.rows.get(id);
-    if (row) row.passwordHash = passwordHash;
-  }
-
-  /** Mirrors the real conditional update: only while `email` is still the user's address. */
-  async markEmailVerified(id: string, email: string): Promise<boolean> {
-    const row = this.rows.get(id);
-    if (!row || row.email !== normalize(email)) return false;
-    row.emailVerified = true;
-    return true;
-  }
-}
-
-function toUser({ id, email, emailVerified, name }: User): User {
-  return { id, email, emailVerified, name };
-}
+// hand-written in-memory fake (src/testing/in-memory-users.repository.ts).
 
 const VERIFY_PAGE = 'http://localhost:3000/verify-email';
 const ada = { name: 'Ada Lovelace', email: 'Ada@Example.com', password: 'correct horse battery' };
