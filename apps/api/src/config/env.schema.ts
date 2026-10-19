@@ -1,6 +1,15 @@
 import { z } from 'zod';
 
 /*
+ * An http(s) URL. Plain `z.url()` accepts any scheme, so `localhost:3000`
+ * (no `http://`) passes as scheme "localhost:". `z.httpUrl()` also requires a
+ * dotted hostname, which rejects `localhost` and IP addresses used in dev.
+ * Docs: `url`/`httpUrl` in node_modules/zod/v4/classic/schemas.d.ts, and the
+ * `protocol` option on `$ZodURLDef` in node_modules/zod/v4/core/schemas.d.ts.
+ */
+const httpUrl = () => z.url({ protocol: /^https?$/ });
+
+/*
  * Boot-time validation of the API's environment (CLAUDE.md env list).
  * Wired into `ConfigModule.forRoot({ validate })` in app.module.ts, so a
  * missing or malformed variable stops the app at startup, not at first use.
@@ -14,13 +23,13 @@ export const envSchema = z.object({
   PORT: z.coerce.number().int().positive(),
   DATABASE_URL: z.string().min(1),
   // The web app's origin: CORS origin and the session's trusted origin.
-  APP_URL: z.url(),
+  APP_URL: httpUrl(),
   // Shared with the web app so the API trusts its forwarded client address.
   INTERNAL_API_SECRET: z.string().min(16),
 
   // Object storage (RustFS in dev, S3-compatible in prod).
   S3_BUCKET: z.string().min(1),
-  S3_ENDPOINT: z.url(),
+  S3_ENDPOINT: httpUrl(),
   S3_REGION: z.string().min(1),
   S3_ACCESS_KEY: z.string().min(1),
   S3_SECRET_KEY: z.string().min(1),
@@ -40,7 +49,9 @@ export const envSchema = z.object({
 export type Env = z.infer<typeof envSchema>;
 
 /** Throws a readable list of problems, so boot fails fast and legibly. */
-export function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
+export function validateEnv(
+  config: Record<string, unknown>,
+): Record<string, unknown> {
   const parsed = envSchema.safeParse(config);
   if (!parsed.success) {
     const problems = parsed.error.issues

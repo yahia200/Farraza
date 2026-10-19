@@ -15,9 +15,12 @@ import { ThrottlerModule, minutes } from '@nestjs/throttler';
 import { TrustedClientThrottlerGuard } from './common/trusted-client-throttler.guard.js';
 import { PipelineModule } from './pipeline/pipeline.module.js';
 import { StorageModule } from './storage/storage.module.js';
+import { validateEnv } from './config/env.schema.js';
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }),
-  // forRootAsync to read the web app's URL from config (APP_URL in .env).
+  // validateEnv stops boot with a list of every missing or malformed variable
+  // (src/config/env.schema.ts).
+  imports: [ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
+  // forRootAsync to read values from the validated config (APP_URL in .env).
   AuthenticationModule.forRootAsync({
     inject: [ConfigService],
     useFactory: (config: ConfigService) => ({
