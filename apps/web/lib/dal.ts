@@ -21,6 +21,8 @@ export interface CurrentUser {
   id: string;
   name: string;
   email: string;
+  /** Whether they opened the link emailed at sign-up (the dashboard reminds them until then). */
+  emailVerified: boolean;
 }
 
 /**
@@ -41,7 +43,7 @@ export async function getCurrentUser(): Promise<CurrentUser> {
 
   const user = (await response.json()) as CurrentUser;
   // Expose only what the UI needs.
-  return { id: user.id, name: user.name, email: user.email };
+  return { id: user.id, name: user.name, email: user.email, emailVerified: user.emailVerified };
 }
 
 /** Mirrors CompanyWithRole in apps/api/src/companies/company.ts. */
