@@ -11,11 +11,10 @@ export class AuthController {
     private readonly signInService: SignInService,
   ) { }
 
+  /** Creates the account, signs in, and emails a verification link (CredentialsService.signUp). */
   @Post('sign-up')
-  async signUp(@Body({ schema: signUpSchema }) body: SignUpDto) {
-    const user = await this.credentialsService.register(body.name, body.email, body.password);
-    await this.signInService.signIn(user.id, { method: 'password' });
-    return user;
+  signUp(@Body({ schema: signUpSchema }) body: SignUpDto) {
+    return this.credentialsService.signUp(body);
   }
 
   @Post('sign-in')

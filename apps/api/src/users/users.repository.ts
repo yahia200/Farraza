@@ -40,6 +40,18 @@ export class UsersRepository {
   async updatePasswordHash(id: string, passwordHash: string): Promise<void> {
     await this.users.where({ id }).update({ passwordHash });
   }
+
+  /**
+   * Marks the address verified, but only while `email` is still the user's
+   * address: one conditional UPDATE (`WHERE id = $1 AND email = $2`), so a
+   * link sent to an old address verifies nothing. False when no row matched.
+   */
+  async markEmailVerified(id: string, email: string): Promise<boolean> {
+    const updated = await this.users
+      .where({ id, email: normalize(email) })
+      .updateAndCount({ emailVerified: true });
+    return updated > 0;
+  }
 }
 
 function toUser(row: { id: string; email: string; emailVerified: boolean; name: string }): User {
