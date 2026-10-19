@@ -4,13 +4,13 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] A Zod-based `validate` function is wired into `ConfigModule.forRoot`, parsing the whole environment non-strictly (unrelated variables pass through untouched) and coercing `PORT` to a number.
-- [ ] Validation covers the currently-used variables: `PORT`, `DATABASE_URL`, `APP_URL` (a URL), `INTERNAL_API_SECRET` (minimum length), the five `S3_*` variables, and optional `S3_FORCE_PATH_STYLE`.
-- [ ] A missing or malformed variable stops boot with a message naming each offending variable; a valid environment boots exactly as before.
-- [ ] `AuthenticationModule` reads its values through the injected `ConfigService` (async factory), ready for later tickets to extend.
-- [ ] `pnpm --filter api build`, lint, and type-check pass.
+- [x] A Zod-based `validate` function is wired into `ConfigModule.forRoot`, parsing the whole environment non-strictly (unrelated variables pass through untouched) and coercing `PORT` to a number.
+- [x] Validation covers the currently-used variables: `PORT`, `DATABASE_URL`, `APP_URL` (a URL), `INTERNAL_API_SECRET` (minimum length), the five `S3_*` variables, and optional `S3_FORCE_PATH_STYLE`.
+- [x] A missing or malformed variable stops boot with a message naming each offending variable; a valid environment boots exactly as before.
+- [x] `AuthenticationModule` reads its values through the injected `ConfigService` (async factory), ready for later tickets to extend.
+- [x] `pnpm --filter api build`, lint, and type-check pass.
 
 ## Comments
 

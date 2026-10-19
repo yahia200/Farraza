@@ -4,13 +4,13 @@
 
 **Blocked by:** 02 (reuses the `PrismaEmailTokenStore` and the `MailModule` it stands up).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] A `PasswordResetHandler` registered as `passwordReset` finds the account by email (returning the stored address and stored hash), sends the link to the stored address, and stores the new hash; `passwordReset.url` points at the web reset page.
-- [ ] `POST /api/auth/password/forgot` (public) returns 202 before the lookup, so timing and response are identical whether or not the address exists, and is rate-limited to 5 per 10 minutes per visitor.
-- [ ] `POST /api/auth/password/reset` (public) accepts the token and a new password (sign-up password rules), signs the user in on success, ends the account's other sessions, and marks the address verified; an invalid, used, or expired token — or a password the hasher refuses — returns 400 without consuming the link.
-- [ ] A password reset on an account someone else registered with the user's address takes over that account (new password, address verified).
-- [ ] The web app has a forgot-password page and a reset-password page (reads the token from its URL, redirects to the dashboard on success).
-- [ ] `forgotPassword` and `resetPassword` shared Zod schemas in `@repo/shared` are used by both the API DTOs and the web actions.
-- [ ] A reset email template renders through the existing mail setup.
-- [ ] Build, lint, and type-check pass across the touched packages.
+- [x] A `PasswordResetHandler` registered as `passwordReset` finds the account by email (returning the stored address and stored hash), sends the link to the stored address, and stores the new hash; `passwordReset.url` points at the web reset page.
+- [x] `POST /api/auth/password/forgot` (public) returns 202 before the lookup, so timing and response are identical whether or not the address exists, and is rate-limited to 5 per 10 minutes per visitor.
+- [x] `POST /api/auth/password/reset` (public) accepts the token and a new password (sign-up password rules), signs the user in on success, ends the account's other sessions, and marks the address verified; an invalid, used, or expired token — or a password the hasher refuses — returns 400 without consuming the link.
+- [x] A password reset on an account someone else registered with the user's address takes over that account (new password, address verified).
+- [x] The web app has a forgot-password page and a reset-password page (reads the token from its URL, redirects to the dashboard on success).
+- [x] `forgotPassword` and `resetPassword` shared Zod schemas in `@repo/shared` are used by both the API DTOs and the web actions.
+- [x] A reset email template renders through the existing mail setup.
+- [x] Build, lint, and type-check pass across the touched packages.

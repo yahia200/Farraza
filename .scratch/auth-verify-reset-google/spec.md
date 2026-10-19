@@ -1,6 +1,6 @@
 # Spec: Email verification, password reset, and Google sign-in
 
-Status: ready-for-agent
+Status: resolved
 
 Built on `@nestjs/authentication` + `@nestjs/mail` (both already installed), following `docs/nestjs/auth.md`. One branch, sequenced: shared schemas → config validation → DB → stores/repository → mail → email verification → password reset → Google OIDC → web surface → CSRF.
 
