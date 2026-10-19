@@ -35,8 +35,9 @@ export const envSchema = z.object({
   S3_SECRET_KEY: z.string().min(1),
   S3_FORCE_PATH_STYLE: z.enum(['true', 'false']).optional(),
 
-  // Google OAuth client (type "Web application"). See docs/adr for why the
-  // callback is registered on the web origin.
+  // Google OAuth client (type "Web application"). See
+  // docs/adr/0003-oidc-through-the-web-app.md for why the callback is
+  // registered on the web origin.
   GOOGLE_CLIENT_ID: z.string().min(1),
   GOOGLE_CLIENT_SECRET: z.string().min(1),
 
