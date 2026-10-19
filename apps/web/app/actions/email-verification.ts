@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { verifyEmailSchema, type VerifyEmailInput } from '@repo/shared';
-import { apiFetch, readApiError } from '@/lib/api';
+import { apiFetch, failureFromResponse } from '@/lib/api';
 
 /**
  * Email verification Server Actions (API: apps/api/src/auth/email-verification.controller.ts).
@@ -60,14 +60,14 @@ export async function resendVerification(): Promise<ResendVerificationResult> {
   }
 }
 
+/**
+ * The shared API error handling (429 and the fallback), with no form fields:
+ * the token isn't typed by anyone, so a 400 shows the API's message about the
+ * link itself.
+ */
 async function messageFor(response: Response): Promise<string> {
-  if (response.status === 400) {
-    const body = await readApiError(response);
-    const message = Array.isArray(body.message) ? body.message.join(' ') : body.message;
-    return message || 'This link is invalid or has expired.';
-  }
-  if (response.status === 429) {
-    return 'Too many attempts. Wait a minute and try again.';
-  }
-  return 'Something went wrong. Please try again.';
+  const failure = await failureFromResponse(response, [], {
+    400: (message) => ({ formError: message || 'This link is invalid or has expired.' }),
+  });
+  return failure.formError ?? 'Something went wrong. Please try again.';
 }
