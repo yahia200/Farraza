@@ -1,9 +1,10 @@
+import { PASSWORD_SIGN_IN_REQUIRED_MESSAGE } from '@repo/shared';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { OidcErrorCode } from '@/lib/oidc';
 
 const MESSAGES: Record<OidcErrorCode, string> = {
-  'google-account-exists':
-    'An account with this email already exists. Sign in with your password, then connect Google from your account.',
+  // The API's own 403 message for this refusal (@repo/shared oidc.ts).
+  'google-account-exists': PASSWORD_SIGN_IN_REQUIRED_MESSAGE,
   'google-refused': "Google sign-in isn't available for this Google account. Use an account whose email Google has verified.",
   'google-failed': "Google sign-in didn't complete. Please try again.",
   'too-many-attempts': 'Too many attempts. Wait a minute and try again.',

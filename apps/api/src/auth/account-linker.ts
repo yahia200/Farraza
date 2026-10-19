@@ -6,15 +6,9 @@ import {
   type OidcProfile,
   type OidcResolveContext,
 } from '@nestjs/authentication';
+import { PASSWORD_SIGN_IN_REQUIRED, PASSWORD_SIGN_IN_REQUIRED_MESSAGE } from '@repo/shared';
 import type { User } from '../users/user.js';
 import { UsersRepository } from '../users/users.repository.js';
-
-/**
- * `errorCode` of the 403 for a first Google sign-in whose email matches an
- * account that hasn't verified it. The web callback reads it to tell the user
- * to sign in with their password instead.
- */
-export const PASSWORD_SIGN_IN_REQUIRED = 'password_sign_in_required';
 
 @Injectable()
 export class AccountLinker extends OidcAccountResolver {
@@ -75,10 +69,11 @@ export class AccountLinker extends OidcAccountResolver {
     // pre-hijacking). They can sign in with the password and connect Google
     // from their account instead (the link flow above).
     if (!existing.emailVerified) {
-      throw new ForbiddenException(
-        'An account with this email already exists. Sign in with your password, then connect Google from your account.',
-        { errorCode: PASSWORD_SIGN_IN_REQUIRED },
-      );
+      // The code and text live in @repo/shared (oidc.ts): the web callback
+      // matches on the code and shows the same text.
+      throw new ForbiddenException(PASSWORD_SIGN_IN_REQUIRED_MESSAGE, {
+        errorCode: PASSWORD_SIGN_IN_REQUIRED,
+      });
     }
     return (await this.usersRepository.linkIdentity(existing.id, identity.provider, identity.subject))
       ? existing

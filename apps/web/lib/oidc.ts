@@ -1,5 +1,6 @@
 import 'server-only';
 import { NextResponse, type NextRequest } from 'next/server';
+import { PASSWORD_SIGN_IN_REQUIRED } from '@repo/shared';
 import { apiFetch, readApiError } from './api';
 
 /**
@@ -25,9 +26,6 @@ interface OidcRedirect {
 
 /** `?error=` codes the sign-in page explains (components/auth/google-sign-in-error.tsx). */
 export type OidcErrorCode = 'google-account-exists' | 'google-refused' | 'google-failed' | 'too-many-attempts';
-
-/** Same value as PASSWORD_SIGN_IN_REQUIRED in apps/api/src/auth/account-linker.ts. */
-const PASSWORD_SIGN_IN_REQUIRED = 'password_sign_in_required';
 
 /**
  * Calls an API OIDC route with this browser's API cookies (session and
