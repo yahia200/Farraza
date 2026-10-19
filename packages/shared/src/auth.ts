@@ -8,6 +8,20 @@ import { z } from 'zod';
 export const PASSWORD_MIN_LENGTH = 12;
 export const PASSWORD_MAX_LENGTH = 128;
 
+/**
+ * The rules for choosing a password (sign-up and reset). Signing in only checks
+ * that one was entered, so a rule change never locks out an existing password.
+ * Not trimmed: spaces can be a deliberate part of a password.
+ */
+export const newPasswordSchema = z
+  .string()
+  .min(PASSWORD_MIN_LENGTH, {
+    error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`,
+  })
+  .max(PASSWORD_MAX_LENGTH, {
+    error: `Password must be ${PASSWORD_MAX_LENGTH} characters or fewer.`,
+  });
+
 export const signUpSchema = z.strictObject({
   name: z
     .string()
@@ -15,15 +29,7 @@ export const signUpSchema = z.strictObject({
     .min(2, { error: 'Name must be at least 2 characters.' })
     .max(100, { error: 'Name must be 100 characters or fewer.' }),
   email: z.email({ error: 'Enter a valid email address.' }),
-  // Not trimmed: spaces can be a deliberate part of a password.
-  password: z
-    .string()
-    .min(PASSWORD_MIN_LENGTH, {
-      error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`,
-    })
-    .max(PASSWORD_MAX_LENGTH, {
-      error: `Password must be ${PASSWORD_MAX_LENGTH} characters or fewer.`,
-    }),
+  password: newPasswordSchema,
 });
 
 export type SignUpInput = z.infer<typeof signUpSchema>;
@@ -45,15 +51,7 @@ export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 /** The reset link's token, and the new password under the sign-up rules. */
 export const resetPasswordSchema = z.strictObject({
   token: z.string().min(1, { error: 'This reset link is missing its token.' }),
-  // Not trimmed: spaces can be a deliberate part of a password.
-  password: z
-    .string()
-    .min(PASSWORD_MIN_LENGTH, {
-      error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`,
-    })
-    .max(PASSWORD_MAX_LENGTH, {
-      error: `Password must be ${PASSWORD_MAX_LENGTH} characters or fewer.`,
-    }),
+  password: newPasswordSchema,
 });
 
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
