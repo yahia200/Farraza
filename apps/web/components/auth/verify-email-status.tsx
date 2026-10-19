@@ -15,8 +15,11 @@ import { Spinner } from '@/components/ui/spinner';
  * link previews fetch the page with GET, and must not use the link up.
  * Pattern: calling a Server Function from useEffect, in
  * node_modules/next/dist/docs/01-app/01-getting-started/07-mutating-data.md.
+ * On failure, a signed-in user can ask for a new link here; a signed-out
+ * visitor is asked to sign in first (resend needs the session to know whose
+ * address to use). `signedIn` comes from the DAL, in the page.
  */
-export function VerifyEmailStatus({ token }: { token: string }) {
+export function VerifyEmailStatus({ token, signedIn }: { token: string; signedIn: boolean }) {
   const [result, setResult] = useState<VerifyEmailResult>();
   const [, startTransition] = useTransition();
   // A link works once. Strict Mode runs effects twice in development, and a
@@ -68,7 +71,17 @@ export function VerifyEmailStatus({ token }: { token: string }) {
           {result.message} Each link works once and expires after 24 hours.
         </AlertDescription>
       </Alert>
-      <ResendVerificationButton />
+      {signedIn ? (
+        <ResendVerificationButton />
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Need a new link?{' '}
+          <Link href="/sign-in" className="text-primary underline-offset-4 hover:underline">
+            Sign in
+          </Link>
+          , then open this link again to send one.
+        </p>
+      )}
     </div>
   );
 }

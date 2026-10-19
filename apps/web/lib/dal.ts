@@ -33,9 +33,28 @@ export interface CurrentUser {
 export async function getCurrentUser(): Promise<CurrentUser> {
   'use cache: private';
 
+  const user = await fetchCurrentUser();
+  if (!user) {
+    redirect('/sign-in');
+  }
+  return user;
+}
+
+/**
+ * The signed-in user, or null for a signed-out visitor: for public pages that
+ * only adapt to who is viewing (such as /verify-email). Same private cache and
+ * <Suspense> rule as getCurrentUser().
+ */
+export async function getCurrentUserOrNull(): Promise<CurrentUser | null> {
+  'use cache: private';
+
+  return fetchCurrentUser();
+}
+
+async function fetchCurrentUser(): Promise<CurrentUser | null> {
   const response = await apiFetch('/api/users/me');
   if (response.status === 401) {
-    redirect('/sign-in');
+    return null;
   }
   if (!response.ok) {
     throw new Error(`Could not load the current user (HTTP ${response.status}).`);
