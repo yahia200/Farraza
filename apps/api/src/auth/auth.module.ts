@@ -11,6 +11,9 @@ import { VerificationService } from './verification.service.js';
 import { AccountLinker } from './account-linker.js';
 import { OidcController } from './oidc.controller.js';
 import { PrismaOidcStateStore } from './prisma-oidc-state.store.js';
+import { PasswordResetController } from './password-reset.controller.js';
+import { PasswordResetMailer } from './password-reset.mailer.js';
+import { PasswordRecoveryService } from './password-recovery.service.js';
 
 @Module({
   imports: [UsersModule],
@@ -18,6 +21,7 @@ import { PrismaOidcStateStore } from './prisma-oidc-state.store.js';
     AuthController,
     EmailVerificationController,
     OidcController,
+    PasswordResetController,
   ],
   providers: [
     SessionAuth,
@@ -28,6 +32,8 @@ import { PrismaOidcStateStore } from './prisma-oidc-state.store.js';
     VerificationService,
     AccountLinker,
     PrismaOidcStateStore,
+    PasswordResetMailer,
+    PasswordRecoveryService,
   ],
 })
 export class AuthModule {}

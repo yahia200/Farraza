@@ -8,7 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service.js';
 
 /**
- * Keeps email verification (and, later, password reset) tokens in the
+ * Keeps email verification and password reset tokens in the
  * `email_tokens` table, so a link survives an API restart. Mirrors
  * PrismaSessionStore. Contract: `EmailTokenStore` in
  * node_modules/@nestjs/authentication/dist/interfaces/email-token-store.interface.d.ts

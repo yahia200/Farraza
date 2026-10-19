@@ -30,6 +30,9 @@ import { oidcOptions } from './auth/oidc.options.js';
       session: { absoluteTtl: '14d', idleTtl: '3d', trustedOrigins: [config.getOrThrow<string>('APP_URL'), "http://192.168.1.100:3000"] },
       // Links in verification emails open the web app's page, which POSTs the token back.
       emailVerification: { url: `${config.getOrThrow<string>('APP_URL')}/verify-email` },
+      // Links in reset emails open the web app's page, which POSTs the token
+      // and the new password. They work once, for an hour (the default ttl).
+      passwordReset: { url: `${config.getOrThrow<string>('APP_URL')}/reset-password` },
       // "Sign in with Google" (src/auth/oidc.options.ts).
       oidc: oidcOptions(config),
     }),
