@@ -1,5 +1,6 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { OidcService, Public, type OidcRedirect } from '@nestjs/authentication';
+import { oidcLoginQuerySchema, type OidcLoginQueryDto } from './dto/oidc-login.dto.js';
 
 /**
  * "Sign in with Google", behind the web app (backend-for-frontend). Unlike the
@@ -21,20 +22,27 @@ export class OidcController {
    * Starts a login: `url` is the provider's authorization URL, `cookies` the
    * login's transaction cookie. With `?link=true`, connects the provider to the
    * signed-in user instead (401 without a session, 403 from another site).
+   * Any other query key, or a `link` other than "true"/"false", is a 400.
    */
   @Get(':provider/login')
   login(
     @Param('provider') provider: string,
-    @Query('redirectTo') redirectTo?: string,
-    @Query('link') link?: string,
+    @Query({ schema: oidcLoginQuerySchema }) { redirectTo, link }: OidcLoginQueryDto,
   ): Promise<OidcRedirect> {
-    return this.oidcService.start(provider, { redirectTo, link: link === 'true' });
+    return this.oidcService.start(provider, { redirectTo, link });
   }
 
   /**
    * Finishes a login with the provider's callback query: `url` is the relative
    * path to land on, `cookies` the session cookie (sign-in only) and the
    * cleared transaction cookie.
+   *
+   * The query is left unvalidated on purpose: it is the provider's (`code`,
+   * `state`, `iss`, or `error`, plus extras such as Google's `scope` and
+   * `authuser`), and OidcService.finish takes it whole and checks it against
+   * the stored login (`finish(provider, query: Record<string, unknown>)` in
+   * node_modules/@nestjs/authentication/dist/oidc/oidc.service.d.ts). A schema
+   * here would only restate, and could drift from, the package's own checks.
    */
   @Get(':provider/callback')
   callback(
