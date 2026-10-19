@@ -18,7 +18,7 @@ async function bootstrap() {
   // OIDC login and callback) always do. CORS origins aren't trusted implicitly:
   // node_modules/@nestjs/common/interfaces/http/csrf-protection-options.interface.d.ts
   app.enableCsrfProtection({
-    trustedOrigins: [config.getOrThrow<string>('APP_URL'), 'http://192.168.1.100:3000'],
+    trustedOrigins: [config.getOrThrow<string>('APP_URL')],
   });
   // Validates every @Body/@Query/@Param that declares `{ schema }` (Zod schemas
   // from @repo/shared); parameters without one pass through untouched.
