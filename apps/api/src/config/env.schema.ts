@@ -59,8 +59,6 @@ export const envSchema = z.object({
     message: 'SMTP_URL is required when NODE_ENV is "production" (without it, email is only logged)',
   });
 
-export type Env = z.infer<typeof envSchema>;
-
 /** Throws a readable list of problems, so boot fails fast and legibly. */
 export function validateEnv(
   config: Record<string, unknown>,
