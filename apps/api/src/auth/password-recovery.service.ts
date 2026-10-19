@@ -3,7 +3,7 @@ import { PasswordResetService } from '@nestjs/authentication';
 import type { User } from '../users/user.js';
 import { UsersRepository } from '../users/users.repository.js';
 
-const INVALID_LINK = 'This link is invalid or has expired. Ask for a new one.';
+const INVALID_LINK = 'This reset link is invalid or has expired.';
 
 /**
  * The app's rules around @nestjs/authentication's PasswordResetService, which
