@@ -21,6 +21,7 @@ const companyName = z
  */
 export const RESERVED_COMPANY_SLUGS: ReadonlySet<string> = new Set([
   'api',
+  'auth',
   'companies',
   'dashboard',
   'onboarding',
