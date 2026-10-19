@@ -26,6 +26,7 @@ export const RESERVED_COMPANY_SLUGS: ReadonlySet<string> = new Set([
   'onboarding',
   'sign-in',
   'sign-up',
+  'verify-email',
 ]);
 
 export const createCompanySchema = z.strictObject({ name: companyName });
