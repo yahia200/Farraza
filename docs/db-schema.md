@@ -9,7 +9,7 @@ Sections 1–7 describe what is built. Section 8 lists designed tables and const
 ## 1. Conventions
 
 - **Naming:** tables and columns are snake_case in Postgres. In `contract.prisma`, models are PascalCase and fields camelCase, mapped with `@@map` / `@map`. Each table below gives its model name, and each column gives its contract field name.
-- **Primary keys:** `id uuid DEFAULT gen_random_uuid()` on every table except `sessions`, whose text id comes from the auth library. `gen_random_uuid()` is built into PostgreSQL 13+, so no extension is needed.
+- **Primary keys:** `id uuid DEFAULT gen_random_uuid()` on every table except `sessions`, `email_tokens` and `oidc_states`, whose text keys come from the auth library. `gen_random_uuid()` is built into PostgreSQL 13+, so no extension is needed.
 - **Timestamps:** `timestamptz` (`TimestamptzJsDate` in the contract). `created_at` defaults to `now()`. `updated_at` is `NOT NULL` with **no database default**: the contract declares it as `temporal.updatedAtJsDate()`, and the Prisma ORM sets it on every create and update. Any write that bypasses the ORM must set it too.
 - **Enums are text plus a CHECK.** Contract `enum`s become `text` columns with a `CHECK (col IN (...))` constraint, not Postgres enum types. The contract uses PascalCase member names (for example `Draft = "draft"`), but only the lowercase string values are stored.
 - **Emails:** plain `text`, not `citext`. The application normalizes them before writing (trim, Unicode NFC, lowercase), and `CHECK (email = lower(email))` backs this up, which makes uniqueness case-insensitive.
@@ -32,6 +32,7 @@ Sections 1–7 describe what is built. Section 8 lists designed tables and const
 | `FilePurpose` | `files.purpose` | `cv`, `answer` |
 | `FileStatus` | `files.status` | `pending`, `uploaded` |
 | `SessionMfa` | `sessions.mfa` | `pending`, `verified` |
+| `EmailTokenPurpose` | `email_tokens.purpose` | `email-verification`, `password-reset` (hyphenated: these are the auth library's `EmailTokenPurpose` values) |
 
 No code writes `withdrawn` yet, either as a status or as an event type.
 
@@ -280,6 +281,53 @@ An applicant's uploaded files: the CV, and the answers to file questions. A row 
 - Deleting a row does not delete the object in storage. The application must delete the object as well.
 - Nothing parsing-specific is stored. A later parse table would reference the CV's row.
 
+### 3.13 `identities` (model `Identity`)
+A sign-in identity from an OIDC provider (Google) linked to a `users` row. Accounts are linked by (`provider`, `subject`), never by email: an email can change, a subject doesn't.
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK |
+| `user_id` | `userId` | `uuid` | NOT NULL, FK → `users.id` ON DELETE CASCADE |
+| `provider` | `provider` | `text` | NOT NULL (the provider's name in the auth options, e.g. `google`) |
+| `subject` | `subject` | `text` | NOT NULL (the provider's stable account id, the ID token's `sub`) |
+| `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+
+- UNIQUE (`provider`, `subject`): one identity belongs to one user
+- INDEX (`user_id`)
+
+### 3.14 `email_tokens` (model `EmailToken`)
+Email verification and password reset links, persisted by the auth library's `EmailTokenStore` (`@nestjs/authentication`). The token itself only exists in the email; the row is keyed by its hash. Enum: `EmailTokenPurpose` (§2).
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `text` | PK (SHA-256 of the token) |
+| `purpose` | `purpose` | `text` (`EmailTokenPurpose`) | NOT NULL |
+| `user_id` | `userId` | `uuid` | NOT NULL, FK → `users.id` ON DELETE CASCADE |
+| `email` | `email` | `text` | NOT NULL (the address the link was sent to, and the only one it works for) |
+| `fingerprint` | `fingerprint` | `text` | NULL (password resets: SHA-256 of the password hash at send time, so any password change invalidates the link) |
+| `created_at` | `createdAt` | `timestamptz` | NOT NULL (no default: set by the auth library) |
+| `expires_at` | `expiresAt` | `timestamptz` | NOT NULL |
+
+- INDEX (`user_id`, `purpose`) for deleting a user's outstanding links of one purpose; INDEX (`user_id`) (Prisma adds one for every FK); INDEX (`expires_at`) for pruning expired links on save
+
+### 3.15 `oidc_states` (model `OidcState`)
+OIDC logins in progress, persisted by the auth library's `OidcStateStore` and consumed once by the provider callback.
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `state` | `state` | `text` | PK (the OAuth `state` parameter) |
+| `provider` | `provider` | `text` | NOT NULL |
+| `nonce` | `nonce` | `text` | NULL |
+| `code_verifier` | `codeVerifier` | `text` | NOT NULL (PKCE) |
+| `redirect_to` | `redirectTo` | `text` | NULL (where to send the browser after sign-in) |
+| `link_user_id` | `linkUserId` | `uuid` | NULL, FK → `users.id` ON DELETE CASCADE (link flow: the signed-in user who started it) |
+| `link_session_id` | `linkSessionId` | `text` | NULL, no FK (link flow: that user's session, re-checked on the callback) |
+| `created_at` | `createdAt` | `timestamptz` | NOT NULL (no default: set by the auth library) |
+| `expires_at` | `expiresAt` | `timestamptz` | NOT NULL |
+
+- CHECK `oidc_states_link_complete`: `(link_user_id IS NULL) = (link_session_id IS NULL)`: a link flow has both, a sign-in has neither. The store maps the pair to the library's `link: { userId, sessionId }`.
+- INDEX (`expires_at`) for pruning expired logins on save; INDEX (`link_user_id`) (Prisma adds one for every FK)
+
 ## 4. JSONB shapes
 
 The database does not validate these. The application does, using the Zod schemas and parsers in `packages/shared` (`@repo/shared`).
@@ -361,7 +409,7 @@ A knocked-out application is created directly in the Rejected stage with `status
 These are the relations declared in `contract.prisma`. Columns marked "no FK" above are not relations.
 
 - A `company` has many `memberships`, `jobs`, `stages`, `form_versions`, `candidates`, `applications`, and `files`.
-- A `user` has many `memberships` and `sessions`, and is referenced by `jobs.created_by` and `notes.author_id`.
+- A `user` has many `memberships`, `sessions`, `identities` and `email_tokens`, and is referenced by `jobs.created_by`, `notes.author_id` and `oidc_states.link_user_id`.
 - A `job` has many `form_versions`, `stages`, `applications`, and `files`.
 - A `candidate` has many `applications`.
 - An `application` belongs to one `job`, one `candidate`, one `form_version`, and one `stage`, and has many `application_events`, `notes`, and `files`.
@@ -382,7 +430,7 @@ Prisma works out table creation order and constraint names from the contract. Co
 The database cannot check these, so the services must:
 
 - `company_id` on a child row equals the `company_id` of its parent. It is copied from the parent on insert, and every read filters by it.
-- Columns without an FK (`application_events.company_id`/`from_stage_id`/`to_stage_id`/`actor_id`, `notes.company_id`, `form_versions.created_by`) hold valid ids at the time of writing.
+- Columns without an FK (`application_events.company_id`/`from_stage_id`/`to_stage_id`/`actor_id`, `notes.company_id`, `form_versions.created_by`, `oidc_states.link_session_id`) hold valid ids at the time of writing.
 - `applications.stage_id` belongs to the same job as the application. A move is rejected unless the target is one of the job's stages.
 - `applications.form_version_id` is the job's latest published version at submit time, and `applications.answers` is valid against its fields.
 - A published `form_versions` row is never modified. Draft updates and publishing are conditional on `published_at IS NULL`.
@@ -395,6 +443,8 @@ The database cannot check these, so the services must:
 - Every state change writes its `application_events` row in the same transaction. Events are never updated or deleted.
 - Each job has exactly one `hired` and one `rejected` stage (currently guaranteed by `DEFAULT_STAGES`).
 - Emails are normalized (trim, NFC, lowercase) before they are written to `users` or `candidates`.
+- `email_tokens` and `oidc_states` rows are consumed with one atomic `DELETE … RETURNING`, so a link or a callback works exactly once. Saving a row first deletes expired rows and enforces a cap, so anyone asking for links or starting logins can't grow the tables without bound (the store contracts in `@nestjs/authentication`'s `email-token-store.interface.d.ts` and `oidc-state-store.interface.d.ts`).
+- A Google sign-in is matched to a user through `identities` (`provider`, `subject`) only. Linking a new identity to an existing user by email is allowed only when both Google and `users.email_verified` say the address is verified.
 
 ## 8. Not built yet
 

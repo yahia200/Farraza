@@ -313,3 +313,69 @@ model Session {
   @@index([expiresAt])
   @@map("sessions")
 }
+
+/// A sign-in identity from an OIDC provider (Google) linked to a user. Accounts
+/// are linked by (provider, subject), never by email: emails change, subjects don't.
+model Identity {
+  id        Uuid              @id @default(sql`gen_random_uuid()`)
+  userId    Uuid              @map("user_id")
+  /// The provider's name in the auth library's options, e.g. "google".
+  provider  String
+  /// The provider's stable id for the account (the ID token's `sub`).
+  subject   String
+  createdAt TimestamptzJsDate @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, subject])
+  @@index([userId])
+  @@map("identities")
+}
+
+enum EmailTokenPurpose {
+  EmailVerification = "email-verification"
+  PasswordReset     = "password-reset"
+}
+
+/// Email verification and password reset links, persisted by the EmailTokenStore
+/// for @nestjs/authentication. The token itself only exists in the email.
+model EmailToken {
+  /// SHA-256 of the token.
+  id          String            @id
+  purpose     EmailTokenPurpose
+  userId      Uuid              @map("user_id")
+  /// The address the token was sent to, and the only one it works for.
+  email       String
+  /// Password resets: SHA-256 of the password hash at send time, so any password change invalidates the link.
+  fingerprint String?
+  createdAt   TimestamptzJsDate @map("created_at")
+  expiresAt   TimestamptzJsDate @map("expires_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@index([expiresAt])
+  @@map("email_tokens")
+}
+
+/// OIDC logins in progress (PKCE verifier, nonce, return path), persisted by the
+/// OidcStateStore for @nestjs/authentication and consumed once by the callback.
+model OidcState {
+  state         String             @id
+  provider      String
+  nonce         String?
+  codeVerifier  String             @map("code_verifier")
+  redirectTo    String?            @map("redirect_to")
+  /// Link flow ("connect your Google account"): the signed-in user who started it.
+  linkUserId    Uuid?              @map("link_user_id")
+  /// Link flow: that user's session id, re-checked on the callback.
+  linkSessionId String?            @map("link_session_id")
+  createdAt     TimestamptzJsDate  @map("created_at")
+  expiresAt     TimestamptzJsDate  @map("expires_at")
+
+  linkUser User? @relation(fields: [linkUserId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@check(expression: "(link_user_id IS NULL) = (link_session_id IS NULL)", name: "oidc_states_link_complete")
+  @@map("oidc_states")
+}
