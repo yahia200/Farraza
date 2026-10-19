@@ -1,0 +1,53 @@
+import { z } from 'zod';
+
+/*
+ * Boot-time validation of the API's environment (CLAUDE.md env list).
+ * Wired into `ConfigModule.forRoot({ validate })` in app.module.ts, so a
+ * missing or malformed variable stops the app at startup, not at first use.
+ *
+ * `@nestjs/config` passes the whole `process.env` here, so this is a plain
+ * (non-strict) object: it validates the keys it names and leaves every other
+ * variable (PATH, NODE_ENV, ...) untouched. Docs: @nestjs/config .d.ts in
+ * apps/api/node_modules/@nestjs/config, and docs/nestjs/auth.md (config hint).
+ */
+export const envSchema = z.object({
+  PORT: z.coerce.number().int().positive(),
+  DATABASE_URL: z.string().min(1),
+  // The web app's origin: CORS origin and the session's trusted origin.
+  APP_URL: z.url(),
+  // Shared with the web app so the API trusts its forwarded client address.
+  INTERNAL_API_SECRET: z.string().min(16),
+
+  // Object storage (RustFS in dev, S3-compatible in prod).
+  S3_BUCKET: z.string().min(1),
+  S3_ENDPOINT: z.url(),
+  S3_REGION: z.string().min(1),
+  S3_ACCESS_KEY: z.string().min(1),
+  S3_SECRET_KEY: z.string().min(1),
+  S3_FORCE_PATH_STYLE: z.enum(['true', 'false']).optional(),
+
+  // Google OAuth client (type "Web application"). See docs/adr for why the
+  // callback is registered on the web origin.
+  GOOGLE_CLIENT_ID: z.string().min(1),
+  GOOGLE_CLIENT_SECRET: z.string().min(1),
+
+  // Mail: SMTP_URL sends real email; without it, LogMailTransport prints to
+  // the log in development. MAIL_FROM is the envelope sender.
+  SMTP_URL: z.url().optional(),
+  MAIL_FROM: z.string().min(1).default('Khatwateen <accounts@khatwateen.app>'),
+});
+
+export type Env = z.infer<typeof envSchema>;
+
+/** Throws a readable list of problems, so boot fails fast and legibly. */
+export function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
+  const parsed = envSchema.safeParse(config);
+  if (!parsed.success) {
+    const problems = parsed.error.issues
+      .map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`)
+      .join('\n');
+    throw new Error(`Invalid environment variables:\n${problems}`);
+  }
+  // Keep every other process.env key; override only the ones we coerced/defaulted.
+  return { ...config, ...parsed.data };
+}

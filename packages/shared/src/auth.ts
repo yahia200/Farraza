@@ -34,3 +34,33 @@ export const signInSchema = z.strictObject({
 });
 
 export type SignInInput = z.infer<typeof signInSchema>;
+
+/** "Forgot your password?": just the address a reset link is sent to. */
+export const forgotPasswordSchema = z.strictObject({
+  email: z.email({ error: 'Enter a valid email address.' }),
+});
+
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+
+/** The reset link's token, and the new password under the sign-up rules. */
+export const resetPasswordSchema = z.strictObject({
+  token: z.string().min(1, { error: 'This reset link is missing its token.' }),
+  // Not trimmed: spaces can be a deliberate part of a password.
+  password: z
+    .string()
+    .min(PASSWORD_MIN_LENGTH, {
+      error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`,
+    })
+    .max(PASSWORD_MAX_LENGTH, {
+      error: `Password must be ${PASSWORD_MAX_LENGTH} characters or fewer.`,
+    }),
+});
+
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+/** The token a verification link carries, POSTed back by the page it opens. */
+export const verifyEmailSchema = z.strictObject({
+  token: z.string().min(1, { error: 'This verification link is missing its token.' }),
+});
+
+export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
