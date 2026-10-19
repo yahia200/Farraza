@@ -44,6 +44,22 @@ describe('validateEnv', () => {
     expect(env.MAIL_FROM).toBe('Khatwateen <accounts@khatwateen.app>');
   });
 
+  it('refuses to boot in production without SMTP_URL, naming it', () => {
+    expect(() => validateEnv({ ...valid(), NODE_ENV: 'production' })).toThrow(
+      /SMTP_URL/,
+    );
+  });
+
+  it('boots in production when SMTP_URL is set', () => {
+    const env = validateEnv({
+      ...valid(),
+      NODE_ENV: 'production',
+      SMTP_URL: 'smtp://user:pass@smtp.example.com:587',
+    });
+
+    expect(env.SMTP_URL).toBe('smtp://user:pass@smtp.example.com:587');
+  });
+
   it('refuses an S3_FORCE_PATH_STYLE other than "true" or "false"', () => {
     expect(() =>
       validateEnv({ ...valid(), S3_FORCE_PATH_STYLE: 'yes' }),

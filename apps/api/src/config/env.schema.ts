@@ -41,11 +41,23 @@ export const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().min(1),
   GOOGLE_CLIENT_SECRET: z.string().min(1),
 
+  // Read only for the SMTP_URL rule below.
+  NODE_ENV: z.string().optional(),
+
   // Mail: SMTP_URL sends real email; without it, LogMailTransport prints to
-  // the log in development. MAIL_FROM is the envelope sender.
+  // the log (development and tests only: required in production, below).
+  // MAIL_FROM is the envelope sender.
   SMTP_URL: z.url().optional(),
   MAIL_FROM: z.string().min(1).default('Khatwateen <accounts@khatwateen.app>'),
-});
+})
+  // In production a missing SMTP_URL would silently log verification and reset
+  // links instead of sending them. `refine` with `path` reports the issue on
+  // SMTP_URL. Docs: `refine` in node_modules/zod/v4/classic/schemas.d.ts,
+  // `$ZodCustomParams` (`path`) in node_modules/zod/v4/core/api.d.ts.
+  .refine((env) => env.NODE_ENV !== 'production' || env.SMTP_URL !== undefined, {
+    path: ['SMTP_URL'],
+    message: 'SMTP_URL is required when NODE_ENV is "production" (without it, email is only logged)',
+  });
 
 export type Env = z.infer<typeof envSchema>;
 

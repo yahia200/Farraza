@@ -38,7 +38,8 @@ import { oidcOptions } from './auth/oidc.options.js';
     }),
   }),
   // Real email when SMTP_URL is set; otherwise LogMailTransport prints each
-  // email (links included) to the log, for development. Bodies are the HTML
+  // email (links included) to the log, for development and tests (env.schema.ts
+  // refuses to boot in production without SMTP_URL). Bodies are the HTML
   // templates in src/mail/templates (copied to dist by nest-cli.json assets).
   // Docs: node_modules/@nestjs/mail/dist/interfaces/mail-module-options.interface.d.ts,
   // docs/nestjs/auth.md "Verify email addresses".
