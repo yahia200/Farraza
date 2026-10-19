@@ -1,14 +1,30 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-import { PasswordHasher } from '@nestjs/authentication';
+import { PasswordHasher, SignInService } from '@nestjs/authentication';
 import type { User } from '../users/user.js';
 import { UsersRepository } from '../users/users.repository.js';
+import type { SignUpDto } from './dto/auth.dto.js';
+import { VerificationService } from './verification.service.js';
 
 @Injectable()
 export class CredentialsService {
   constructor(
     private readonly usersRepository: UsersRepository,
     private readonly passwordHasher: PasswordHasher,
+    private readonly signInService: SignInService,
+    private readonly verification: VerificationService,
   ) {}
+
+  /**
+   * Creates the account, signs this browser in, then emails a link that
+   * proves the address (docs/nestjs/auth.md, "Verify email addresses").
+   * Nothing waits on verification: the user carries on to onboarding.
+   */
+  async signUp({ name, email, password }: SignUpDto): Promise<User> {
+    const user = await this.register(name, email, password);
+    await this.signInService.signIn(user.id, { method: 'password' });
+    await this.verification.sendAfterSignUp(user);
+    return user;
+  }
 
   async register(name: string, email: string, password: string): Promise<User> {
     if (await this.usersRepository.findByEmail(email)) {

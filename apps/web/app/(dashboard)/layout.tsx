@@ -4,6 +4,7 @@ import { CompanySwitcher } from '@/components/dashboard/company-switcher';
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
 import { NavUser } from '@/components/dashboard/nav-user';
 import { PersistentSidebarProvider } from '@/components/dashboard/persistent-sidebar';
+import { VerifyEmailReminder } from '@/components/dashboard/verify-email-reminder';
 import { SidebarInset } from '@/components/ui/sidebar';
 import { Toaster } from '@/components/ui/toast';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -42,7 +43,13 @@ export default function DashboardLayout({ children }: LayoutProps<'/'>) {
         />
         <SidebarInset>
           <DashboardHeader />
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">{children}</div>
+          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+            {/* Reads the session, so it streams in after the static shell. */}
+            <Suspense fallback={null}>
+              <VerifyEmailReminderSlot />
+            </Suspense>
+            {children}
+          </div>
         </SidebarInset>
       </PersistentSidebarProvider>
       <Toaster />
@@ -56,4 +63,10 @@ async function CompanySwitcherSlot() {
 
 async function NavUserSlot() {
   return <NavUser user={await getCurrentUser()} />;
+}
+
+/** Nothing for a verified user. getCurrentUser() is cached, so this costs no extra request. */
+async function VerifyEmailReminderSlot() {
+  const user = await getCurrentUser();
+  return user.emailVerified ? null : <VerifyEmailReminder email={user.email} />;
 }

@@ -1,0 +1,26 @@
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { ForgotPasswordForm } from '@/components/auth/forgot-password-form';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+
+export const metadata: Metadata = { title: 'Forgot your password · Khatwateen' };
+
+export default function ForgotPasswordPage() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Forgot your password?</CardTitle>
+        <CardDescription>Enter your email and we&apos;ll send you a link to choose a new one.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ForgotPasswordForm />
+      </CardContent>
+      <CardFooter className="justify-center text-sm text-muted-foreground">
+        Remembered it?&nbsp;
+        <Link href="/sign-in" className="text-primary underline-offset-4 hover:underline">
+          Sign in
+        </Link>
+      </CardFooter>
+    </Card>
+  );
+}

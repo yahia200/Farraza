@@ -21,11 +21,15 @@ const companyName = z
  */
 export const RESERVED_COMPANY_SLUGS: ReadonlySet<string> = new Set([
   'api',
+  'auth',
   'companies',
   'dashboard',
+  'forgot-password',
   'onboarding',
+  'reset-password',
   'sign-in',
   'sign-up',
+  'verify-email',
 ]);
 
 export const createCompanySchema = z.strictObject({ name: companyName });

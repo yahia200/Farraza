@@ -33,12 +33,13 @@ Use the local docs first: they match the installed version. Paths are relative t
 | Next.js | 16.4.0 | `apps/web/node_modules/next/dist/docs/` (`01-app/` for the App Router). Read before writing web code; see `apps/web/AGENTS.md`. | https://nextjs.org/docs |
 | NestJS (core, common, config, testing, CLI) | 12.1 | READMEs only, so use the `.d.ts` files in `apps/api/node_modules/@nestjs/*` | https://docs.nestjs.com |
 | `@nestjs/authentication`, `@nestjs/authorization` | 0.0.1 | Each `README.md` (quick start) plus its `.d.ts` files. These are new packages. | https://docs.nestjs.com/security/authentication, https://docs.nestjs.com/security/authorization |
+| `@nestjs/mail` | 0.0.1 | `apps/api/node_modules/@nestjs/mail/README.md` (overview only), so use the `.d.ts` files in `apps/api/node_modules/@nestjs/mail/dist/` (module options: `interfaces/mail-module-options.interface.d.ts`); worked examples in `docs/nestjs/auth.md` ("Verify email addresses"). A new package. | https://docs.nestjs.com/application/mail |
 | `@nestjs/throttler` | 6.7.1 | `apps/api/node_modules/@nestjs/throttler/README.md` (full guide) | https://github.com/nestjs/throttler |
 | Prisma ORM (`@prisma/orm-postgres`) | 8.0.0-rc.14 | `apps/api/prisma-8.md`, plus the generated types in `apps/api/src/prisma/contract.d.ts` | https://github.com/prisma/orm |
 | Prisma CLI (`prisma`) | 8.0.0-rc.20 | `prisma <command> --help` (authoritative); `apps/api/node_modules/prisma/README.md` | https://github.com/prisma/prisma-cli/blob/main/docs/README.md |
 | Nest Standard Schema validation | 12.1 | `apps/api/node_modules/@nestjs/common/pipes/standard-schema-validation.pipe.d.ts` | https://docs.nestjs.com/application/validation |
 | React Hook Form, `@hookform/resolvers` | 7.90 / 5.9 | `.d.ts` in `apps/web/node_modules/react-hook-form` | https://react-hook-form.com, https://ui.shadcn.com/docs/forms/react-hook-form |
-| Zod | 4.4.3 | `packages/shared/node_modules/zod/README.md` | https://zod.dev |
+| Zod | 4.4.3 | `packages/shared/node_modules/zod/README.md`, or `apps/api/node_modules/zod/` (also a direct `apps/api` dependency, for the env schema and API-only query schemas); types in `v4/classic/schemas.d.ts` | https://zod.dev |
 | Vitest | 4.1.11 | `.d.ts` in `apps/api/node_modules/vitest` | https://vitest.dev |
 | oxlint | 1.87.0 | `apps/api/node_modules/oxlint/README.md` | https://oxc.rs/docs/guide/usage/linter |
 | ESLint | 9.39.5 | — | https://eslint.org |
@@ -65,7 +66,7 @@ pnpm build | pnpm lint | pnpm check-types
 pnpm format                          # prettier over the whole repo
 ```
 
-`apps/api/.env` needs `PORT`, `DATABASE_URL`, `APP_URL` (the web app's URL: CORS origin and session `trustedOrigins`) and `INTERNAL_API_SECRET`; `apps/web/.env.local` needs `API_URL` and the same `INTERNAL_API_SECRET` (a long random string, different per environment). All API routes are under the `/api` prefix.
+`apps/api/.env` needs `PORT`, `DATABASE_URL`, `APP_URL` (the web app's URL: CORS origin, session and CSRF `trustedOrigins`, and the base of the Google callback), `INTERNAL_API_SECRET`, the object-storage vars `S3_BUCKET`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, and `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (an OAuth client of type "Web application" whose redirect URI is `${APP_URL}/auth/oidc/google/callback`, on the web origin: see ADR-0003). Optional: `S3_FORCE_PATH_STYLE` (`true`/`false`), `SMTP_URL` (required when `NODE_ENV=production`, where the API refuses to boot without it; in development and tests, leaving it unset prints emails to the API log) and `MAIL_FROM` (defaults to `Khatwateen <accounts@khatwateen.app>`). The API validates its environment at boot against `apps/api/src/config/env.schema.ts` and refuses to start with a list of what is missing or malformed; add new variables there. `apps/web/.env.local` needs `API_URL` and the same `INTERNAL_API_SECRET` (a long random string, different per environment). All API routes are under the `/api` prefix.
 
 The API imports `@repo/shared` from its built `dist/`. After changing `packages/shared`, rebuild it (`pnpm --filter @repo/shared build`) or keep `pnpm dev` running, which watches it.
 

@@ -20,12 +20,20 @@
       "model": "Company",
       "namespace": "public"
     },
+    "email_tokens": {
+      "model": "EmailToken",
+      "namespace": "public"
+    },
     "files": {
       "model": "File",
       "namespace": "public"
     },
     "form_versions": {
       "model": "FormVersion",
+      "namespace": "public"
+    },
+    "identities": {
+      "model": "Identity",
       "namespace": "public"
     },
     "jobs": {
@@ -38,6 +46,10 @@
     },
     "notes": {
       "model": "Note",
+      "namespace": "public"
+    },
+    "oidc_states": {
+      "model": "OidcState",
       "namespace": "public"
     },
     "sessions": {
@@ -125,6 +137,19 @@
               {
                 "name": "Required",
                 "value": "required"
+              }
+            ]
+          },
+          "EmailTokenPurpose": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "EmailVerification",
+                "value": "email-verification"
+              },
+              {
+                "name": "PasswordReset",
+                "value": "password-reset"
               }
             ]
           },
@@ -806,6 +831,110 @@
               "table": "companies"
             }
           },
+          "EmailToken": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              },
+              "email": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "expiresAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              },
+              "fingerprint": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "purpose": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "EmailTokenPurpose",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "user": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "email": {
+                  "column": "email"
+                },
+                "expiresAt": {
+                  "column": "expires_at"
+                },
+                "fingerprint": {
+                  "column": "fingerprint"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "purpose": {
+                  "column": "purpose"
+                },
+                "userId": {
+                  "column": "user_id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "email_tokens"
+            }
+          },
           "File": {
             "fields": {
               "applicationId": {
@@ -1166,6 +1295,84 @@
               },
               "namespaceId": "public",
               "table": "form_versions"
+            }
+          },
+          "Identity": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "provider": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "subject": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "user": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "provider": {
+                  "column": "provider"
+                },
+                "subject": {
+                  "column": "subject"
+                },
+                "userId": {
+                  "column": "user_id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "identities"
             }
           },
           "Job": {
@@ -1555,6 +1762,124 @@
               },
               "namespaceId": "public",
               "table": "notes"
+            }
+          },
+          "OidcState": {
+            "fields": {
+              "codeVerifier": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              },
+              "expiresAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              },
+              "linkSessionId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "linkUserId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "nonce": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "provider": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "redirectTo": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "state": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "linkUser": {
+                "cardinality": "N:1",
+                "nullable": true,
+                "on": {
+                  "localFields": [
+                    "linkUserId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "codeVerifier": {
+                  "column": "code_verifier"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "expiresAt": {
+                  "column": "expires_at"
+                },
+                "linkSessionId": {
+                  "column": "link_session_id"
+                },
+                "linkUserId": {
+                  "column": "link_user_id"
+                },
+                "nonce": {
+                  "column": "nonce"
+                },
+                "provider": {
+                  "column": "provider"
+                },
+                "redirectTo": {
+                  "column": "redirect_to"
+                },
+                "state": {
+                  "column": "state"
+                }
+              },
+              "namespaceId": "public",
+              "table": "oidc_states"
             }
           },
           "Session": {
@@ -2478,6 +2803,110 @@
                 }
               ]
             },
+            "email_tokens": {
+              "checks": [
+                {
+                  "expression": "\"purpose\" IN ('email-verification', 'password-reset')",
+                  "name": "email_tokens_purpose_check_fb584a5c",
+                  "prefix": "email_tokens_purpose_check"
+                }
+              ],
+              "columns": {
+                "created_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "email": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "expires_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "fingerprint": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "purpose": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "EmailTokenPurpose",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "user_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "user_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "email_tokens"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "users"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "expires_at"
+                  ],
+                  "name": "email_tokens_expires_at_idx_35365ada",
+                  "prefix": "email_tokens_expires_at_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "user_id"
+                  ],
+                  "name": "email_tokens_user_id_idx_6c952402",
+                  "prefix": "email_tokens_user_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "user_id",
+                    "purpose"
+                  ],
+                  "name": "email_tokens_user_id_purpose_idx_b55b3751",
+                  "prefix": "email_tokens_user_id_purpose_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
             "files": {
               "checks": [
                 {
@@ -2864,6 +3293,85 @@
                   "columns": [
                     "job_id",
                     "version"
+                  ]
+                }
+              ]
+            },
+            "identities": {
+              "columns": {
+                "created_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "default": {
+                    "expression": "gen_random_uuid()",
+                    "kind": "function"
+                  },
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "provider": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "subject": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "user_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "user_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "identities"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "users"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "user_id"
+                  ],
+                  "name": "identities_user_id_idx_6c952402",
+                  "prefix": "identities_user_id_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "provider",
+                    "subject"
                   ]
                 }
               ]
@@ -3273,6 +3781,105 @@
               },
               "uniques": []
             },
+            "oidc_states": {
+              "checks": [
+                {
+                  "expression": "(link_user_id IS NULL) = (link_session_id IS NULL)",
+                  "name": "oidc_states_link_complete_6e225095",
+                  "prefix": "oidc_states_link_complete"
+                }
+              ],
+              "columns": {
+                "code_verifier": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "created_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "expires_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "link_session_id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "link_user_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": true
+                },
+                "nonce": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "provider": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "redirect_to": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "state": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "link_user_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "oidc_states"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "users"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "expires_at"
+                  ],
+                  "name": "oidc_states_expires_at_idx_35365ada",
+                  "prefix": "oidc_states_expires_at_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "link_user_id"
+                  ],
+                  "name": "oidc_states_link_user_id_idx_694e5978",
+                  "prefix": "oidc_states_link_user_id_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "state"
+                ]
+              },
+              "uniques": []
+            },
             "sessions": {
               "checks": [
                 {
@@ -3633,6 +4240,13 @@
                 "required"
               ]
             },
+            "EmailTokenPurpose": {
+              "kind": "valueSet",
+              "values": [
+                "email-verification",
+                "password-reset"
+              ]
+            },
             "FilePurpose": {
               "kind": "valueSet",
               "values": [
@@ -3695,7 +4309,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "4db2ac6290228e9d567107ad6661dfcd73131e11a049874f490c58312540fc74"
+    "storageHash": "06c9c7f03a37af33a5340d6b9e267de5147655c0acd40b9b9c103705cdcc5502"
   },
   "execution": {
     "executionHash": "c19b53563967fe1cdc97d45552456039c34d42f7b292484a823348d6f653f142",

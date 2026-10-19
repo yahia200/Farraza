@@ -44,13 +44,24 @@ export function apiUrl(path: string): string {
  * `next dev` fills from the connection. Elsewhere, only trust it behind a proxy
  * that sets it.
  */
-export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  const session = (await cookies()).get(SESSION_COOKIE)?.value;
+export async function apiFetch(
+  path: string,
+  init: RequestInit = {},
+  /** Other API cookies to forward besides the session, e.g. the OIDC transaction cookie (lib/oidc.ts). */
+  { forwardCookies = [] }: { forwardCookies?: readonly string[] } = {},
+): Promise<Response> {
+  const cookieStore = await cookies();
   const clientIp = (await headers()).get('x-forwarded-for')?.split(',')[0]?.trim();
   const secret = process.env.INTERNAL_API_SECRET;
   const requestHeaders = new Headers(init.headers);
-  if (session) {
-    requestHeaders.set('cookie', `${SESSION_COOKIE}=${session}`);
+  // Only the API's own cookies go to the API, never the web app's (like sidebar_state).
+  const cookieHeader = [SESSION_COOKIE, ...forwardCookies]
+    .map((name) => cookieStore.get(name))
+    .filter((cookie) => cookie !== undefined)
+    .map(({ name, value }) => `${name}=${value}`)
+    .join('; ');
+  if (cookieHeader) {
+    requestHeaders.set('cookie', cookieHeader);
   }
   if (clientIp && secret) {
     requestHeaders.set('x-client-ip', clientIp);
