@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -65,7 +66,16 @@ export function SignInForm() {
           control={form.control}
           render={({ field, fieldState }) => (
             <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="sign-in-password">Password</FieldLabel>
+              {/* Label row with the reset link, as in shadcn's login-01 block (https://ui.shadcn.com/blocks/login). */}
+              <div className="flex items-center">
+                <FieldLabel htmlFor="sign-in-password">Password</FieldLabel>
+                <Link
+                  href="/forgot-password"
+                  className="ml-auto text-sm text-muted-foreground underline-offset-4 hover:underline"
+                >
+                  Forgot your password?
+                </Link>
+              </div>
               <Input
                 {...field}
                 id="sign-in-password"

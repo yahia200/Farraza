@@ -17,7 +17,7 @@ Loaded when you work in `apps/web`. The shared facts, docs table, and commands a
   - Docs: `02-guides/authentication-with-cache-components.md`.
 - **Route groups:**
   - `(marketing)`: the landing page, and the only place with the floating `NavBar`.
-  - `(auth)`: sign-in and sign-up.
+  - `(auth)`: sign-in, sign-up, verify-email, forgot-password and reset-password.
   - `(onboarding)`: `/onboarding`.
   - `(dashboard)`: the shadcn sidebar layout. Besides `/dashboard/…` it holds `/companies/new`, the two-step "Add company" page (name, then optional logo and color), which is linked from the company switcher. It isn't at `/dashboard/new` because "new" is a valid company slug.
 - **Company pages** live at `/dashboard/[companySlug]/…`, because top-level `/{company}/{job}` is reserved for public apply pages (`docs/db-schema.md`). Every company page wraps its content in `CompanyPage` (`components/dashboard/company-page.tsx`).
