@@ -97,8 +97,8 @@ function Footer() {
           </small>
         </p>
 
-        <p className="hidden md:block text-[15vw] font-extrabold leading-0 text-center text-brand-accent absolute bottom-[0.175em] left-1/2 -translate-x-1/2 pointer-events-none select-none">
-          Khatwateen
+        <p className="hidden md:block text-[15vw] font-extrabold leading-0 text-center text-brand-accent absolute bottom-[0.112em] left-1/2 -translate-x-1/2 pointer-events-none select-none">
+          khatwateen
         </p>
       </div>
     </footer>
