@@ -32,6 +32,7 @@ import {
   sampleZip,
 } from '../testing/sample-files.js';
 import type {
+  CompanyOpenJobs,
   FileToVerify,
   NewApplication,
   NewPendingFile,
@@ -62,6 +63,16 @@ class InMemoryApplicationsRepository implements PublicApi<ApplicationsRepository
   private readonly applied = new Set<string>();
   private nextApplicationId = 1;
   readonly applications: NewApplication[] = [];
+  /** Every company a job was seeded for, with its public branding — so the listing knows it exists. */
+  private readonly companies = new Map<string, OpenJob['company']>();
+  /** One row per seeded job (open or not), for the public listing: like the `jobs` table's rows. */
+  private readonly jobRows: Array<{
+    companySlug: string;
+    open: boolean;
+    title: string;
+    slug: string;
+    description: string | null;
+  }> = [];
   /** Test setup: a file whose attach loses a race (another submit takes it between the check and the attach). */
   raceOnFile: string | null = null;
 
@@ -71,14 +82,16 @@ class InMemoryApplicationsRepository implements PublicApi<ApplicationsRepository
     cvMode: CvMode;
     open?: boolean;
     fields?: FormFields;
+    logoUrl?: string | null;
+    brandColor?: string | null;
   }): OpenJob {
     const job: OpenJob = {
       company: {
         id: 'company-1',
         name: 'Acme',
         slug: 'acme',
-        logoUrl: null,
-        brandColor: null,
+        logoUrl: options.logoUrl ?? null,
+        brandColor: options.brandColor ?? null,
       },
       job: {
         id: `job-${options.slug}`,
@@ -93,8 +106,45 @@ class InMemoryApplicationsRepository implements PublicApi<ApplicationsRepository
       firstStageId: 'stage-applied',
       rejectedStageId: 'stage-rejected',
     };
+    this.companies.set(job.company.slug, job.company);
+    this.jobRows.push({
+      companySlug: job.company.slug,
+      open: options.open !== false,
+      title: job.job.title,
+      slug: options.slug,
+      description: job.job.description,
+    });
     if (options.open !== false) this.jobs.push(job);
     return job;
+  }
+
+  /** The company's branding and open jobs, or null when no company has that slug (mirrors the SQL). */
+  async listCompanyOpenJobs(companySlug: string): Promise<CompanyOpenJobs | null> {
+    const company = this.companies.get(companySlug);
+    if (!company) return null;
+    return {
+      company: {
+        name: company.name,
+        slug: company.slug,
+        logoUrl: company.logoUrl,
+        brandColor: company.brandColor,
+      },
+      jobs: this.jobRows
+        .filter((row) => row.companySlug === companySlug && row.open)
+        .map((row) => ({ title: row.title, slug: row.slug, description: row.description })),
+    };
+  }
+
+  /** The company's branding only, or null when no company has that slug. */
+  async findCompanyBranding(companySlug: string): Promise<CompanyOpenJobs['company'] | null> {
+    const company = this.companies.get(companySlug);
+    if (!company) return null;
+    return {
+      name: company.name,
+      slug: company.slug,
+      logoUrl: company.logoUrl,
+      brandColor: company.brandColor,
+    };
   }
 
   /** Test setup: a file that was uploaded for a job but not yet submitted. */
@@ -1616,6 +1666,61 @@ describe('ApplicationsService', () => {
 
       expect(job.cvMode).toBe('required');
       expect(JSON.stringify(job)).not.toContain('signed');
+    });
+  });
+
+  // The public listing at /{companySlug}: a company's branding and only its open jobs, projected to
+  // the fields applicants may see. The repository query is checked against the real database by hand.
+  describe('listCompanyJobs', () => {
+    it("returns the company's branding and only its open jobs, as public fields", async () => {
+      repository.seedJob({ slug: 'backend', cvMode: 'optional' });
+      repository.seedJob({ slug: 'design', cvMode: 'optional' });
+      repository.seedJob({ slug: 'old-role', cvMode: 'optional', open: false });
+
+      const listing = await service.listCompanyJobs('acme');
+
+      expect(listing.company).toEqual({ name: 'Acme', slug: 'acme', logoUrl: null, brandColor: null });
+      expect(listing.jobs.map((job) => job.slug).sort()).toEqual(['backend', 'design']);
+      // Only the public projection leaves the API: no id, status or timestamps.
+      for (const job of listing.jobs) {
+        expect(Object.keys(job).sort()).toEqual(['description', 'slug', 'title']);
+      }
+    });
+
+    it('returns an empty list for a real company with no open jobs', async () => {
+      repository.seedJob({ slug: 'old-role', cvMode: 'optional', open: false });
+
+      await expect(service.listCompanyJobs('acme')).resolves.toMatchObject({ jobs: [] });
+    });
+
+    it('is a 404 for a company that does not exist', async () => {
+      await expect(service.listCompanyJobs('nope')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('getCompanyBranding', () => {
+    it("returns only the company's branding, no jobs", async () => {
+      repository.seedJob({
+        slug: 'backend',
+        cvMode: 'optional',
+        logoUrl: 'https://cdn.example/acme.png',
+        brandColor: '#3366ff',
+      });
+
+      const branding = await service.getCompanyBranding('acme');
+
+      expect(branding).toEqual({
+        name: 'Acme',
+        slug: 'acme',
+        logoUrl: 'https://cdn.example/acme.png',
+        brandColor: '#3366ff',
+      });
+      // Branding only: the projection carries no jobs and no internal fields.
+      expect(Object.keys(branding).sort()).toEqual(['brandColor', 'logoUrl', 'name', 'slug']);
+    });
+
+    it('is a 404 for a company that does not exist', async () => {
+      await expect(service.getCompanyBranding('nope')).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });

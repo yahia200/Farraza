@@ -8,6 +8,17 @@ export interface OpenJob {
   rejectedStageId: string;
 }
 
+/**
+ * A company's public listing: its branding and its open jobs, for GET
+ * /api/public/:companySlug. Only the fields applicants may see — no internal
+ * job id, status or timestamps. `slug` stays, because the page links each job
+ * to its apply page (/{companySlug}/{jobSlug}).
+ */
+export interface CompanyOpenJobs {
+  company: { name: string; slug: string; logoUrl: string | null; brandColor: string | null };
+  jobs: Array<{ title: string; slug: string; description: string | null }>;
+}
+
 /** A file the applicant uploaded for this submission, to be attached inside the Application's transaction. */
 export interface FileToAttach {
   id: string;

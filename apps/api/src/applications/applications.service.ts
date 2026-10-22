@@ -16,6 +16,8 @@ import {
   isMediaContentType,
   matchAllowedType,
   parseAnswers,
+  publicBrandingSchema,
+  publicCompanyJobsSchema,
   toPublicFields,
   type Answers,
   type FieldError,
@@ -35,6 +37,34 @@ export class ApplicationsService {
     private readonly applications: ApplicationsRepository,
     private readonly storage: StorageService,
   ) {}
+
+  /**
+   * The company's branding and its open jobs, for the public listing at
+   * /{companySlug}. A company that doesn't exist is a 404 (same as a missing
+   * job on the apply page); a company with no open jobs is a 200 with an empty
+   * list, so the page can say "no openings". Parsing through the shared schema
+   * is the public projection: only the listed fields leave the API.
+   */
+  async listCompanyJobs(companySlug: string) {
+    const found = await this.applications.listCompanyOpenJobs(companySlug);
+    if (!found) {
+      throw new NotFoundException();
+    }
+    return publicCompanyJobsSchema.parse(found);
+  }
+
+  /**
+   * A company's branding for the public layout: a 404 when the company doesn't
+   * exist (like the listing). Parsing through the shared schema is the public
+   * projection — only the branding fields leave the API.
+   */
+  async getCompanyBranding(companySlug: string) {
+    const found = await this.applications.findCompanyBranding(companySlug);
+    if (!found) {
+      throw new NotFoundException();
+    }
+    return publicBrandingSchema.parse(found);
+  }
 
   async getPublicJob(companySlug: string, jobSlug: string) {
     const found = await this.applications.findOpenJob(companySlug, jobSlug);

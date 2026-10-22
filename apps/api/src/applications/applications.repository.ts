@@ -3,6 +3,7 @@ import type { FilePurpose, FormFields } from '@repo/shared';
 import { isUniqueViolation } from '../common/db-errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
+  CompanyOpenJobs,
   FileToVerify,
   NewApplication,
   NewPendingFile,
@@ -50,8 +51,67 @@ export class ApplicationsRepository {
     return this.prisma.db.orm.public.FormVersion;
   }
 
+  /**
+   * A company's public branding and its open jobs, by company slug. Returns
+   * null when no company has that slug (a 404 for an unknown company); a real
+   * company with no open jobs returns an empty `jobs` list, not null.
+   */
+  async listCompanyOpenJobs(
+    companySlug: string,
+  ): Promise<CompanyOpenJobs | null> {
+    const company = await this.companies.where({ slug: companySlug }).first();
+    if (!company) return null;
+
+    const jobs: CompanyOpenJobs['jobs'] = await this.jobs
+      .where({ companyId: company.id, status: 'open' })
+      .select('title', 'slug', 'description')
+      .orderBy((job) => job.createdAt.desc())
+      .all()
+      .then((rows) =>
+        rows.map((row) => ({
+          title: row.title,
+          slug: row.slug,
+          description: row.description,
+        })),
+      );
+
+    return {
+      company: {
+        name: company.name,
+        slug: company.slug,
+        logoUrl: company.logoUrl,
+        brandColor: company.brandColor,
+      },
+      jobs,
+    };
+  }
+
+  /**
+   * A company's public branding by slug (no jobs, no form): the one query the
+   * public layout needs to theme every page. Null when no company has the slug.
+   */
+  async findCompanyBranding(
+    companySlug: string,
+  ): Promise<CompanyOpenJobs['company'] | null> {
+    const company = await this.companies
+      .where({ slug: companySlug })
+      .select('name', 'slug', 'logoUrl', 'brandColor')
+      .first();
+    if (!company) return null;
+
+    return {
+      name: company.name,
+      slug: company.slug,
+      logoUrl: company.logoUrl,
+      brandColor: company.brandColor,
+    };
+  }
+
   /** The job as applicants see it, or null unless it is open with a published form. */
-  async findOpenJob(companySlug: string, jobSlug: string): Promise<OpenJob | null> {
+  async findOpenJob(
+    companySlug: string,
+    jobSlug: string,
+  ): Promise<OpenJob | null> {
     const company = await this.companies.where({ slug: companySlug }).first();
     if (!company) return null;
 
@@ -82,7 +142,11 @@ export class ApplicationsRepository {
         brandColor: company.brandColor,
       },
       job: { id: job.id, title: job.title, description: job.description },
-      form: { id: form.id, fields: form.fields as FormFields, cvMode: form.cvMode },
+      form: {
+        id: form.id,
+        fields: form.fields as FormFields,
+        cvMode: form.cvMode,
+      },
       firstStageId: first.id,
       rejectedStageId: rejected.id,
     };
@@ -146,7 +210,10 @@ export class ApplicationsRepository {
         const candidate = await tx.orm.public.Candidate.upsert({
           create: { companyId: input.companyId, ...input.candidate },
           update: { name: input.candidate.name, phone: input.candidate.phone },
-          conflictOn: { companyId: input.companyId, email: input.candidate.email },
+          conflictOn: {
+            companyId: input.companyId,
+            email: input.candidate.email,
+          },
         });
 
         const application = await tx.orm.public.Application.create({
@@ -184,7 +251,11 @@ export class ApplicationsRepository {
             status: 'pending',
           })
             .where((f) => f.applicationId.isNull())
-            .where((f) => (file.fieldKey === null ? f.fieldKey.isNull() : f.fieldKey.eq(file.fieldKey)))
+            .where((f) =>
+              file.fieldKey === null
+                ? f.fieldKey.isNull()
+                : f.fieldKey.eq(file.fieldKey),
+            )
             // The type is the one found in the bytes at the check, replacing the declared one.
             .update({
               applicationId: application.id,

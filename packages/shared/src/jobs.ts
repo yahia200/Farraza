@@ -33,3 +33,46 @@ export const saveFormSchema = z.strictObject({
   cvMode: cvModeSchema,
 });
 export type SaveFormInput = z.infer<typeof saveFormSchema>;
+
+/**
+ * Response for the public company listing (GET /api/public/:companySlug): a
+ * company's branding and every open job. Unlike the schemas above, which
+ * validate request *bodies*, this is a *response* contract shared by the API
+ * and the web app. The API builds its reply through it, so parsing doubles as
+ * the public projection — an internal job field (id, status, timestamps) added
+ * by mistake is dropped instead of leaked — and the web app parses what comes
+ * back at the trust boundary. Branding is kept loose (plain nullable strings):
+ * `logoUrl`/`brandColor` are already validated when saved (companies.ts), and
+ * re-checking their format on read would only risk rejecting stored data.
+ * Each job carries its `slug`, which the listing turns into an apply link
+ * (/{companySlug}/{jobSlug}).
+ */
+/**
+ * A company's public branding: the fields the applicant-facing pages render
+ * directly (name, logo, brand color). It is both its own response contract —
+ * GET /api/public/:companySlug/branding, which the public layout fetches once
+ * to theme every page under it — and the `company` shape inside
+ * `publicCompanyJobsSchema` below, so the two can't drift. Like the listing
+ * schema, branding is kept loose (plain nullable strings): logoUrl/brandColor
+ * are already validated when saved (companies.ts), and re-checking on read
+ * would only risk rejecting stored data.
+ */
+export const publicBrandingSchema = z.object({
+  name: z.string(),
+  slug: z.string(),
+  logoUrl: z.string().nullable(),
+  brandColor: z.string().nullable(),
+});
+export type PublicBranding = z.infer<typeof publicBrandingSchema>;
+
+export const publicCompanyJobsSchema = z.object({
+  company: publicBrandingSchema,
+  jobs: z.array(
+    z.object({
+      title: z.string(),
+      slug: z.string(),
+      description: z.string().nullable(),
+    }),
+  ),
+});
+export type PublicCompanyJobs = z.infer<typeof publicCompanyJobsSchema>;
