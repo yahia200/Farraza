@@ -9,7 +9,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 const outfit = Outfit({subsets:['latin'],variable:'--font-sans'});
 
 const thunder = localFont({
-  src: "./fonts/Thunder-ExtraBoldLC.woff2",
+  src: "./fonts/Thunder-BoldLC.woff2",
   weight: "900",
   style: "normal",
   variable: "--font-display",
