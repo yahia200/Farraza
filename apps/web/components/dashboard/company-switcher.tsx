@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ChevronsUpDownIcon, PlusIcon } from 'lucide-react';
@@ -15,14 +16,27 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
+import { useActiveCompany } from './active-company';
 import { initials } from './initials';
 
-/** Adapted from shadcn block sidebar-07 (team-switcher): switches between your companies. */
+/**
+ * Adapted from shadcn block sidebar-07 (team-switcher): switches between your companies.
+ * It decides which company the sidebar shows: the one in the URL, else the
+ * last one shown (pages like /dashboard/settings have no slug), else your
+ * first. It reports that to ActiveCompanyProvider so NavMain links to it too.
+ */
 export function CompanySwitcher({ companies }: { companies: MyCompany[] }) {
   const { companySlug } = useParams<{ companySlug?: string }>();
+  const { slug: rememberedSlug, setSlug } = useActiveCompany();
   const { isMobile } = useSidebar();
 
-  const active = companies.find((company) => company.slug === companySlug) ?? companies[0];
+  const wanted = companySlug ?? rememberedSlug;
+  const active = companies.find((company) => company.slug === wanted) ?? companies[0];
+  const activeSlug = active?.slug ?? null;
+  // Tells the sibling NavMain, which can't see the company list. An effect,
+  // because a child may not set its parent's state while rendering.
+  useEffect(() => setSlug(activeSlug), [activeSlug, setSlug]);
+
   if (!active) {
     return null;
   }

@@ -11,6 +11,7 @@ import {
   SidebarRail,
 } from '@/components/ui/sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ActiveCompanyProvider } from './active-company';
 import { NavMain } from './nav-main';
 import { SIDEBAR_COLLAPSIBLE, SidebarStateScript } from './persistent-sidebar';
 
@@ -27,14 +28,17 @@ import { SIDEBAR_COLLAPSIBLE, SidebarStateScript } from './persistent-sidebar';
 export function AppSidebar({ header, footer }: { header: ReactNode; footer: ReactNode }) {
   return (
     <>
-      <Sidebar variant="floating" collapsible={SIDEBAR_COLLAPSIBLE}>
-        <SidebarHeader>{header}</SidebarHeader>
-        <SidebarContent>
-          <NavMain />
-        </SidebarContent>
-        <SidebarFooter>{footer}</SidebarFooter>
-        <SidebarRail />
-      </Sidebar>
+      {/* Shared by the switcher (in `header`) and NavMain; see active-company.tsx. */}
+      <ActiveCompanyProvider>
+        <Sidebar variant="floating" collapsible={SIDEBAR_COLLAPSIBLE}>
+          <SidebarHeader>{header}</SidebarHeader>
+          <SidebarContent>
+            <NavMain />
+          </SidebarContent>
+          <SidebarFooter>{footer}</SidebarFooter>
+          <SidebarRail />
+        </Sidebar>
+      </ActiveCompanyProvider>
       {/* After the sidebar in the HTML, so the element exists when it runs. */}
       <SidebarStateScript />
     </>

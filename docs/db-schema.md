@@ -116,7 +116,7 @@ Links a user to a company with a role.
 | `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
 | `updated_at` | `updatedAt` | `timestamptz` | NOT NULL, set by the ORM |
 
-- UNIQUE (`company_id`, `slug`). The public apply URL is `/{company.slug}/{job.slug}`. Company slugs never take a name in `RESERVED_COMPANY_SLUGS` (`packages/shared/src/companies.ts`), because the web app's own top-level routes would hide those pages.
+- UNIQUE (`company_id`, `slug`). The public apply URL is `/{company.slug}/{job.slug}`. Company slugs never take a name in `RESERVED_COMPANY_SLUGS` (`packages/shared/src/companies.ts`), because the web app's own top-level routes (and its fixed segments under `/dashboard`, such as `/dashboard/settings`) would hide those pages.
 - INDEX (`company_id`), INDEX (`company_id`, `status`), INDEX (`created_by`)
 - CHECK `jobs_slug_format`: `slug ~ '^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$'`
 - There is no pointer to the published form. A job's published form is its `form_versions` row with the highest `version` where `published_at IS NOT NULL`. The application refuses to open a job that has no published version.

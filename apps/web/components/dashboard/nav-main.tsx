@@ -9,6 +9,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import { useActiveCompany } from './active-company';
 import { NAV_ITEMS } from './nav-items';
 
 
@@ -50,12 +51,21 @@ function NavItems() {
 function NavLinks() {
   // The slug comes from the URL on the client, so the layout never awaits params.
   const { companySlug } = useParams<{ companySlug?: string }>();
+  // What the CompanySwitcher resolved: undefined until it has its data, null with no company.
+  const active = useActiveCompany();
   const pathname = usePathname();
-  if (!companySlug) {
-    return null;
+
+  // Pages like /dashboard/settings have no slug in the URL, so they follow the switcher.
+  const slug = companySlug ?? active.slug;
+  if (slug === undefined) {
+    // Not known yet (a full load, before the switcher has its data): same items, not links.
+    return <NavItems />;
+  }
+  if (slug === null) {
+    return null; // No company: nothing to link to.
   }
 
-  const base = `/dashboard/${companySlug}`;
+  const base = `/dashboard/${slug}`;
   return (
     <SidebarGroup>
       <SidebarMenu>

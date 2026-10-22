@@ -14,10 +14,11 @@ const companyName = z
   .max(100, { error: 'Company name must be 100 characters or fewer.' });
 
 /**
- * Company slugs the API never hands out. Public apply pages live at
- * /{companySlug}/{jobSlug}, and a fixed path segment wins over a dynamic one,
- * so a company named after a top-level web route (apps/web/app) would have
- * unreachable job pages. Add new top-level routes here.
+ * Company slugs the API never hands out. A fixed path segment wins over a
+ * dynamic one, so a company named after a web route (apps/web/app) would be
+ * unreachable: public apply pages live at /{companySlug}/{jobSlug}, and
+ * company dashboards at /dashboard/{companySlug}. Add new top-level routes,
+ * and new fixed segments directly under /dashboard, here.
  */
 export const RESERVED_COMPANY_SLUGS: ReadonlySet<string> = new Set([
   'api',
@@ -27,6 +28,7 @@ export const RESERVED_COMPANY_SLUGS: ReadonlySet<string> = new Set([
   'forgot-password',
   'onboarding',
   'reset-password',
+  'settings', // /dashboard/settings
   'sign-in',
   'sign-up',
   'verify-email',

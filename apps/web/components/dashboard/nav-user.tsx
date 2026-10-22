@@ -1,7 +1,8 @@
 'use client';
 
 import { useTransition } from 'react';
-import { ChevronsUpDownIcon, LogOutIcon } from 'lucide-react';
+import Link from 'next/link';
+import { ChevronsUpDownIcon, LogOutIcon, SettingsIcon } from 'lucide-react';
 import { signOut } from '@/app/actions/auth';
 import type { CurrentUser } from '@/lib/dal';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -11,6 +12,7 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuLinkItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -52,6 +54,13 @@ export function NavUser({ user }: { user: CurrentUser }) {
               <DropdownMenuLabel className="p-0 font-normal">
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">{identity}</div>
               </DropdownMenuLabel>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuLinkItem render={<Link href="/dashboard/settings" />}>
+                <SettingsIcon />
+                Settings
+              </DropdownMenuLinkItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             {/* Server Action from an event handler: 01-getting-started/07-mutating-data.md (Event Handlers). */}

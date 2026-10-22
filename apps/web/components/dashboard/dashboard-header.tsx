@@ -32,7 +32,7 @@ export function DashboardHeader() {
 }
 
 /** Pages outside /dashboard/[companySlug] that still use this layout. */
-const OTHER_PAGES: Record<string, string> = { '/companies/new': 'Add company' };
+const OTHER_PAGES: Record<string, string> = { '/companies/new': 'Add company', '/dashboard/settings': 'Settings' };
 
 function PageName() {
   const { companySlug } = useParams<{ companySlug?: string }>();
