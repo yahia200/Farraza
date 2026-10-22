@@ -51,7 +51,7 @@ export function JobStatusActions({
   if (status === 'open') {
     return (
       <>
-        <Button variant="outline" onClick={() => setConfirmClose(true)}>
+        <Button variant="ghost" onClick={() => setConfirmClose(true)}>
           Close job
         </Button>
         <AlertDialog open={confirmClose} onOpenChange={(open) => !pending && setConfirmClose(open)}>
@@ -66,7 +66,7 @@ export function JobStatusActions({
             <AlertDialogFooter>
               <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
               {/* AlertDialogAction is a plain Button: the dialog stays open while closing. */}
-              <AlertDialogAction onClick={() => run(closeJob, 'Job closed')} disabled={pending}>
+              <AlertDialogAction onClick={() => run(closeJob, 'Job closed')} disabled={pending} variant="destructive">
                 {pending && <Spinner data-icon="inline-start" />}
                 Close job
               </AlertDialogAction>

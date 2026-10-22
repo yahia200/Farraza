@@ -1,5 +1,5 @@
 import type { ApplicationStatus } from '@repo/shared';
-import { Badge } from '@/components/ui/badge';
+import { Badge, type BadgeVariant } from '@/components/ui/badge';
 
 export const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {
   active: 'In progress',
@@ -10,10 +10,10 @@ export const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {
 
 const VARIANTS = {
   active: 'secondary',
-  hired: 'default',
+  hired: 'success',
   rejected: 'destructive',
   withdrawn: 'outline',
-} as const satisfies Record<ApplicationStatus, 'default' | 'secondary' | 'destructive' | 'outline'>;
+} as const satisfies Record<ApplicationStatus, BadgeVariant>;
 
 /** An application's status. The API derives it from the stage's kind (pipeline.ts, STATUS_FOR_STAGE). */
 export function ApplicationStatusBadge({ status }: { status: ApplicationStatus }) {
