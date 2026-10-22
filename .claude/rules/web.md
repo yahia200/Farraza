@@ -86,6 +86,7 @@ Loaded when you work in `apps/web`. The shared facts, docs table, and commands a
 - **Generated shadcn files we changed** (check these before running `shadcn add --overwrite`):
   - `components/ui/dropdown-menu.tsx` gained `DropdownMenuLinkItem`, which wraps Base UI's `Menu.LinkItem`.
   - `components/ui/button.tsx`: the `secondary` variant is a solid brand-accent fill (`bg-brand-accent text-brand-accent-foreground`, `hover:/80` like `default`) instead of shadcn's grey `bg-secondary`. The `--secondary` token is unchanged, so badges and other `bg-secondary` surfaces keep the grey.
+  - `components/ui/card.tsx`: `Card` gained a `ghost` prop (no background, shadow or ring; used by the auth and settings cards). It removes the ring with `ring-0`, because `cn` keeps the base's `dark:ring-foreground/10` beside a `ring-transparent`.
   - `components/ui/badge.tsx` gained `success` and `warning` variants (solid fill with the dark `-foreground` text, which reads in both themes) and exports the `BadgeVariant` type.
   - `components/ui/toast.tsx` colors the success and warning icons (`text-success`, `text-warning`), like the error icon's `text-destructive`.
   - `hooks/use-mobile.ts` uses `useSyncExternalStore` instead of calling `setState` in an effect.
