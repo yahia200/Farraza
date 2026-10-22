@@ -21,12 +21,12 @@ function Footer() {
             >
               {/* Decorative: the brand name next to it is the link text. */}
               <Image src="/Logo_white.svg" alt="" width={24} height={24} />
-              <span>Khatwateen</span>
+              <span>Farraza</span>
             </Link>
             <p>The applicant tracking system for small teams.</p>
             <p className="text-sm text-primary-foreground/70 hidden md:block">
               <small>
-                © <CopyrightYear /> Khatwateen. All rights reserved.
+                © <CopyrightYear /> Farraza. All rights reserved.
               </small>
             </p>
           </div>
@@ -93,12 +93,12 @@ function Footer() {
         </div>
         <p className="text-sm mt-8 text-primary-foreground/70 block md:hidden">
           <small>
-            © <CopyrightYear /> Khatwateen. All rights reserved.
+            © <CopyrightYear /> Farraza. All rights reserved.
           </small>
         </p>
 
-        <p className="hidden md:block text-[15vw] font-extrabold leading-0 text-center text-brand-accent absolute bottom-[0.112em] left-1/2 -translate-x-1/2 pointer-events-none select-none">
-          khatwateen
+        <p className="hidden md:block text-[20vw] font-extrabold leading-0 text-center text-brand-accent absolute bottom-[0.175em] left-1/2 -translate-x-1/2 pointer-events-none select-none">
+          farraza
         </p>
       </div>
     </footer>

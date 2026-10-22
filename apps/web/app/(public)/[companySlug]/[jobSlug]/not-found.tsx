@@ -22,7 +22,7 @@ export default function JobNotFound() {
           {/* A link styled as a button: Base UI's Button is only for buttons
               (node_modules/@base-ui/react/docs/react/components/button.md, "Rendering links as buttons"). */}
           <Link href="/" className={buttonVariants({ variant: 'outline' })}>
-            Go to Khatwateen
+            Go to Farraza
           </Link>
         </EmptyContent>
       </Empty>

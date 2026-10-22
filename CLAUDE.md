@@ -13,7 +13,7 @@ This is a learning project. The owner is building it to learn and grow, and want
 
 ## What this is
 
-Khatwateen is a multi-tenant hiring-pipeline SaaS (a small ATS). Companies create jobs, build a versioned application form per job, publish a public apply page, and move applicants through a stage pipeline. It is a pnpm + Turborepo monorepo:
+Farraza is a multi-tenant hiring-pipeline SaaS (a small ATS). Companies create jobs, build a versioned application form per job, publish a public apply page, and move applicants through a stage pipeline. It is a pnpm + Turborepo monorepo:
 
 - `apps/api`: NestJS 12 REST API (ESM), Prisma 8 ORM on PostgreSQL. Most of the code lives here.
 - `apps/web`: Next.js 16 frontend (App Router, Tailwind v4, shadcn `base-luma` on `@base-ui/react`). It has a landing page, sign-in/sign-up, onboarding, and a placeholder dashboard. See "Web architecture" below.
@@ -67,7 +67,7 @@ pnpm build | pnpm lint | pnpm check-types
 pnpm format                          # prettier over the whole repo
 ```
 
-`apps/api/.env` needs `PORT`, `DATABASE_URL`, `APP_URL` (the web app's URL: CORS origin, session and CSRF `trustedOrigins`, and the base of the Google callback), `INTERNAL_API_SECRET`, the object-storage vars `S3_BUCKET`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, and `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (an OAuth client of type "Web application" whose redirect URI is `${APP_URL}/auth/oidc/google/callback`, on the web origin: see ADR-0003). Optional: `S3_FORCE_PATH_STYLE` (`true`/`false`), `SMTP_URL` (required when `NODE_ENV=production`, where the API refuses to boot without it; in development and tests, leaving it unset prints emails to the API log) and `MAIL_FROM` (defaults to `Khatwateen <accounts@khatwateen.app>`). The API validates its environment at boot against `apps/api/src/config/env.schema.ts` and refuses to start with a list of what is missing or malformed; add new variables there. `apps/web/.env.local` needs `API_URL` and the same `INTERNAL_API_SECRET` (a long random string, different per environment). All API routes are under the `/api` prefix.
+`apps/api/.env` needs `PORT`, `DATABASE_URL`, `APP_URL` (the web app's URL: CORS origin, session and CSRF `trustedOrigins`, and the base of the Google callback), `INTERNAL_API_SECRET`, the object-storage vars `S3_BUCKET`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, and `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (an OAuth client of type "Web application" whose redirect URI is `${APP_URL}/auth/oidc/google/callback`, on the web origin: see ADR-0003). Optional: `S3_FORCE_PATH_STYLE` (`true`/`false`), `SMTP_URL` (required when `NODE_ENV=production`, where the API refuses to boot without it; in development and tests, leaving it unset prints emails to the API log) and `MAIL_FROM` (defaults to `Farraza <accounts@farraza.app>`). The API validates its environment at boot against `apps/api/src/config/env.schema.ts` and refuses to start with a list of what is missing or malformed; add new variables there. `apps/web/.env.local` needs `API_URL` and the same `INTERNAL_API_SECRET` (a long random string, different per environment). All API routes are under the `/api` prefix.
 
 The API imports `@repo/shared` from its built `dist/`. After changing `packages/shared`, rebuild it (`pnpm --filter @repo/shared build`) or keep `pnpm dev` running, which watches it.
 

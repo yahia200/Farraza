@@ -7,7 +7,7 @@ const valid = (): Record<string, string> => ({
   DATABASE_URL: 'postgresql://hiring:hiring@localhost:5432/hiring',
   APP_URL: 'http://localhost:3000',
   INTERNAL_API_SECRET: 'a-long-random-dev-secret',
-  S3_BUCKET: 'khatwateen-dev',
+  S3_BUCKET: 'farraza-dev',
   S3_ENDPOINT: 'http://localhost:9000',
   S3_REGION: 'us-east-1',
   S3_ACCESS_KEY: 'rustfsadmin',
@@ -41,7 +41,7 @@ describe('validateEnv', () => {
 
     expect(env.S3_FORCE_PATH_STYLE).toBeUndefined();
     expect(env.SMTP_URL).toBeUndefined();
-    expect(env.MAIL_FROM).toBe('Khatwateen <accounts@khatwateen.app>');
+    expect(env.MAIL_FROM).toBe('Farraza <accounts@farraza.app>');
   });
 
   it('refuses to boot in production without SMTP_URL, naming it', () => {

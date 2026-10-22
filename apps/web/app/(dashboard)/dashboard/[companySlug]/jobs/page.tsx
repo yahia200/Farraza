@@ -7,7 +7,7 @@ import { NewJobDialog } from '@/components/dashboard/jobs/new-job-dialog';
 import { getJobs, type MyCompany } from '@/lib/dal';
 import { formatDate } from '@/lib/format';
 
-export const metadata: Metadata = { title: 'Jobs · Khatwateen' };
+export const metadata: Metadata = { title: 'Jobs · Farraza' };
 
 export default function JobsPage({ params }: PageProps<'/dashboard/[companySlug]/jobs'>) {
   return <CompanyPage params={params}>{(company) => <Jobs company={company} />}</CompanyPage>;

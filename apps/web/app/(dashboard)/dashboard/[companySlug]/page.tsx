@@ -4,7 +4,7 @@ import { CompanyPage, PageTitle } from '@/components/dashboard/company-page';
 import { NAV_ITEMS } from '@/components/dashboard/nav-items';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-export const metadata: Metadata = { title: 'Overview · Khatwateen' };
+export const metadata: Metadata = { title: 'Overview · Farraza' };
 
 const DESCRIPTIONS: Record<string, string> = {
   Jobs: 'Create jobs, build their application forms and publish them.',

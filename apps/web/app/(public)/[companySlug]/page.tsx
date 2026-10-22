@@ -34,7 +34,7 @@ export async function generateMetadata({ params }: PageProps<'/[companySlug]'>):
   const { companySlug } = await params;
   const data = await loadCompany(companySlug);
   if (!data) {
-    return { title: 'Company not found · Khatwateen' };
+    return { title: 'Company not found · Farraza' };
   }
   return {
     title: `Jobs at ${data.company.name}`,

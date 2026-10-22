@@ -38,7 +38,7 @@ export function OnboardingChoice({ email }: { email: string }) {
     <FieldGroup>
       <FieldSet>
         <FieldLegend variant="label" id="path-legend">
-          How will you use Khatwateen?
+          How will you use Farraza?
         </FieldLegend>
         {/*
           aria-labelledby names the group, as in Base UI's radio docs (docs/react/components/radio.md).
@@ -60,7 +60,7 @@ export function OnboardingChoice({ email }: { email: string }) {
               <RadioGroupItem value="employee" id="path-employee" />
               <FieldContent>
                 <FieldTitle>I&apos;m joining my team</FieldTitle>
-                <FieldDescription>Your company already uses Khatwateen.</FieldDescription>
+                <FieldDescription>Your company already uses Farraza.</FieldDescription>
               </FieldContent>
             </Field>
           </FieldLabel>

@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: PageProps<'/[companySlug]/[jo
   const { companySlug, jobSlug } = await params;
   const data = await loadJob(companySlug, jobSlug);
   if (!data) {
-    return { title: 'Job not found · Khatwateen' };
+    return { title: 'Job not found · Farraza' };
   }
   const { company, job } = data;
   return {

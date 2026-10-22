@@ -1,9 +1,9 @@
 /**
  * Throwaway seed for the landing-page pipeline screenshot.
  *
- * Stages a realistic candidate pipeline on the "Khatwateen" company's
+ * Stages a realistic candidate pipeline on the "Farraza" company's
  * "Senior Frontend Engineer" job so the board at
- *   /dashboard/khatwateen/jobs/senior-frontend-engineer/candidates?view=board
+ *   /dashboard/farraza/jobs/senior-frontend-engineer/candidates?view=board
  * photographs well for the hero shot. Not part of the app; safe to delete.
  *
  * Run from apps/api so dotenv picks up DATABASE_URL and the ORM resolves:
@@ -16,7 +16,7 @@
  */
 import { db } from '../src/prisma/db.ts';
 
-const COMPANY_SLUG = 'khatwateen';
+const COMPANY_SLUG = 'farraza';
 const JOB_SLUG = 'senior-frontend-engineer';
 const LOGO_URL = 'http://localhost:3000/logo-violet.svg';
 const BRAND_COLOR = '#4a62e6'; // --primary (public/logo-violet.svg), matches the new theme
@@ -59,7 +59,7 @@ async function main() {
   const company = await db.orm.public.Company.where({ slug: COMPANY_SLUG }).first();
   if (!company) throw new Error(`Company "${COMPANY_SLUG}" not found — create it in the UI first.`);
 
-  const user = await db.orm.public.User.where({ email: 'team@khatwateen.app' }).first();
+  const user = await db.orm.public.User.where({ email: 'team@farraza.app' }).first();
 
   const job = await db.orm.public.Job.where({ companyId: company.id, slug: JOB_SLUG })
     .include('stages')

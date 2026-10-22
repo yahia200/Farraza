@@ -5,7 +5,7 @@ import { GoogleSignInButton } from '@/components/auth/google-sign-in-button';
 import { SignUpForm } from '@/components/auth/sign-up-form';
 import { FieldSeparator } from '@/components/ui/field';
 
-export const metadata: Metadata = { title: 'Create account · Khatwateen' };
+export const metadata: Metadata = { title: 'Create account · Farraza' };
 
 export default function SignUpPage() {
   return (

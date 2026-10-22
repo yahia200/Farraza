@@ -38,7 +38,7 @@ describe('email verification', () => {
           transport: mailbox,
           // The app's real templates, so a broken template fails here too.
           templates: new FileTemplateEngine({ dir: join(import.meta.dirname, '../mail/templates') }),
-          from: 'Khatwateen <accounts@khatwateen.test>',
+          from: 'Farraza <accounts@farraza.test>',
           retry: false,
         }),
       ],

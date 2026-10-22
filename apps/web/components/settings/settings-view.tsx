@@ -30,7 +30,7 @@ export function SettingsView({ account }: { account: ReactNode }) {
           <CardHeader>
             <CardTitle>Theme</CardTitle>
             <CardDescription>
-              Choose how Khatwateen looks. “System” follows your device’s appearance setting.
+              Choose how Farraza looks. “System” follows your device’s appearance setting.
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -8,7 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { buttonVariants } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 
-export const metadata: Metadata = { title: 'Choose a new password · Khatwateen' };
+export const metadata: Metadata = { title: 'Choose a new password · Farraza' };
 
 /**
  * The page reset emails link to: /reset-password?token=… (the API's

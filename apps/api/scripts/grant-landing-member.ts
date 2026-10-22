@@ -8,7 +8,7 @@
  */
 import { db } from '../src/prisma/db.ts';
 
-const COMPANY_SLUG = 'khatwateen';
+const COMPANY_SLUG = 'farraza';
 const EMAIL = process.argv[2] ?? 'landing-shot@example.com';
 const ROLE = process.argv[3] ?? 'admin';
 

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { AddCompanyWizard } from '@/components/dashboard/add-company-wizard';
 
-export const metadata: Metadata = { title: 'Add company · Khatwateen' };
+export const metadata: Metadata = { title: 'Add company · Farraza' };
 
 /**
  * /companies/new, not /dashboard/new: under /dashboard, "new" would be read as

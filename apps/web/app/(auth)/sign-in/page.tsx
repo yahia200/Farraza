@@ -7,7 +7,7 @@ import { GoogleSignInError } from '@/components/auth/google-sign-in-error';
 import { SignInForm } from '@/components/auth/sign-in-form';
 import { FieldSeparator } from '@/components/ui/field';
 
-export const metadata: Metadata = { title: 'Sign in · Khatwateen' };
+export const metadata: Metadata = { title: 'Sign in · Farraza' };
 
 export default function SignInPage({ searchParams }: PageProps<'/sign-in'>) {
   return (

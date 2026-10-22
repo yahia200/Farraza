@@ -1,7 +1,7 @@
 /**
  * Throwaway seed for the landing-page screenshots, run after seed-landing.ts.
  *
- * On the "Khatwateen" demo company it:
+ * On the "Farraza" demo company it:
  *   1. gives "Senior Frontend Engineer" a real application form (published v1),
  *   2. fills in answers for the demo applications, so the candidate sheet has content,
  *   3. adds more jobs (open, draft, closed) for the jobs list and the careers page,
@@ -17,7 +17,7 @@
 import { db } from '../src/prisma/db.ts';
 import { DEFAULT_STAGES } from '../src/jobs/job.ts';
 
-const COMPANY_SLUG = 'khatwateen';
+const COMPANY_SLUG = 'farraza';
 const JOB_SLUG = 'senior-frontend-engineer';
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -158,7 +158,7 @@ const OTHER_JOBS = [
   {
     slug: 'customer-success-lead',
     title: 'Customer Success Lead',
-    description: 'Help small teams get their first hire through Khatwateen, and bring what they need back to the product.',
+    description: 'Help small teams get their first hire through Farraza, and bring what they need back to the product.',
     status: 'open',
     daysAgo: 6,
   },
@@ -214,7 +214,7 @@ const TEAMMATES = [
 async function main() {
   const company = await db.orm.public.Company.where({ slug: COMPANY_SLUG }).first();
   if (!company) throw new Error(`Company "${COMPANY_SLUG}" not found.`);
-  const owner = await db.orm.public.User.where({ email: 'team@khatwateen.app' }).first();
+  const owner = await db.orm.public.User.where({ email: 'team@farraza.app' }).first();
 
   // 1. The main job's form: replace the fields of its latest published version.
   const job = await db.orm.public.Job.where({ companyId: company.id, slug: JOB_SLUG }).include('stages').first();

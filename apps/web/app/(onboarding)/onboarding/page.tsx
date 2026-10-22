@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Spinner } from '@/components/ui/spinner';
 import { getCurrentUser, getMyCompanies } from '@/lib/dal';
 
-export const metadata: Metadata = { title: 'Get started · Khatwateen' };
+export const metadata: Metadata = { title: 'Get started · Farraza' };
 
 /** Shown until the user belongs to a company. The session read streams in behind <Suspense>. */
 export default function OnboardingPage() {
