@@ -62,7 +62,7 @@ export function StepsSection() {
     <section aria-labelledby="landing-steps-heading" className="mx-auto w-full max-w-400 pt-24">
       <h2
         id="landing-steps-heading"
-        className="mb-12 text-center font-display text-[max(6vw,2.75rem)] leading-[0.85] font-black uppercase"
+        className="my-12 pt-26 text-center font-display text-[max(6vw,2.75rem)] leading-[0.85] font-black uppercase"
       >
         Four steps to hired
       </h2>
