@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { CompanyPage, PageTitle } from '@/components/dashboard/company-page';
 import { CompanySettingsForm } from '@/components/dashboard/company-settings-form';
 
-export const metadata: Metadata = { title: 'Settings · Khatwateen' };
+export const metadata: Metadata = { title: 'Settings · Farraza' };
 
 export default function SettingsPage({ params }: PageProps<'/dashboard/[companySlug]/settings'>) {
   return (

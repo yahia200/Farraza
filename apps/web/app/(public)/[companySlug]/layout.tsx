@@ -7,7 +7,7 @@ import { getBranding } from '@/lib/public-jobs';
 /**
  * The shared frame for every public page of a company — the listing
  * (/{companySlug}) and each apply page (/{companySlug}/{jobSlug}). It themes
- * the whole surface with the company's brand color and adds the Khatwateen
+ * the whole surface with the company's brand color and adds the Farraza
  * footer once, so the pages inside only render their own content.
  *
  * Branding is fetched once here with getBranding (a single cheap call, cached
@@ -53,7 +53,7 @@ export default async function PublicCompanyLayout({
       >
         Hiring with{' '}
         <Link href="/" className="font-medium underline-offset-4 hover:underline">
-          Khatwateen
+          Farraza
         </Link>
       </footer>
     </div>

@@ -482,7 +482,7 @@ export function ApplyForm({
                   </label>
                   <input
                     id={`${idPrefix}-hp`}
-                    name="khatwateen-hp"
+                    name="farraza-hp"
                     type="text"
                     tabIndex={-1}
                     autoComplete="off"

@@ -17,7 +17,7 @@ const thunder = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Khatwateen",
+  title: "Farraza",
   description: "Work in progress",
 };
 

@@ -19,8 +19,8 @@ services:
       - "9000:9000"
       - "9001:9001"
     environment:
-      RUSTFS_ACCESS_KEY: khatwateen-dev
-      RUSTFS_SECRET_KEY: khatwateen-dev-secret
+      RUSTFS_ACCESS_KEY: farraza-dev
+      RUSTFS_SECRET_KEY: farraza-dev-secret
       RUSTFS_ADDRESS: ":9000"
       RUSTFS_CONSOLE_ADDRESS: ":9001"
       RUSTFS_CONSOLE_ENABLE: "true"
@@ -37,16 +37,16 @@ services:
     depends_on:
       - rustfs
     environment:
-      AWS_ACCESS_KEY_ID: khatwateen-dev
-      AWS_SECRET_ACCESS_KEY: khatwateen-dev-secret
+      AWS_ACCESS_KEY_ID: farraza-dev
+      AWS_SECRET_ACCESS_KEY: farraza-dev-secret
       AWS_DEFAULT_REGION: us-east-1
     volumes:
       - ./docker/rustfs-cors.json:/cors.json:ro
     entrypoint: ["/bin/sh", "-c"]
     command:
       - "until aws --endpoint-url http://rustfs:9000 s3 ls; do echo 'Waiting for RustFS...'; sleep 2; done; \
-         aws --endpoint-url http://rustfs:9000 s3 mb s3://khatwateen-dev-bucket || true; \
-         aws --endpoint-url http://rustfs:9000 s3api put-bucket-cors --bucket khatwateen-dev-bucket --cors-configuration file:///cors.json && \
+         aws --endpoint-url http://rustfs:9000 s3 mb s3://farraza-dev-bucket || true; \
+         aws --endpoint-url http://rustfs:9000 s3api put-bucket-cors --bucket farraza-dev-bucket --cors-configuration file:///cors.json && \
          echo 'Bucket ready.'"
 
 volumes:

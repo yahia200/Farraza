@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { getCurrentUser } from '@/lib/dal';
 
-export const metadata: Metadata = { title: 'Settings · Khatwateen' };
+export const metadata: Metadata = { title: 'Settings · Farraza' };
 
 /**
  * Per-user settings (not company-scoped), under the dashboard sidebar layout.
@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: 'Settings · Khatwateen' };
 export default function SettingsPage() {
   return (
     <>
-      <PageTitle title="Settings" description="Manage your account and how Khatwateen looks." />
+      <PageTitle title="Settings" description="Manage your account and how Farraza looks." />
       <SettingsView
         account={
           <Suspense fallback={<Skeleton className="h-40 w-full max-w-xl" />}>

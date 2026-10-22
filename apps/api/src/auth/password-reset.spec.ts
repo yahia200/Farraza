@@ -47,7 +47,7 @@ describe('password reset', () => {
         MailModule.forRoot({
           transport: mailbox,
           templates: new FileTemplateEngine({ dir: join(import.meta.dirname, '../mail/templates') }),
-          from: 'Khatwateen <accounts@khatwateen.test>',
+          from: 'Farraza <accounts@farraza.test>',
           retry: false,
         }),
       ],

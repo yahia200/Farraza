@@ -12,7 +12,7 @@ function Hero() {
           <span>step by step</span>
         </h1>
         <p className="text-lg text-center max-w-3xl text-foreground">
-          Khatwateen is the applicant tracking system for small teams. Post a job, build the exact
+          Farraza is the applicant tracking system for small teams. Post a job, build the exact
           application form you need, share one public link, and move every candidate through your
           pipeline, all in one place.
         </p>
@@ -37,7 +37,7 @@ function Hero() {
       <div className="w-full max-w-7xl mask-radial-[120%_100%] mask-radial-from-50% mask-radial-at-top">
         <Image
           src="/pipeline-board.webp"
-          alt="Khatwateen pipeline board moving candidates from Applied to Hired"
+          alt="Farraza pipeline board moving candidates from Applied to Hired"
           width={2048}
           height={1152}
           preload

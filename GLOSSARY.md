@@ -1,6 +1,6 @@
-# Khatwateen
+# Farraza
 
-Khatwateen is a multi-tenant hiring-pipeline tool (a small ATS). A company posts jobs, collects applications through a public form, and moves candidates through a pipeline of stages until they are hired or rejected.
+Farraza is a multi-tenant hiring-pipeline tool (a small ATS). A company posts jobs, collects applications through a public form, and moves candidates through a pipeline of stages until they are hired or rejected.
 
 ## Hiring
 
@@ -69,7 +69,7 @@ A sign-in from an outside provider (such as Google) linked to one User, named by
 _Avoid_: Social login, connection, OAuth account
 
 **Account linking**:
-Attaching an Identity to an existing User, either by a signed-in User connecting the provider, or on a first provider sign-in whose email matches a User when both the provider and Khatwateen have verified that address.
+Attaching an Identity to an existing User, either by a signed-in User connecting the provider, or on a first provider sign-in whose email matches a User when both the provider and Farraza have verified that address.
 _Avoid_: Merging, connecting (as a noun)
 
 **Account pre-hijacking**:

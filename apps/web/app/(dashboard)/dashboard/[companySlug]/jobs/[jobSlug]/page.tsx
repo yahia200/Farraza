@@ -5,7 +5,7 @@ import { JobPage } from '@/components/dashboard/jobs/job-page';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/format';
 
-export const metadata: Metadata = { title: 'Job · Khatwateen' };
+export const metadata: Metadata = { title: 'Job · Farraza' };
 
 /** Overview: edit the title and description; see the dates and pipeline stages. */
 export default function JobOverviewPage({ params }: PageProps<'/dashboard/[companySlug]/jobs/[jobSlug]'>) {

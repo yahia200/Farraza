@@ -12,7 +12,7 @@ import { JobPage, type LoadedJob } from '@/components/dashboard/jobs/job-page';
 import { Skeleton } from '@/components/ui/skeleton';
 import { flattenBoard, getPipelineBoard, type MyCompany, type PipelineColumn } from '@/lib/dal';
 
-export const metadata: Metadata = { title: 'Candidates · Khatwateen' };
+export const metadata: Metadata = { title: 'Candidates · Farraza' };
 
 /**
  * Everyone who applied to the job. Every member can view it, interviewers

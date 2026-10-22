@@ -4,7 +4,7 @@ import { FormBuilder } from '@/components/dashboard/jobs/form-builder/form-build
 import { JobPage } from '@/components/dashboard/jobs/job-page';
 import { getJobForm } from '@/lib/dal';
 
-export const metadata: Metadata = { title: 'Application form · Khatwateen' };
+export const metadata: Metadata = { title: 'Application form · Farraza' };
 
 /**
  * The job's application form builder. Starts from the draft if there is one,

@@ -71,7 +71,7 @@ export function AddMemberDialog({ companySlug, roles }: { companySlug: string; r
         <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
           <DialogHeader>
             <DialogTitle>Add a member</DialogTitle>
-            <DialogDescription>They need a Khatwateen account. Ask them to sign up first if they don&apos;t have one.</DialogDescription>
+            <DialogDescription>They need a Farraza account. Ask them to sign up first if they don&apos;t have one.</DialogDescription>
           </DialogHeader>
           <FieldGroup className="py-4">
             {formError && (

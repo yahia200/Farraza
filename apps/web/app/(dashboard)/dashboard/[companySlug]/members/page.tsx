@@ -7,7 +7,7 @@ import { MembersTable } from '@/components/dashboard/members/members-table';
 import { getCurrentUser, getMembers, type MyCompany } from '@/lib/dal';
 import { formatDate } from '@/lib/format';
 
-export const metadata: Metadata = { title: 'Members · Khatwateen' };
+export const metadata: Metadata = { title: 'Members · Farraza' };
 
 export default function MembersPage({ params }: PageProps<'/dashboard/[companySlug]/members'>) {
   return <CompanyPage params={params}>{(company) => <Members company={company} />}</CompanyPage>;

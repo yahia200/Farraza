@@ -48,7 +48,7 @@ export const envSchema = z.object({
   // the log (development and tests only: required in production, below).
   // MAIL_FROM is the envelope sender.
   SMTP_URL: z.url().optional(),
-  MAIL_FROM: z.string().min(1).default('Khatwateen <accounts@khatwateen.app>'),
+  MAIL_FROM: z.string().min(1).default('Farraza <accounts@farraza.app>'),
 })
   // In production a missing SMTP_URL would silently log verification and reset
   // links instead of sending them. `refine` with `path` reports the issue on

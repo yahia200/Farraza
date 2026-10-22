@@ -5,7 +5,7 @@ import { VerifyEmailStatus } from '@/components/auth/verify-email-status';
 import { getCurrentUserOrNull } from '@/lib/dal';
 import { Spinner } from '@/components/ui/spinner';
 
-export const metadata: Metadata = { title: 'Confirm your email · Khatwateen' };
+export const metadata: Metadata = { title: 'Confirm your email · Farraza' };
 
 /**
  * The page verification emails link to: /verify-email?token=…

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { AuthCard } from '@/components/auth/auth-card';
 import { ForgotPasswordForm } from '@/components/auth/forgot-password-form';
 
-export const metadata: Metadata = { title: 'Forgot your password · Khatwateen' };
+export const metadata: Metadata = { title: 'Forgot your password · Farraza' };
 
 export default function ForgotPasswordPage() {
   return (

@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getApplication, getApplicationFiles } from '@/lib/dal';
 import { cn } from '@/lib/utils';
 
-export const metadata: Metadata = { title: 'File preview · Khatwateen' };
+export const metadata: Metadata = { title: 'File preview · Farraza' };
 
 /**
  * One CV or attachment on a page of its own, opened in a new tab from the candidate sheet's
