@@ -2,10 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { CircleXIcon } from 'lucide-react';
+import { AuthCard } from '@/components/auth/auth-card';
 import { ResetPasswordForm } from '@/components/auth/reset-password-form';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { buttonVariants } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 
 export const metadata: Metadata = { title: 'Choose a new password · Khatwateen' };
@@ -19,17 +19,11 @@ export const metadata: Metadata = { title: 'Choose a new password · Khatwateen'
  */
 export default function ResetPasswordPage({ searchParams }: PageProps<'/reset-password'>) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Choose a new password</CardTitle>
-        <CardDescription>You&apos;ll be signed in, and signed out everywhere else.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Suspense fallback={<Spinner />}>
-          <ResetWithToken searchParams={searchParams} />
-        </Suspense>
-      </CardContent>
-    </Card>
+    <AuthCard title="Choose a new password" description="You'll be signed in, and signed out everywhere else.">
+      <Suspense fallback={<Spinner />}>
+        <ResetWithToken searchParams={searchParams} />
+      </Suspense>
+    </AuthCard>
   );
 }
 

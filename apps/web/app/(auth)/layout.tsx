@@ -5,7 +5,7 @@
 export default function AuthLayout({ children }: LayoutProps<'/'>) {
   return (
     <main className="flex min-h-svh items-center justify-center px-4 py-8">
-      <div className="w-full max-w-sm">{children}</div>
+      <div className="w-full max-w-lg">{children}</div>
     </main>
   );
 }

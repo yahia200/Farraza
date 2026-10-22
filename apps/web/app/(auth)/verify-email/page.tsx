@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
+import { AuthCard } from '@/components/auth/auth-card';
 import { VerifyEmailStatus } from '@/components/auth/verify-email-status';
 import { getCurrentUserOrNull } from '@/lib/dal';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 
 export const metadata: Metadata = { title: 'Confirm your email · Khatwateen' };
@@ -17,17 +17,11 @@ export const metadata: Metadata = { title: 'Confirm your email · Khatwateen' };
  */
 export default function VerifyEmailPage({ searchParams }: PageProps<'/verify-email'>) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Confirm your email</CardTitle>
-        <CardDescription>Proving the address is yours keeps your account safe.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Suspense fallback={<Spinner />}>
-          <VerifyWithToken searchParams={searchParams} />
-        </Suspense>
-      </CardContent>
-    </Card>
+    <AuthCard title="Confirm your email" description="Proving the address is yours keeps your account safe.">
+      <Suspense fallback={<Spinner />}>
+        <VerifyWithToken searchParams={searchParams} />
+      </Suspense>
+    </AuthCard>
   );
 }
 
