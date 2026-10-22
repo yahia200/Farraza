@@ -2,7 +2,9 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/* `dark:` applies under `.dark` (set on <html> by next-themes), except inside a
+   `.light` island such as the marketing layout, which stays light. */
+@custom-variant dark (&:is(.dark *):not(.light *));
 
 @theme inline {
   --color-background: var(--background);
@@ -116,7 +118,11 @@
   --dot-color: --value(--color-*, [color]);
 }
 
-:root {
+/* `.light` re-declares the light tokens on an element, so its subtree inherits
+   them even while <html> is `.dark` (custom properties inherit from the
+   nearest element that declares them). */
+:root,
+.light {
   --background: oklch(1 0 0);
   --foreground: oklch(0.296 0.031 281.7);
   --card: oklch(1 0 0);
@@ -169,7 +175,11 @@
   --sidebar-ring: oklch(0.555 0.201 270.6);
   --radius: 0.625rem;
 }
-
+/* next-themes sets `color-scheme` inline on <html>; this keeps native UI
+   (inputs, scrollbars) light inside a `.light` island too. */
+.light {
+  color-scheme: light;
+}
 .dark {
   --background: oklch(0.201 0.02 284.5);
   --foreground: oklch(0.933 0.011 286.2);

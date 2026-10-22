@@ -16,7 +16,7 @@ Loaded when you work in `apps/web`. The shared facts, docs table, and commands a
   - Any action that changes the session or memberships must call `revalidatePath('/', 'layout')` before redirecting, or the private cache serves stale data.
   - Docs: `02-guides/authentication-with-cache-components.md`.
 - **Route groups:**
-  - `(marketing)`: the landing page, and the only place with the floating `NavBar`.
+  - `(marketing)`: the landing page, and the only place with the floating `NavBar`. It always renders light: its layout wraps everything in `.light`, which re-declares the light tokens (`:root, .light` in `globals.css`) and is excluded from the `dark:` variant (`&:is(.dark *):not(.light *)`). next-themes' `forcedTheme` doesn't fit here: a nested `ThemeProvider` is ignored, and reading `usePathname()` in the root layout would suspend on dynamic routes.
   - `(auth)`: sign-in, sign-up, verify-email, forgot-password and reset-password.
   - `(onboarding)`: `/onboarding`.
   - `(dashboard)`: the shadcn sidebar layout. Besides `/dashboard/…` it holds `/companies/new`, the two-step "Add company" page (name, then optional logo and color), which is linked from the company switcher. It isn't at `/dashboard/new` because "new" is a valid company slug.
