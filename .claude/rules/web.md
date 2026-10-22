@@ -49,7 +49,7 @@ Loaded when you work in `apps/web`. The shared facts, docs table, and commands a
 - **Data tables:** `components/data-table/data-table.tsx` (`DataTable`, `DataTableSortButton`, `DataTableColumnMeta`) only renders a table instance. Each feature keeps its own `data-table-features.ts` (v9 `tableFeatures`), `columns.tsx` and a `useTable` call; see members and jobs.
 - **Jobs:**
   - The list at `/dashboard/[companySlug]/jobs` has a status filter (`ToggleGroup`, whose Base UI value is an array).
-  - Each job lives at `/dashboard/[companySlug]/jobs/[jobSlug]`. Its `layout.tsx` holds the header (status and open/close) and link-tabs (`JobTabs`) to Overview, `/form` and `/candidates`. The pipeline (`/candidates`) is the board and table of applicants; see "Pipeline board" below.
+  - Each job lives at `/dashboard/[companySlug]/jobs/[jobSlug]`. Its `layout.tsx` holds the header (status and open/close) and link-tabs (`JobTabs`) to Overview, `/form` and `/candidates`. The pipeline (`/candidates`) is the board and table of candidates; see "Pipeline board" below.
   - Pages use `JobPage` (like `CompanyPage`) to await params and load the company and job.
 - **Pipeline board (`/jobs/[jobSlug]/candidates?view=board`, `components/dashboard/candidates/`):**
   - `PipelineBoard` is a client component seeded with the server's columns. `useOptimistic` with `applyMove` from `@repo/shared` as the reducer shows a move at once; `moveApplication` returns failures (no throw), so when the transition ends the board falls back to the server's columns (a failed move snaps back) and the board toasts the failure. The action revalidates on 404/409, so a stale view corrects itself.

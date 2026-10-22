@@ -1,11 +1,11 @@
 # Khatwateen
 
-Khatwateen is a multi-tenant hiring-pipeline tool (a small ATS). A company posts jobs, collects applications through a public form, and moves applicants through a pipeline of stages until they are hired or rejected.
+Khatwateen is a multi-tenant hiring-pipeline tool (a small ATS). A company posts jobs, collects applications through a public form, and moves candidates through a pipeline of stages until they are hired or rejected.
 
 ## Hiring
 
 **Company**:
-A tenant — an organization that posts jobs and whose members review applicants. All data belongs to exactly one company.
+A tenant — an organization that posts jobs and whose members review candidates. All data belongs to exactly one company.
 _Avoid_: Organization, tenant, account
 
 **Member**:
@@ -16,9 +16,13 @@ _Avoid_: User (a User is the person's login; a Member is that person within one 
 A single open position a company is hiring for, with its own application form and pipeline.
 _Avoid_: Posting, vacancy, role (role is a member's permission level, not a job)
 
+**Applicant**:
+A person filling in a Job's public application form. Once they submit it, they are a Candidate with an Application.
+_Avoid_: Candidate (until they submit)
+
 **Candidate**:
 A person who has applied to a company, identified by their email. One Candidate per company.
-_Avoid_: Applicant, lead, contact
+_Avoid_: Applicant (an Applicant hasn't submitted yet), lead, contact
 
 **Application**:
 One Candidate's submission to one Job — the answers to that job's form at the moment they applied. A Candidate has at most one Application per Job. The UI labels a job's list of Applications "Candidates", but each row is an Application.
