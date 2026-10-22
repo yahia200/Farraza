@@ -20,7 +20,7 @@ function Footer() {
               className="flex items-center gap-2 font-medium text-lg"
             >
               {/* Decorative: the brand name next to it is the link text. */}
-              <Image src="/logo_white.svg" alt="" width={24} height={24} />
+              <Image src="/Logo_white.svg" alt="" width={24} height={24} />
               <span>Khatwateen</span>
             </Link>
             <p>The applicant tracking system for small teams.</p>
