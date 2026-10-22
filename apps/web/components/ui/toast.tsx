@@ -137,7 +137,7 @@ function ToastIcon({ type }: { type: string | undefined }) {
 
   if (type === "success") {
     icon = (
-      <CircleCheckIcon aria-hidden="true" />
+      <CircleCheckIcon className="text-success" aria-hidden="true" />
     )
   }
 
@@ -149,7 +149,7 @@ function ToastIcon({ type }: { type: string | undefined }) {
 
   if (type === "warning") {
     icon = (
-      <TriangleAlertIcon aria-hidden="true" />
+      <TriangleAlertIcon className="text-warning" aria-hidden="true" />
     )
   }
 

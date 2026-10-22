@@ -83,6 +83,9 @@ Loaded when you work in `apps/web`. The shared facts, docs table, and commands a
   - `<Select>` needs `items` to show labels instead of raw values.
 - **Generated shadcn files we changed** (check these before running `shadcn add --overwrite`):
   - `components/ui/dropdown-menu.tsx` gained `DropdownMenuLinkItem`, which wraps Base UI's `Menu.LinkItem`.
+  - `components/ui/button.tsx`: the `secondary` variant is a solid brand-accent fill (`bg-brand-accent text-brand-accent-foreground`, `hover:/80` like `default`) instead of shadcn's grey `bg-secondary`. The `--secondary` token is unchanged, so badges and other `bg-secondary` surfaces keep the grey.
+  - `components/ui/badge.tsx` gained `success` and `warning` variants (solid fill with the dark `-foreground` text, which reads in both themes) and exports the `BadgeVariant` type.
+  - `components/ui/toast.tsx` colors the success and warning icons (`text-success`, `text-warning`), like the error icon's `text-destructive`.
   - `hooks/use-mobile.ts` uses `useSyncExternalStore` instead of calling `setState` in an effect.
 - **Testing in the hidden browser pane:** React's streamed reveals are scheduled with `requestAnimationFrame`, which doesn't run while the page isn't drawn. If Suspense content looks stuck, take a screenshot (which forces a draw) before concluding it's a bug.
 - **Forms:** React Hook Form with `zodResolver(<schema from @repo/shared>)` and shadcn `Field`/`FieldError` (https://ui.shadcn.com/docs/forms/react-hook-form).
