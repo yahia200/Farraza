@@ -17,6 +17,7 @@ Loaded when you work in `apps/web`. The shared facts, docs table, and commands a
   - Docs: `02-guides/authentication-with-cache-components.md`.
 - **Route groups:**
   - `(marketing)`: the landing page, and the only place with the floating `NavBar`. It always renders light: its layout wraps everything in `.light`, which re-declares the light tokens (`:root, .light` in `globals.css`) and is excluded from the `dark:` variant (`&:is(.dark *):not(.light *)`). next-themes' `forcedTheme` doesn't fit here: a nested `ThemeProvider` is ignored, and reading `usePathname()` in the root layout would suspend on dynamic routes.
+    - "Four steps to hired" (`components/landing/`) is a stack of cards that pile up while scrolling: CSS `position: sticky` pins each card, and Motion only shrinks the covered ones (off under `useReducedMotion()`). `CardStack` shares one `useScroll` through context; the card content stays server-rendered children. Sticky breaks inside an ancestor with `overflow` hidden/auto/scroll (the Hero has `overflow-hidden`), so keep the section a sibling of the Hero.
   - `(auth)`: sign-in, sign-up, verify-email, forgot-password and reset-password.
   - `(onboarding)`: `/onboarding`.
   - `(dashboard)`: the shadcn sidebar layout. Besides `/dashboard/…` it holds `/companies/new`, the two-step "Add company" page (name, then optional logo and color), which is linked from the company switcher. It isn't at `/dashboard/new` because "new" is a valid company slug.
