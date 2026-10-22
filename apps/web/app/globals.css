@@ -222,10 +222,14 @@
        or when a popup locks scrolling (Base UI's scroll lock keeps this value). */
     @apply font-sans scrollbar-gutter-stable;
   }
-  html:has([data-public-job-layout]) {
+  /* On a public company page the branded layout is the scroller (it owns the
+     brand background), so the document itself must not also reserve a gutter
+     or paint its own background — otherwise a white strip shows beside the
+     brand color. Keyed off the layout's marker attribute. */
+  html:has([data-public-layout]) {
     scrollbar-gutter: auto;
   }
-  body:has([data-public-job-layout]) {
+  body:has([data-public-layout]) {
     overflow: hidden;
     background: transparent;
   }

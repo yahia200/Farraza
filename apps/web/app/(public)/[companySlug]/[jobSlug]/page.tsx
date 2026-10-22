@@ -59,7 +59,7 @@ async function Apply({ params, searchParams }: PageProps<'/[companySlug]/[jobSlu
 
   return (
     <>
-      <main className="mx-auto flex-1 w-screen py-10 sm:py-14">
+      <main className="mx-auto flex-1 w-screen py-10 sm:py-14 px-4">
         <section className="flex flex-col gap-6 w-full max-w-2xl mx-auto">
           <ApplyForm
             company={company}
