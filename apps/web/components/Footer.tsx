@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
@@ -12,7 +11,7 @@ import { cacheLife } from "next/cache";
 function Footer() {
   return (
     <footer className="p-4">
-      <div className="relative overflow-hidden flex flex-col items-center justify-between p-8 md:pt-12 md:pb-[12vw] bg-primary-950 text-primary-foreground rounded-4xl">
+      <div className="relative overflow-hidden flex flex-col items-center justify-between p-8 md:pt-12 md:pb-[13vw] bg-primary-950 text-primary-foreground rounded-4xl">
         <div className="flex flex-col gap-8 w-full max-w-[83vw] md:flex-row md:justify-between">
           <div className="flex flex-col gap-2 h-full">
             <Link
@@ -20,8 +19,7 @@ function Footer() {
               className="flex items-center gap-2 font-medium text-lg"
             >
               {/* Decorative: the brand name next to it is the link text. */}
-              <Image src="/Logo_white.svg" alt="" width={24} height={24} />
-              <span>Farraza</span>
+              <img src="/Logo_name_white.svg" alt="" className="h-5" />
             </Link>
             <p>The applicant tracking system for small teams.</p>
             <p className="text-sm text-primary-foreground/70 hidden md:block">
@@ -97,7 +95,7 @@ function Footer() {
           </small>
         </p>
 
-        <p className="hidden md:block text-[20vw] font-extrabold leading-0 text-center text-brand-accent absolute bottom-[0.175em] left-1/2 -translate-x-1/2 pointer-events-none select-none">
+        <p className="hidden md:block text-[20vw] font-extrabold leading-0 text-center text-brand-accent absolute bottom-[0.125em] left-1/2 -translate-x-1/2 pointer-events-none select-none">
           farraza
         </p>
       </div>
