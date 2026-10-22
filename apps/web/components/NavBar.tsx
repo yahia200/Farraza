@@ -6,9 +6,9 @@ import { cn } from "@/lib/utils";
 function NavBar() {
   return (
     <nav className="fixed top-4 left-1/2 -translate-x-1/2 w-2/3 min-w-xs max-w-4xl bg-brand-accent/65 backdrop-blur-md z-99 rounded-full flex items-center justify-between p-1 shadow-lg">
-      <div className="flex items-center gap-4 pl-1">
+      <div className="flex items-center gap-4 pl-2">
         <span className="flex items-center text-sm font-bold">
-          <img src="/logo.svg" alt="Logo" className="size-6" />
+          <img src="/Logo_name.svg" alt="Logo" className="h-3.5" />
         </span>
         <div>
           {/* <Link

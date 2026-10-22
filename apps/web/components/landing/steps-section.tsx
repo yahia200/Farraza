@@ -53,7 +53,7 @@ const steps: Step[] = [
 ];
 
 /**
- * "Four steps to hired": the product walkthrough under the Hero, as a stack of
+ * "Four steps to hire": the product walkthrough under the Hero, as a stack of
  * cards that pile up while scrolling (CardStack). The list's ::after adds half
  * a screen after the last card, so the finished stack holds before it leaves.
  */
@@ -64,7 +64,7 @@ export function StepsSection() {
         id="landing-steps-heading"
         className="my-12 pt-26 text-center font-display text-[max(6vw,2.75rem)] leading-[0.85] font-black uppercase"
       >
-        Four steps to hired
+        four steps to hire
       </h2>
       <CardStack total={steps.length} className="flex flex-col gap-[25vh] after:block after:h-[50svh]">
         {steps.map((step, index) => (
