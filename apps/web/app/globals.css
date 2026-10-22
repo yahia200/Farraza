@@ -233,4 +233,9 @@
     overflow: hidden;
     background: transparent;
   }
+  /* The landing page hides the document's scrollbar (it still scrolls).
+     Keyed off the marker attribute on its <main>. */
+  html:has([data-landing]) {
+    @apply scrollbar-none;
+  }
 }
