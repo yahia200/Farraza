@@ -2,6 +2,7 @@ import React from "react";
 import Hero from "@/components/Hero";
 import { StepsSection } from "@/components/landing/steps-section";
 import { FeaturesSection } from "@/components/landing/features-section";
+import { CtaSection } from "@/components/landing/cta-section";
 
 function page() {
   return (
@@ -9,6 +10,7 @@ function page() {
       <Hero />
       <StepsSection />
       <FeaturesSection />
+      <CtaSection />
     </main>
   );
 }
