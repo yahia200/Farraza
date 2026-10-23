@@ -9,6 +9,12 @@
  * Run from apps/api so dotenv picks up DATABASE_URL and the ORM resolves:
  *   node --experimental-strip-types scripts/seed-landing.ts
  *
+ * On an empty database, create what it builds on through the UI first: sign
+ * up the demo owner (name "Farraza Team", email team@farraza.app, password
+ * "farraza-landing-demo"; a throwaway dev-only account), create the "Farraza"
+ * company at onboarding, and add a "Senior Frontend Engineer" job described as
+ * "Build and own our React/Next.js product surface. Remote-friendly, Cairo HQ."
+ *
  * It is re-runnable: it wipes this job's demo applications/candidates first.
  * It writes logo_url directly (the API/schema demand https://, but the board's
  * sidebar <img> happily renders the same-origin dev SVG), and publishes the
@@ -18,8 +24,10 @@ import { db } from '../src/prisma/db.ts';
 
 const COMPANY_SLUG = 'farraza';
 const JOB_SLUG = 'senior-frontend-engineer';
-const LOGO_URL = 'http://localhost:3000/logo-violet.svg';
-const BRAND_COLOR = '#4a62e6'; // --primary (public/logo-violet.svg), matches the new theme
+// The mark inset on a white circle (apps/web/public/logo_avatar.svg), so it
+// doesn't fill the round avatar edge to edge.
+const LOGO_URL = 'http://localhost:3000/logo_avatar.svg';
+const BRAND_COLOR = '#4a62e6'; // --primary, the logo's blue
 const DAY = 24 * 60 * 60 * 1000;
 
 type Seed = {

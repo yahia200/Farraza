@@ -21,9 +21,9 @@ const features: Feature[] = [
     text: "Add colleagues by email as admins, recruiters or interviewers. Interviewers can read candidates and forms but can't edit jobs or move anyone.",
     image: {
       src: '/landing/team-roles.webp',
-      alt: 'Members table listing an owner, two admins, a recruiter and two interviewers',
+      alt: 'Members table listing an owner, an admin, a recruiter and two interviewers',
       width: 1600,
-      height: 719,
+      height: 479,
     },
   },
   {
@@ -43,9 +43,9 @@ const features: Feature[] = [
     text: 'Drag candidates across stages on the board, or sort and filter them in a table.',
     image: {
       src: '/landing/pipeline-table.webp',
-      alt: 'Candidates table for a job with Table and Board views and a stage filter',
+      alt: "Candidates table listing each candidate's stage, status and application date",
       width: 1600,
-      height: 972,
+      height: 842,
     },
   },
 ];

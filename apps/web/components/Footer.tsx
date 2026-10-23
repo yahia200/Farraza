@@ -12,7 +12,7 @@ function Footer() {
   return (
     <footer className="p-4">
       <div className="relative overflow-hidden flex flex-col items-center justify-between p-8 md:pt-12 md:pb-[13vw] bg-primary-950 text-primary-foreground rounded-4xl">
-        <div className="flex flex-col gap-8 w-full max-w-[83vw] md:flex-row md:justify-between">
+        <div className="flex flex-col gap-8 w-full max-w-400 md:flex-row md:justify-between">
           <div className="flex flex-col gap-2 h-full">
             <Link
               href="/"
