@@ -300,7 +300,7 @@ export function FormBuilder({
       </p>
 
       {/* The questions */}
-      <fieldset className="flex flex-col gap-2">
+      <fieldset className="flex min-w-0 flex-col gap-2">
         <legend className="sr-only">Questions</legend>
         {rows.length === 0 ? (
           <Empty className="border">

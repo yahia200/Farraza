@@ -94,7 +94,9 @@ export function QuestionCard({
           {field.required && <Badge variant="secondary">Required</Badge>}
           {autoRejects && <Badge variant="outline">Auto-reject</Badge>}
           {field.type === 'repeating_group' && Number.isFinite(field.config.maxEntries) && (
-            <Badge variant="outline">Up to {field.config.maxEntries} entries</Badge>
+            <Badge variant="outline" className="hidden sm:inline-flex">
+              Up to {field.config.maxEntries} entries
+            </Badge>
           )}
         </CollapsibleTrigger>
         {editable && (
