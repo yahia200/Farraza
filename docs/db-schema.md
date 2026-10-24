@@ -355,6 +355,7 @@ An array of at most 50 field objects (`formFieldsSchema` in `form-fields.ts`, ch
 | `label` | string | Trimmed, 1–200 characters. |
 | `helpText` | string or null | Trimmed, at most 500 characters. |
 | `required` | boolean | |
+| `presetKey` | string, null or absent | Which Preset the question came from (the Preset key, ADR-0004), or `null`/absent for a question built by hand. Optional on every type, sub-questions included, because forms saved before Presets have no such property. Must be a key of the catalog below, on a question of the type the catalog gives it. |
 | `config` | object | Shape depends on `type`. |
 
 | Type | `config` | Answer value in `applications.answers` |
@@ -377,6 +378,19 @@ Rules across properties:
 - A group's sub-questions can't be `file` questions or other groups (`parseFormFields` reports it on the sub-question's `type`), and the group needs at least one.
 - A sub-question can't carry an auto-reject rule: `rejectOptionIds` must be empty and `rejectWhen` must be `null`. The properties stay in the shape so the sub-question goes through the same validation as a top-level question, and `parseFormFields` refuses a rule instead of ignoring it.
 - Question keys are unique across the whole form, sub-questions included: a sub-question can't reuse a top-level key or another sub-question's key. Option ids, option rules and `maxSelections` inside a sub-question follow the same rules as above.
+
+**Preset keys.** A Preset key says what a question asks for and survives relabelling, so a future CV autofill can find a school or a job title wherever the recruiter put it. The catalog (`PRESET_KEY_TYPES` in `packages/shared/src/preset-keys.ts`) maps each key to the question type it requires:
+
+| Preset | Keys (type) |
+|---|---|
+| Education | `education` (`repeating_group`); `education.school`, `education.field_of_study`, `education.start_year`, `education.end_year` (`short_text`); `education.degree` (`single_select`) |
+| Experience | `experience` (`repeating_group`); `experience.job_title`, `experience.company`, `experience.start_date`, `experience.end_date` (`short_text`); `experience.description` (`long_text`) |
+
+- **The catalog is append-only.** A key is never removed and never changed to another type. A published form version is immutable and keeps the keys it was saved with, and editing the draft copied from it runs `parseFormFields` again; if a key had left the catalog or changed type, that old form could no longer be loaded or edited. To retire a Preset, stop offering it in the builder and keep its keys.
+- `parseFormFields` refuses an unknown key and a key on a question of the wrong type (for example `education.school` on a yes/no, or `education` on a short text), each reported on the question's `presetKey` path (`<index>.presetKey`, or `<index>.config.fields.<childIndex>.presetKey` for a sub-question).
+- A Preset key can be used once per scope: once among the form's top-level questions, and once inside each group. The second use is refused on its own `presetKey` path. The same sub-question key (`education.school`, say) in two different groups is fine.
+- `toPublicFields()` keeps `presetKey` on every question, sub-questions included; it is not private.
+- Relabelling a question does not clear its `presetKey` (accepted trade-off: autofill only pre-fills values the applicant reviews before sending).
 
 **Knockout rules** (`rejectOptionIds`, `rejectWhen`) are never sent to applicants. `toPublicFields()` removes them before the public endpoint returns a form.
 
