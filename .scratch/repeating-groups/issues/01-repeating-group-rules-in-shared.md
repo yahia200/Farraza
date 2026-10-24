@@ -8,7 +8,7 @@ Prefactor first: pull the per-question answer check out of the answer parser so 
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Form validation accepts a group whose sub-questions are valid leaf questions, and the group counts as one question toward the form's question limit
 - [ ] Form validation refuses, with a clear message on the right path: a file question or a nested group inside a group, a non-empty auto-reject rule on a sub-question, a duplicate sub-question key (including a clash with a top-level key), `maxEntries` outside 1 to 10, and an invalid sub-question (for example fewer than two options)
@@ -22,3 +22,7 @@ Prefactor first: pull the per-question answer check out of the answer parser so 
 - [ ] Tests at the shared package's public functions cover every criterion above, written like the existing form-field and answer tests; `pnpm --filter @repo/shared test` passes
 - [ ] The shared package is rebuilt and `pnpm lint` and `pnpm check-types` pass for the whole repo
 - [ ] The schema doc's question types table, answer shape section and the rules across properties describe the group
+
+## Comments
+
+Resolved on `feat/repeating-groups` (commits 39c22ca..ca7f6c3). Design choices: sub-questions live at `config.fields`; a group needs at least one sub-question; auto-reject rules on sub-questions are refused by a check, not by separate schemas; `maxEntries` counts Entries after blank ones are dropped. See `docs/db-schema.md` for the rules.
