@@ -539,7 +539,7 @@ It also adds `candidates.account_id uuid NULL` (FK → `candidate_accounts.id` O
 
 - **Invitations** (inviting teammates by email): add with the team feature. For now, members are added directly by email.
 - **Emails sent to candidates:** adds `email_sent` (`{ "template": "application_received" }`) to `ApplicationEventType`, and uses `applications.rejection_notified_at`.
-- **Structured experience and timed questions:** new field types in `form_versions.fields`.
+- **Structured question types:** `number`, `date` and `url` field types in `form_versions.fields` (a separate ticket). Structured education and work history are built (§4.1: the `repeating_group` type and the Education and Experience Presets), and timed answers exist as video and audio Attachments (§9); until `date` exists, the Presets' dates and years are free text. Not built: CV parsing and autofill (which would read each question's `presetKey`), single-question Presets, and recruiter-saved Presets.
 - **Server-side video processing:** video and audio Attachments already exist (§3.12, §9). What is not built is anything the server does to the media itself (transcoding, thumbnails), which would need extra columns on `files`.
 - **Billing and plans.**
 

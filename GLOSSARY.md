@@ -77,7 +77,7 @@ A free-text comment a Member leaves on an Application. Append-only — notes are
 _Avoid_: Comment, remark
 
 **Application Event**:
-An entry in an Application's append-only history: applied, auto-rejected, moved, hired, rejected, or note added. Together these form the audit trail of everything that has happened to an Application.
+A record in an Application's append-only history: applied, auto-rejected, moved, hired, rejected, or note added. Together these form the audit trail of everything that has happened to an Application.
 _Avoid_: Log, activity, audit record
 
 **Auto-reject rule**:
