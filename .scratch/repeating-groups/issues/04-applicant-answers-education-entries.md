@@ -6,7 +6,7 @@ A group is one step in the questionnaire, with a card per Entry inside it and "A
 
 **Blocked by:** 03 (needs a published form with an Education group).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] A required group starts with one empty card; an optional group starts with none and offers "Add"; "Add another" is disabled at the group's `maxEntries`
 - [ ] The applicant can add, fill and remove cards; removing a card does not disturb the others' values
@@ -18,3 +18,7 @@ A group is one step in the questionnaire, with a card per Entry inside it and "A
 - [ ] A server error with a group path sends the applicant back to the group's step and marks the right input in the right card
 - [ ] Checked in the browser pane: apply with several Entries, try an incomplete Entry, try exceeding the maximum, submit, and force a server error; the pane shows no console errors
 - [ ] `pnpm lint` and `pnpm check-types` pass; the web architecture notes describe the group step
+
+## Comments
+
+Resolved on `feat/repeating-groups` (commits d5d5c02, 31961a5). Design choices: one questionnaire step per group with a sr-only mirrored input (same as the CV and file steps); cards live in react-hook-form at `answers.<key>`; blank cards are kept as `{}` by `compactAnswers` so server error indexes match the on-screen cards; the per-Entry multiple-choice limit is computed in render, not in the page-wide locked-options state; Enter and letter shortcuts are stopped inside cards. Browser-checked on a scratch database including a forced server error with a group path and a phone viewport. Known gaps: focus after an error goes to the first input of the step, not the invalid card input; an optional single choice inside a card cannot be cleared (Remove the card). Sub-questions of yes/no, multiple-choice and long-text types were added by SQL in the scratch database because no shipped Preset has them yet.
