@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils';
 import { at, errorAt, FIELD_TYPES } from './field-types';
 import { FileConfigEditor } from './file-config-editor';
+import { GroupEditor } from './group-editor';
 import { OptionsEditor } from './options-editor';
 import { COLLAPSIBLE_PANEL_CLASS, QuestionBasics } from './question-basics';
 
@@ -92,6 +93,9 @@ export function QuestionCard({
           <span className="sr-only">({FIELD_TYPES[field.type].label})</span>
           {field.required && <Badge variant="secondary">Required</Badge>}
           {autoRejects && <Badge variant="outline">Auto-reject</Badge>}
+          {field.type === 'repeating_group' && Number.isFinite(field.config.maxEntries) && (
+            <Badge variant="outline">Up to {field.config.maxEntries} entries</Badge>
+          )}
         </CollapsibleTrigger>
         {editable && (
           <div className="flex shrink-0 items-center">
@@ -209,6 +213,17 @@ export function QuestionCard({
                 maxSizeMb={field.config.maxSizeMb}
                 maxDurationSeconds={field.config.maxDurationSeconds}
                 kindsError={errorAt(errors, `fields.${index}.config.kinds`)}
+                readOnly={readOnly}
+                disabled={disabled}
+              />
+            )}
+
+            {field.type === 'repeating_group' && (
+              <GroupEditor
+                form={form}
+                path={path}
+                idPrefix={idPrefix}
+                questions={field.config.fields}
                 readOnly={readOnly}
                 disabled={disabled}
               />

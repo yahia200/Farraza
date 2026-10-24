@@ -37,6 +37,7 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -49,6 +50,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
 import { CvCard } from "./cv-card";
 import { BUILDER_TYPES, FIELD_TYPES, newField, type BuilderFieldType } from "./field-types";
+import { PRESETS, type Preset } from "./presets";
 import { QuestionCard, type BuilderValues } from "./question-card";
 import { useFormBackup } from "./use-form-backup";
 
@@ -211,6 +213,13 @@ export function FormBuilder({
     setJustAdded(field.key);
   }
 
+  /** Inserts a copy of a Preset; the menu greys it out while the form has it (see the menu). */
+  function addPreset(preset: Preset) {
+    const field = preset.build();
+    append(field);
+    setJustAdded(field.key);
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {offerRestore && backup && (
@@ -349,6 +358,29 @@ export function FormBuilder({
                   <DropdownMenuItem key={type} onClick={() => add(type)}>
                     <Icon />
                     {label}
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="text-xs text-muted-foreground">
+                Presets
+              </DropdownMenuLabel>
+              {PRESETS.map((preset) => {
+                const Icon = preset.icon;
+                return (
+                  <DropdownMenuItem
+                    key={preset.presetKey}
+                    // A Preset appears once per form (the schema refuses a second one), so it is
+                    // greyed out while a question on the form carries its key.
+                    disabled={values.some(
+                      (field) => field.presetKey === preset.presetKey,
+                    )}
+                    onClick={() => addPreset(preset)}
+                  >
+                    <Icon />
+                    {preset.menuLabel}
                   </DropdownMenuItem>
                 );
               })}
