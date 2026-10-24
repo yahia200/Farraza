@@ -6,7 +6,7 @@ The Preset key sits on the shared base of all question types (null when a questi
 
 **Blocked by:** 01 (the catalog's group keys need the `repeating_group` type).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] A question with no Preset key and a question with a valid Preset key both validate; the key is optional and nullable on every question type, including sub-questions inside a group
 - [ ] Form validation refuses an unknown Preset key, with a clear message on the right path
@@ -18,3 +18,7 @@ The Preset key sits on the shared base of all question types (null when a questi
 - [ ] Tests at the shared package's public functions cover every criterion above; `pnpm --filter @repo/shared test` passes
 - [ ] The shared package is rebuilt and `pnpm lint` and `pnpm check-types` pass for the whole repo
 - [ ] The schema doc describes the Preset key property and the catalog rules
+
+## Comments
+
+Resolved on `feat/repeating-groups` (commits 60db1c6, 4faf356). Design choices: `presetKey` is `.nullish()` because stored forms lack it; the catalog lives in `packages/shared/src/preset-keys.ts`; unknown keys are caught by `z.enum(PRESET_KEYS)`; wrong-type and duplicate checks live in the form `superRefine` next to key uniqueness. The `preset-keys.test.ts` file pins the catalog as literals and tests the exported constant, not one of the four public functions.
