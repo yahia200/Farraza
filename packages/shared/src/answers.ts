@@ -94,6 +94,17 @@ function checkValue(field: PublicFormField, value: unknown): Checked {
   }
 }
 
+/**
+ * The check every question gets, whatever its depth: an empty answer is fine
+ * unless the question is required, anything else must pass `checkValue`.
+ */
+function checkQuestion(field: PublicFormField, value: unknown): Checked | { absent: true } {
+  if (isEmpty(value)) {
+    return field.required ? { error: 'This question needs an answer.' } : { absent: true };
+  }
+  return checkValue(field, value);
+}
+
 /** Checks an applicant's answers against a form's fields. */
 export function parseAnswers(fields: readonly PublicFormField[], input: unknown): AnswersResult {
   if (typeof input !== 'object' || input === null || Array.isArray(input)) {
@@ -112,19 +123,10 @@ export function parseAnswers(fields: readonly PublicFormField[], input: unknown)
   }
 
   for (const field of fields) {
-    const value = raw[field.key];
-
-    if (isEmpty(value)) {
-      if (field.required) {
-        errors.push({ path: field.key, message: 'This question needs an answer.' });
-      }
-      continue;
-    }
-
-    const checked = checkValue(field, value);
+    const checked = checkQuestion(field, raw[field.key]);
     if ('error' in checked) {
       errors.push({ path: field.key, message: checked.error });
-    } else {
+    } else if ('value' in checked) {
       answers[field.key] = checked.value;
     }
   }
