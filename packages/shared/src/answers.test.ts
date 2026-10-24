@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { findKnockout, parseAnswers, toPublicFields } from './answers.js';
-import type { FormFields } from './form-fields.js';
+import { parseFormFields, type FormFields } from './form-fields.js';
 
 const ONSITE = '3f1c9a52-6f0e-4b7a-9a43-1d2c8e5b7f10';
 const LEVEL = 'a8d2e7b1-0c4f-4e9d-8b21-5f6a7c8d9e01';
@@ -50,6 +50,59 @@ describe('toPublicFields', () => {
 
   it('keeps the options', () => {
     expect(JSON.stringify(toPublicFields(fields))).toContain('Senior');
+  });
+
+  it('keeps Preset keys, on questions and on a group and its sub-questions', () => {
+    const parsed = parseFormFields([
+      {
+        key: ABOUT,
+        type: 'short_text',
+        label: 'Where did you study?',
+        helpText: null,
+        required: false,
+        presetKey: 'education.school',
+        config: { maxLength: 150 },
+      },
+      {
+        key: ONSITE,
+        type: 'repeating_group',
+        label: 'Jobs',
+        helpText: null,
+        required: false,
+        presetKey: 'experience',
+        config: {
+          maxEntries: 3,
+          fields: [
+            {
+              key: LEVEL,
+              type: 'yes_no',
+              label: 'Still there?',
+              helpText: null,
+              required: false,
+              config: { rejectWhen: null },
+            },
+            {
+              key: JUNIOR,
+              type: 'short_text',
+              label: 'Title',
+              helpText: null,
+              required: true,
+              presetKey: 'experience.job_title',
+              config: { maxLength: 100 },
+            },
+          ],
+        },
+      },
+    ]);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+
+    const [school, jobs] = toPublicFields(parsed.fields);
+    expect(school).toMatchObject({ presetKey: 'education.school' });
+    expect(jobs).toMatchObject({
+      presetKey: 'experience',
+      config: { fields: [{ key: LEVEL }, { key: JUNIOR, presetKey: 'experience.job_title' }] },
+    });
   });
 });
 

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_FIELDS, parseFormFields } from './form-fields.js';
 
+const UNKNOWN_PRESET_KEY = "This question's Preset isn't recognised. Reload the page and try again.";
+const WRONG_TYPE_PRESET_KEY = "This question's type doesn't match its Preset. Reload the page and try again.";
+const DUPLICATE_PRESET_KEY = 'This Preset is already on the form.';
+
 const ABOUT = 'c4b1f6a2-9d3e-4f70-a1b2-3c4d5e6f7a81';
 const PORTFOLIO = '5e0d7c3a-2b1f-4a69-8c7d-6e5f4a3b2c10';
 
@@ -315,6 +319,112 @@ describe('parseFormFields', () => {
       expect(parseFormFields([group([repeatedOption])])).toMatchObject({
         ok: false,
         errors: [{ path: '0.config.fields.0.config.options' }],
+      });
+    });
+  });
+
+  describe('Preset keys', () => {
+    const ABOUT_2 = '8d7c6b5a-4e3f-4a21-b0c9-d8e7f6a5b4c3';
+
+    it('accepts a question with no Preset key, a null one and a valid one', () => {
+      const result = parseFormFields([
+        shortText,
+        { ...shortText, key: ABOUT_2, presetKey: null },
+        group([{ ...schoolQuestion, presetKey: 'education.school' }]),
+      ]);
+      expect(result).toMatchObject({ ok: true });
+      expect(result.ok && result.fields.map((field) => field.presetKey ?? null)).toEqual([null, null, null]);
+      expect(result.ok && result.fields[2]).toMatchObject({
+        config: { fields: [{ presetKey: 'education.school' }] },
+      });
+    });
+
+    it('keeps a Preset key on every question type', () => {
+      const result = parseFormFields([
+        { ...group(), presetKey: 'education' },
+        { ...shortText, presetKey: 'experience.job_title' },
+        { ...shortText, key: ABOUT_2, presetKey: 'experience.company' },
+      ]);
+      expect(result).toMatchObject({ ok: true });
+      expect(result.ok && result.fields.map((field) => field.presetKey)).toEqual([
+        'education',
+        'experience.job_title',
+        'experience.company',
+      ]);
+    });
+
+    it('refuses an unknown Preset key, pointing at it', () => {
+      expect(parseFormFields([{ ...shortText, presetKey: 'education.shoe_size' }])).toEqual({
+        ok: false,
+        errors: [{ path: '0.presetKey', message: UNKNOWN_PRESET_KEY }],
+      });
+      expect(parseFormFields([group([{ ...schoolQuestion, presetKey: 'nope' }])])).toEqual({
+        ok: false,
+        errors: [{ path: '0.config.fields.0.presetKey', message: UNKNOWN_PRESET_KEY }],
+      });
+    });
+
+    it('refuses a Preset key that is not a string', () => {
+      expect(parseFormFields([{ ...shortText, presetKey: 7 }])).toEqual({
+        ok: false,
+        errors: [{ path: '0.presetKey', message: UNKNOWN_PRESET_KEY }],
+      });
+    });
+
+    it('refuses a Preset key on a question of the wrong type, pointing at it', () => {
+      const yesNo = {
+        key: ABOUT_2,
+        type: 'yes_no',
+        label: 'Did you graduate?',
+        helpText: null,
+        required: false,
+        config: { rejectWhen: null },
+      };
+      // A school key on a yes/no, and the group key on a short text.
+      expect(parseFormFields([{ ...yesNo, presetKey: 'education.school' }])).toEqual({
+        ok: false,
+        errors: [{ path: '0.presetKey', message: WRONG_TYPE_PRESET_KEY }],
+      });
+      expect(parseFormFields([{ ...shortText, presetKey: 'education' }])).toEqual({
+        ok: false,
+        errors: [{ path: '0.presetKey', message: WRONG_TYPE_PRESET_KEY }],
+      });
+      // A text key on a single choice, inside a group.
+      expect(parseFormFields([group([{ ...degreeQuestion, presetKey: 'education.school' }])])).toEqual({
+        ok: false,
+        errors: [{ path: '0.config.fields.0.presetKey', message: WRONG_TYPE_PRESET_KEY }],
+      });
+    });
+
+    it('refuses the same top-level Preset key twice, pointing at the second, and accepts two different ones', () => {
+      const company = { ...shortText, key: ABOUT_2, presetKey: 'experience.company' };
+      const jobTitle = { ...shortText, presetKey: 'experience.job_title' };
+      expect(parseFormFields([jobTitle, company])).toMatchObject({ ok: true });
+      expect(parseFormFields([jobTitle, { ...company, presetKey: 'experience.job_title' }])).toEqual({
+        ok: false,
+        errors: [{ path: '1.presetKey', message: DUPLICATE_PRESET_KEY }],
+      });
+      expect(parseFormFields([{ ...group(), presetKey: 'education' }, { ...group(), presetKey: 'education' }])).toMatchObject({
+        ok: false,
+        errors: expect.arrayContaining([{ path: '1.presetKey', message: DUPLICATE_PRESET_KEY }]),
+      });
+    });
+
+    it('allows the same sub-question Preset key in two groups, but not twice in one group', () => {
+      const GROUP_2 = '1f2e3d4c-5b6a-4789-8a9b-0c1d2e3f4a5b';
+      const SCHOOL_2 = '2a3b4c5d-6e7f-4801-9a2b-3c4d5e6f7a8b';
+      const school = { ...schoolQuestion, presetKey: 'education.school' };
+      const otherGroup = {
+        ...group([{ ...school, key: SCHOOL_2 }]),
+        key: GROUP_2,
+        presetKey: 'experience',
+      };
+      expect(parseFormFields([group([school]), otherGroup])).toMatchObject({ ok: true });
+
+      const secondSchool = { ...school, key: ABOUT_2 };
+      expect(parseFormFields([group([school, secondSchool])])).toEqual({
+        ok: false,
+        errors: [{ path: '0.config.fields.1.presetKey', message: DUPLICATE_PRESET_KEY }],
       });
     });
   });

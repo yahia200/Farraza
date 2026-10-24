@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { FILE_KINDS, MAX_FILE_SIZE_MB, MIN_FILE_SIZE_MB, kindsNeedDuration } from './files.js';
+import { PRESET_KEYS, PRESET_KEY_TYPES, type PresetKey } from './preset-keys.js';
 
 export const MAX_FIELDS = 50;
 
@@ -9,6 +10,7 @@ export const MAX_FIELDS = 50;
  * or a stale page rather than something to fix by typing.
  */
 const RELOAD = 'Something went wrong with this form. Reload the page and try again.';
+const UNKNOWN_PRESET_KEY = "This question's Preset isn't recognised. Reload the page and try again.";
 
 /** A whole number from `min` to `max`, with one message for every way it can fail. */
 function wholeNumber(min: number, max: number, error: string) {
@@ -43,6 +45,11 @@ const base = {
     .max(500, { error: 'Help text must be 500 characters or fewer.' })
     .nullable(),
   required: z.boolean(),
+  /**
+   * Which Preset this question came from (see preset-keys.ts), or null or
+   * absent for a question built by hand. Absent on forms saved before Presets.
+   */
+  presetKey: z.enum(PRESET_KEYS, { error: UNKNOWN_PRESET_KEY }).nullish(),
 };
 
 const shortText = z.object({
@@ -188,6 +195,38 @@ function checkLeafRules(field: LeafFormField, path: Path, ctx: z.RefinementCtx) 
 
 const NO_RULES_IN_GROUPS = "Auto-reject rules aren't available inside a group.";
 
+/**
+ * Checks a question's Preset key against the catalog and a scope. The scope is
+ * the set of keys already used there: the form's top level, or one group.
+ * Whether the key is in the catalog at all is checked by the schema itself.
+ */
+function checkPresetKey(
+  field: { type: string; presetKey?: PresetKey | null },
+  path: Path,
+  scope: Set<PresetKey>,
+  ctx: z.RefinementCtx,
+) {
+  const { presetKey } = field;
+  if (presetKey == null) {
+    return;
+  }
+  if (PRESET_KEY_TYPES[presetKey] !== field.type) {
+    ctx.addIssue({
+      code: 'custom',
+      message: "This question's type doesn't match its Preset. Reload the page and try again.",
+      path: [...path, 'presetKey'],
+    });
+  }
+  if (scope.has(presetKey)) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'This Preset is already on the form.',
+      path: [...path, 'presetKey'],
+    });
+  }
+  scope.add(presetKey);
+}
+
 export const formFieldsSchema = z
   .array(formFieldSchema)
   .max(MAX_FIELDS, { error: `A form can have at most ${MAX_FIELDS} questions.` })
@@ -201,13 +240,19 @@ export const formFieldsSchema = z
       keys.add(key);
     };
 
+    // A Preset key is used once per scope: once on the form's top level, and once inside each group.
+    const topLevelPresetKeys = new Set<PresetKey>();
+
     fields.forEach((field, index) => {
       claimKey(field.key, [index, 'key']);
+      checkPresetKey(field, [index], topLevelPresetKeys, ctx);
 
       if (field.type === 'repeating_group') {
+        const groupPresetKeys = new Set<PresetKey>();
         field.config.fields.forEach((child, childIndex) => {
           const childPath = [index, 'config', 'fields', childIndex];
           claimKey(child.key, [...childPath, 'key']);
+          checkPresetKey(child, childPath, groupPresetKeys, ctx);
           if (child.type === 'single_select' && child.config.rejectOptionIds.length > 0) {
             ctx.addIssue({
               code: 'custom',
