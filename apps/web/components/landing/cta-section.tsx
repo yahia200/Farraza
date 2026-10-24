@@ -28,15 +28,15 @@ export function CtaSection() {
         <div className="order-2 flex flex-col items-start gap-6 p-6 pt-0 md:order-1 md:p-12 xl:p-16">
           <h2
             id="landing-cta-heading"
-            className="font-display text-[max(4.5vw,2.5rem)] leading-[0.85] font-black uppercase"
+            className="font-display text-[max(4.5vw,2.5rem)] leading-[0.85] font-black uppercase text-center md:text-left"
           >
             Your next hire is a few steps away
           </h2>
-          <p className="max-w-prose text-lg">
+          <p className="max-w-prose text-lg text-center md:text-left">
             Create your company, post a job and share its link. Every applicant lands in your
             pipeline, ready to move forward.
           </p>
-          <Link href="/sign-up" className={cn(buttonVariants({ size: 'lg' }), 'w-full')}>
+          <Link href="/sign-up" className={cn(buttonVariants({ size: 'lg',  }), 'w-full')}>
             Set up your company
           </Link>
         </div>

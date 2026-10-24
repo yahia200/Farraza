@@ -34,7 +34,7 @@ function Hero() {
       {/* Product shot anchored at the bottom, fading into the hero background.
           The mask fades the image itself to transparent so the dark bg shows
           through (no overlay needed); -webkit- for Chromium. */}
-      <div className="w-full max-w-7xl mask-radial-[120%_100%] mask-radial-from-50% mask-radial-at-top">
+      <div className="w-full max-w-7xl mask-radial-[150%_100%] mask-radial-from-50% mask-radial-to-75% mask-radial-at-top">
         <Image
           src="/pipeline-board.webp"
           alt="Farraza pipeline board moving candidates from Applied to Hired"

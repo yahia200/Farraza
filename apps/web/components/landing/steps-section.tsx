@@ -59,7 +59,7 @@ const steps: Step[] = [
  */
 export function StepsSection() {
   return (
-    <section aria-labelledby="landing-steps-heading" className="mx-auto w-full max-w-400 pt-24">
+    <section aria-labelledby="landing-steps-heading" className="mx-auto w-full max-w-400">
       <h2
         id="landing-steps-heading"
         className="my-12 pt-26 text-center font-display text-[max(6vw,2.75rem)] leading-[0.85] font-black uppercase"
