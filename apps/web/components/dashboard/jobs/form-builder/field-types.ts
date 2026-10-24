@@ -8,7 +8,9 @@ import {
   TypeIcon,
   type LucideIcon,
 } from 'lucide-react';
+import type { Path } from 'react-hook-form';
 import { suggestedMaxSizeMb, type FileKind, type FormField, type FormFieldType } from '@repo/shared';
+import type { BuilderValues } from './question-card';
 
 /**
  * The question types the type menu offers. A repeating group is left out on
@@ -64,6 +66,14 @@ export function newField(type: BuilderFieldType): FormField {
 export { newOption };
 
 /**
+ * The RHF path to one setting of a question or sub-question, cast once here:
+ * the question types are a union, and a path like `config.maxLength` exists only on some of them.
+ * `prefix` is where the question sits, `fields.2` for a top-level question or
+ * `fields.2.config.fields.0` for a sub-question of a group, so one editor works at both levels.
+ */
+export const at = (prefix: string, rest: string) => `${prefix}.${rest}` as Path<BuilderValues>;
+
+/**
  * Reads a nested error from RHF's `formState.errors` by a dotted path
  * ("fields.2.config.options"). Array-level errors can sit on `.root`.
  */
@@ -75,4 +85,14 @@ export function errorAt(errors: unknown, path: string): string | undefined {
   }
   const found = node as { message?: string; root?: { message?: string } } | undefined;
   return found?.message ?? found?.root?.message;
+}
+
+/** Whether RHF holds any error at or below a dotted path ("fields.2.config.fields.0"). */
+export function hasErrorAt(errors: unknown, path: string): boolean {
+  let node: unknown = errors;
+  for (const key of path.split('.')) {
+    if (node === null || typeof node !== 'object') return false;
+    node = (node as Record<string, unknown>)[key];
+  }
+  return node != null;
 }
