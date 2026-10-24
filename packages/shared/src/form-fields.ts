@@ -115,6 +115,23 @@ const file = z.object({
   }),
 });
 
+/** The question types a repeating group's sub-questions may have (ADR-0004). */
+const leafFieldSchema = z.discriminatedUnion('type', [shortText, longText, singleSelect, multiSelect, yesNo], {
+  error: 'Only text, choice and yes/no questions can go inside a group.',
+});
+
+export type LeafFormField = z.infer<typeof leafFieldSchema>;
+
+const repeatingGroup = z.object({
+  ...base,
+  type: z.literal('repeating_group'),
+  config: z.object({
+    /** The questions every Entry answers. */
+    fields: z.array(leafFieldSchema).min(1, { error: 'Add at least one question to this group.' }),
+    maxEntries: wholeNumber(1, 10, 'Set an entry limit from 1 to 10.'),
+  }),
+});
+
 export const formFieldSchema = z.discriminatedUnion('type', [
   shortText,
   longText,
@@ -122,22 +139,93 @@ export const formFieldSchema = z.discriminatedUnion('type', [
   multiSelect,
   yesNo,
   file,
+  repeatingGroup,
 ]);
 
 export type FormField = z.infer<typeof formFieldSchema>;
 export type FormFieldType = FormField['type'];
 
+type Path = (string | number)[];
+
+/**
+ * The rules that look across a question's own properties. A repeating group's
+ * sub-questions go through the same function as top-level ones, so a leaf type
+ * added later is checked inside groups with no group-specific code.
+ */
+function checkLeafRules(field: LeafFormField, path: Path, ctx: z.RefinementCtx) {
+  if (field.type !== 'single_select' && field.type !== 'multi_select') {
+    return;
+  }
+
+  const optionIds = new Set(field.config.options.map((option) => option.id));
+  if (optionIds.size !== field.config.options.length) {
+    ctx.addIssue({ code: 'custom', message: RELOAD, path: [...path, 'config', 'options'] });
+  }
+
+  if (field.type === 'single_select') {
+    const unknown = field.config.rejectOptionIds.some((id) => !optionIds.has(id));
+    if (unknown) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'An auto-reject rule points to an option that no longer exists. Update the rule.',
+        path: [...path, 'config', 'rejectOptionIds'],
+      });
+    }
+  }
+
+  if (
+    field.type === 'multi_select' &&
+    field.config.maxSelections !== null &&
+    field.config.maxSelections > field.config.options.length
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      message: "The selection limit can't be more than the number of options.",
+      path: [...path, 'config', 'maxSelections'],
+    });
+  }
+}
+
+const NO_RULES_IN_GROUPS = "Auto-reject rules aren't available inside a group.";
+
 export const formFieldsSchema = z
   .array(formFieldSchema)
   .max(MAX_FIELDS, { error: `A form can have at most ${MAX_FIELDS} questions.` })
   .superRefine((fields, ctx) => {
+    // Keys are unique across the whole form, sub-questions included.
     const keys = new Set<string>();
+    const claimKey = (key: string, path: Path) => {
+      if (keys.has(key)) {
+        ctx.addIssue({ code: 'custom', message: RELOAD, path });
+      }
+      keys.add(key);
+    };
 
     fields.forEach((field, index) => {
-      if (keys.has(field.key)) {
-        ctx.addIssue({ code: 'custom', message: RELOAD, path: [index, 'key'] });
+      claimKey(field.key, [index, 'key']);
+
+      if (field.type === 'repeating_group') {
+        field.config.fields.forEach((child, childIndex) => {
+          const childPath = [index, 'config', 'fields', childIndex];
+          claimKey(child.key, [...childPath, 'key']);
+          if (child.type === 'single_select' && child.config.rejectOptionIds.length > 0) {
+            ctx.addIssue({
+              code: 'custom',
+              message: NO_RULES_IN_GROUPS,
+              path: [...childPath, 'config', 'rejectOptionIds'],
+            });
+          }
+          if (child.type === 'yes_no' && child.config.rejectWhen !== null) {
+            ctx.addIssue({
+              code: 'custom',
+              message: NO_RULES_IN_GROUPS,
+              path: [...childPath, 'config', 'rejectWhen'],
+            });
+          }
+          checkLeafRules(child, childPath, ctx);
+        });
+        return;
       }
-      keys.add(field.key);
 
       if (field.type === 'file') {
         const { kinds, maxDurationSeconds } = field.config;
@@ -163,41 +251,7 @@ export const formFieldsSchema = z
         return;
       }
 
-      if (field.type !== 'single_select' && field.type !== 'multi_select') {
-        return;
-      }
-
-      const optionIds = new Set(field.config.options.map((option) => option.id));
-      if (optionIds.size !== field.config.options.length) {
-        ctx.addIssue({
-          code: 'custom',
-          message: RELOAD,
-          path: [index, 'config', 'options'],
-        });
-      }
-
-      if (field.type === 'single_select') {
-        const unknown = field.config.rejectOptionIds.some((id) => !optionIds.has(id));
-        if (unknown) {
-          ctx.addIssue({
-            code: 'custom',
-            message: 'An auto-reject rule points to an option that no longer exists. Update the rule.',
-            path: [index, 'config', 'rejectOptionIds'],
-          });
-        }
-      }
-
-      if (
-        field.type === 'multi_select' &&
-        field.config.maxSelections !== null &&
-        field.config.maxSelections > field.config.options.length
-      ) {
-        ctx.addIssue({
-          code: 'custom',
-          message: "The selection limit can't be more than the number of options.",
-          path: [index, 'config', 'maxSelections'],
-        });
-      }
+      checkLeafRules(field, [index], ctx);
     });
   });
 

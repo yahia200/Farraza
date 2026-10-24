@@ -143,6 +143,223 @@ describe('file questions (Attachments)', () => {
   });
 });
 
+describe('repeating groups', () => {
+  const GROUP = '7a9e4c10-5d2b-4f83-9c6a-0b1d2e3f4a50';
+  const SCHOOL = 'b1c2d3e4-f5a6-4b78-8c9d-0e1f2a3b4c5d';
+  const DEGREE = 'd9e8f7a6-b5c4-4d32-a1b0-9f8e7d6c5b4a';
+  const CURRENT = 'e2f3a4b5-c6d7-4e89-9fa0-b1c2d3e4f5a6';
+  const SUBJECTS = 'f6a7b8c9-d0e1-4f23-8a45-b6c7d8e9f0a1';
+  const HIGH_SCHOOL = '33333333-3333-4333-8333-333333333333';
+  const BACHELORS = '44444444-4444-4444-8444-444444444444';
+  const NO_LONGER_ON_FORM = 'This question is no longer on the form. Reload the page and try again.';
+
+  const education = (required: boolean, maxEntries = 3): FormFields[number] => ({
+    key: GROUP,
+    type: 'repeating_group',
+    label: 'Education',
+    helpText: null,
+    required,
+    config: {
+      maxEntries,
+      fields: [
+        {
+          key: SCHOOL,
+          type: 'short_text',
+          label: 'School',
+          helpText: null,
+          required: true,
+          config: { maxLength: 10 },
+        },
+        {
+          key: DEGREE,
+          type: 'single_select',
+          label: 'Degree',
+          helpText: null,
+          required: false,
+          config: {
+            options: [
+              { id: HIGH_SCHOOL, label: 'High school' },
+              { id: BACHELORS, label: "Bachelor's" },
+            ],
+            rejectOptionIds: [],
+          },
+        },
+        {
+          key: CURRENT,
+          type: 'yes_no',
+          label: 'Still studying?',
+          helpText: null,
+          required: false,
+          config: { rejectWhen: null },
+        },
+        {
+          key: SUBJECTS,
+          type: 'multi_select',
+          label: 'Subjects',
+          helpText: null,
+          required: false,
+          config: {
+            options: [
+              { id: HIGH_SCHOOL, label: 'Maths' },
+              { id: BACHELORS, label: 'Physics' },
+            ],
+            maxSelections: 1,
+          },
+        },
+      ],
+    },
+  });
+
+  const form = (required = false, maxEntries = 3): FormFields => [education(required, maxEntries)];
+  const errorsOf = (result: ReturnType<typeof parseAnswers>) => (result.ok ? [] : result.errors);
+
+  it('accepts Entries and trims text inside them', () => {
+    const result = parseAnswers(form(), {
+      [GROUP]: [
+        { [SCHOOL]: '  Cairo U  ', [DEGREE]: BACHELORS },
+        { [SCHOOL]: 'AUC', [SUBJECTS]: [BACHELORS] },
+      ],
+    });
+    expect(result).toEqual({
+      ok: true,
+      answers: {
+        [GROUP]: [
+          { [SCHOOL]: 'Cairo U', [DEGREE]: BACHELORS },
+          { [SCHOOL]: 'AUC', [SUBJECTS]: [BACHELORS] },
+        ],
+      },
+    });
+  });
+
+  it('treats false as an answer inside an Entry', () => {
+    const entry = { [SCHOOL]: 'AUC', [CURRENT]: false };
+    expect(parseAnswers(form(), { [GROUP]: [entry] })).toEqual({ ok: true, answers: { [GROUP]: [entry] } });
+    // An Entry holding only a "no" is not blank, so it must satisfy the required sub-questions.
+    expect(errorsOf(parseAnswers(form(), { [GROUP]: [{ [CURRENT]: false }] }))).toEqual([
+      { path: `${GROUP}.0.${SCHOOL}`, message: 'This question needs an answer.' },
+    ]);
+  });
+
+  it('leaves out blank sub-answers of an Entry', () => {
+    expect(parseAnswers(form(), { [GROUP]: [{ [SCHOOL]: 'AUC', [DEGREE]: null, [SUBJECTS]: [] }] })).toEqual({
+      ok: true,
+      answers: { [GROUP]: [{ [SCHOOL]: 'AUC' }] },
+    });
+  });
+
+  it('drops fully blank Entries', () => {
+    const result = parseAnswers(form(), {
+      [GROUP]: [{}, { [SCHOOL]: 'AUC' }, { [SCHOOL]: '   ', [DEGREE]: null, [SUBJECTS]: [] }],
+    });
+    expect(result).toEqual({ ok: true, answers: { [GROUP]: [{ [SCHOOL]: 'AUC' }] } });
+  });
+
+  it('does not count blank Entries toward the limit', () => {
+    const result = parseAnswers(form(false, 1), { [GROUP]: [{}, { [SCHOOL]: 'AUC' }, {}] });
+    expect(result.ok).toBe(true);
+  });
+
+  it('fails a required group with no Entries left, with the usual message', () => {
+    for (const value of [[], [{}], [{ [SCHOOL]: ' ' }], undefined, null]) {
+      expect(parseAnswers(form(true), { [GROUP]: value })).toEqual({
+        ok: false,
+        errors: [{ path: GROUP, message: 'This question needs an answer.' }],
+      });
+    }
+  });
+
+  it('leaves an optional group with no Entries out of the answers', () => {
+    for (const value of [[], [{}], undefined, null]) {
+      expect(parseAnswers(form(false), { [GROUP]: value })).toEqual({ ok: true, answers: {} });
+    }
+    expect(parseAnswers(form(false), {})).toEqual({ ok: true, answers: {} });
+  });
+
+  it("holds an Entry with any answer to its sub-questions' own required flags", () => {
+    expect(errorsOf(parseAnswers(form(), { [GROUP]: [{ [DEGREE]: BACHELORS }] }))).toEqual([
+      { path: `${GROUP}.0.${SCHOOL}`, message: 'This question needs an answer.' },
+    ]);
+  });
+
+  it('reports errors at <group>.<index>.<child>, indexed by position in the submitted array', () => {
+    const result = parseAnswers(form(), {
+      [GROUP]: [{}, { [SCHOOL]: 'x'.repeat(11) }, { [DEGREE]: BACHELORS }],
+    });
+    expect(errorsOf(result)).toEqual([
+      { path: `${GROUP}.1.${SCHOOL}`, message: 'Keep your answer to 10 characters or fewer.' },
+      { path: `${GROUP}.2.${SCHOOL}`, message: 'This question needs an answer.' },
+    ]);
+  });
+
+  it('refuses more Entries than the limit', () => {
+    const entries = [{ [SCHOOL]: 'A' }, { [SCHOOL]: 'B' }, { [SCHOOL]: 'C' }];
+    expect(parseAnswers(form(false, 3), { [GROUP]: entries }).ok).toBe(true);
+    expect(errorsOf(parseAnswers(form(false, 2), { [GROUP]: entries }))).toEqual([
+      { path: GROUP, message: 'Add at most 2 entries.' },
+    ]);
+    expect(errorsOf(parseAnswers(form(false, 1), { [GROUP]: entries.slice(0, 2) }))).toEqual([
+      { path: GROUP, message: 'Add at most 1 entry.' },
+    ]);
+  });
+
+  it.each(['AUC', 7, true, { [SCHOOL]: 'AUC' }])('refuses the answer %j, which is not an array', (value) => {
+    expect(errorsOf(parseAnswers(form(), { [GROUP]: value }))).toEqual([
+      { path: GROUP, message: 'Add your answers as a list of entries.' },
+    ]);
+  });
+
+  it.each([['AUC'], [7], [null], [[{ [SCHOOL]: 'AUC' }]]])(
+    'refuses the Entry %j, which is not an object',
+    (entry) => {
+      expect(errorsOf(parseAnswers(form(), { [GROUP]: [{ [SCHOOL]: 'A' }, entry] }))).toEqual([
+        { path: `${GROUP}.1`, message: 'Fill in this entry again.' },
+      ]);
+    },
+  );
+
+  it('refuses an unknown key inside an Entry', () => {
+    const result = parseAnswers(form(), { [GROUP]: [{ [SCHOOL]: 'AUC', [GROUP]: 'x', extra: 'y' }] });
+    expect(errorsOf(result)).toEqual([
+      { path: `${GROUP}.0.${GROUP}`, message: NO_LONGER_ON_FORM },
+      { path: `${GROUP}.0.extra`, message: NO_LONGER_ON_FORM },
+    ]);
+  });
+
+  it('refuses an invalid choice inside an Entry', () => {
+    expect(errorsOf(parseAnswers(form(), { [GROUP]: [{ [SCHOOL]: 'AUC', [DEGREE]: SCHOOL }] }))).toEqual([
+      { path: `${GROUP}.0.${DEGREE}`, message: 'Choose one of the options.' },
+    ]);
+  });
+
+  it('applies a multiple-choice limit to each Entry on its own', () => {
+    const separate = parseAnswers(form(), {
+      [GROUP]: [
+        { [SCHOOL]: 'A', [SUBJECTS]: [HIGH_SCHOOL] },
+        { [SCHOOL]: 'B', [SUBJECTS]: [BACHELORS] },
+      ],
+    });
+    expect(separate.ok).toBe(true);
+
+    const over = parseAnswers(form(), {
+      [GROUP]: [{ [SCHOOL]: 'A', [SUBJECTS]: [HIGH_SCHOOL, BACHELORS] }],
+    });
+    expect(errorsOf(over)).toEqual([{ path: `${GROUP}.0.${SUBJECTS}`, message: 'Choose up to 1 option.' }]);
+  });
+
+  it('shows applicants the group and all its sub-questions', () => {
+    const [publicGroup] = toPublicFields(form());
+    expect(publicGroup).toMatchObject({
+      type: 'repeating_group',
+      config: { maxEntries: 3, fields: [{ key: SCHOOL }, { key: DEGREE }, { key: CURRENT }, { key: SUBJECTS }] },
+    });
+  });
+
+  it('never triggers an auto-reject', () => {
+    const answers = { [GROUP]: [{ [SCHOOL]: 'AUC', [DEGREE]: HIGH_SCHOOL, [CURRENT]: false }] };
+    expect(findKnockout(form(), answers)).toBeNull();
+  });
+});
+
 describe('findKnockout', () => {
   it('finds a yes/no knockout', () => {
     expect(findKnockout(fields, { [ONSITE]: false, [LEVEL]: SENIOR })?.fieldKey).toBe(ONSITE);
