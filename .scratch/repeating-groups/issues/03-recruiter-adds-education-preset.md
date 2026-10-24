@@ -8,7 +8,7 @@ Prefactor as part of this ticket: the builder card edits nested config through o
 
 **Blocked by:** 01, 02.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] The "Add question" menu has a "Presets" group below the question types, containing Education; choosing it appends the group to the form and opens its card
 - [ ] Once Education is on the form its menu item is greyed out; it becomes available again if the group is deleted
@@ -22,3 +22,7 @@ Prefactor as part of this ticket: the builder card edits nested config through o
 - [ ] Save draft, publish, reload and reopen round-trips the group and its Preset keys unchanged; API errors with group paths land on the right control
 - [ ] Checked in the browser pane: insert, edit, trigger an error, save, publish, reload, and view as an interviewer; the pane shows no console errors
 - [ ] `pnpm lint` and `pnpm check-types` pass; the web architecture notes describe the Presets menu and the group card
+
+## Comments
+
+Resolved on `feat/repeating-groups` (commits 1ad5958, 4f52755, 88aa26a). Design choices: path helper is `at(prefix, rest)` in `field-types.ts`, cast once; Preset definitions live in `form-builder/presets.ts` as `build()` functions (fresh ids per insert); the group card reuses the `QuestionCard` shell with a `GroupEditor` body and collapsible sub-question rows. Browser-checked on a scratch database: insert, greyed-out, edit, error-opening, backup restore, save, publish, reload, interviewer read-only, no console errors. Not observed end to end: a server rejection with a group path (the client validates first); that mapping is reasoned from the existing `fields.${path}` code.
