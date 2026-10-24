@@ -365,6 +365,7 @@ An array of at most 50 field objects (`formFieldsSchema` in `form-fields.ts`, ch
 | `multi_select` | `{ "options": [...], "maxSelections": 3 }` (`maxSelections` ≥ 1, or `null` for no limit) | array of distinct option ids |
 | `yes_no` | `{ "rejectWhen": false }` (`true`, `false`, or `null` for no knockout) | boolean |
 | `file` (an Attachment) | `{ "kinds": ["document", "image"], "maxSizeMb": 10, "maxDurationSeconds": null }` (`kinds`: at least one of `document`, `image`, `video`, `audio`, none twice; `maxSizeMb`: whole number 1–200; `maxDurationSeconds`: a whole number ≥ 1, required when `video` or `audio` is allowed and null otherwise; `parseFormFields` refuses both mistakes, with the missing one reported on `config.maxDurationSeconds`) | file id (uuid string) of a `files` row uploaded for this question (§7). `document` means PDF and DOCX, `image` means JPEG, PNG and WebP (never SVG) (`FILE_KIND_TYPES` in `packages/shared/src/files.ts`). `video` means MP4, MOV and WebM and `audio` means MP3, M4A, WAV, OGG and WebM audio (ticket 09). Those lists are the types a file is declared and stored as; `matchAllowedType` maps other names onto them (`audio/x-m4a`, `audio/x-wav`, `audio/mp3`, parameters such as `audio/ogg; codecs=opus`) and lets `video/mp4` and `video/webm` stand for `audio/mp4` and `audio/webm` where a question allows audio but not video, because those containers cannot say whether they carry pictures. The previous config (`allowedTypes`, 1–25 MB) was replaced; no stored form ever contained a file question. |
+| `repeating_group` (a Repeating group, ADR-0004) | `{ "fields": [<question>, ...], "maxEntries": 5 }` (`fields`: at least one sub-question, each a `short_text`, `long_text`, `single_select`, `multi_select` or `yes_no` question with the usual `key`, `type`, `label`, `helpText`, `required` and `config`; `maxEntries`: whole number 1–10) | array of Entries: objects keyed by sub-question key, each value shaped as that sub-question's answer in this table (see §4.2) |
 
 Rules across properties:
 
@@ -372,6 +373,10 @@ Rules across properties:
 - Option ids are unique within a field. Options are referenced by `id`, not label, so relabelling an option does not break old answers.
 - Every id in `rejectOptionIds` must be one of the field's options. The list may be empty.
 - `maxSelections` cannot exceed the number of options.
+- A repeating group counts as one question toward the 50-question limit; its sub-questions do not count.
+- A group's sub-questions can't be `file` questions or other groups (`parseFormFields` reports it on the sub-question's `type`), and the group needs at least one.
+- A sub-question can't carry an auto-reject rule: `rejectOptionIds` must be empty and `rejectWhen` must be `null`. The properties stay in the shape so the sub-question goes through the same validation as a top-level question, and `parseFormFields` refuses a rule instead of ignoring it.
+- Question keys are unique across the whole form, sub-questions included: a sub-question can't reuse a top-level key or another sub-question's key. Option ids, option rules and `maxSelections` inside a sub-question follow the same rules as above.
 
 **Knockout rules** (`rejectOptionIds`, `rejectWhen`) are never sent to applicants. `toPublicFields()` removes them before the public endpoint returns a form.
 
@@ -389,6 +394,22 @@ An object keyed by field key, checked with `parseAnswers()` in `answers.ts` agai
 
 - Unanswered optional fields are omitted. Empty strings and empty arrays count as unanswered.
 - Keys that are not fields of the form are rejected.
+- **Repeating group answers.** The answer to a `repeating_group` is an array of Entries, in display order. An Entry is an object keyed by sub-question key (Entries have no ids of their own):
+
+  ```json
+  {
+    "7a9e4c10-5d2b-4f83-9c6a-0b1d2e3f4a50": [
+      { "b1c2d3e4-f5a6-4b78-8c9d-0e1f2a3b4c5d": "Cairo University", "d9e8f7a6-b5c4-4d32-a1b0-9f8e7d6c5b4a": "44444444-4444-4444-8444-444444444444" },
+      { "b1c2d3e4-f5a6-4b78-8c9d-0e1f2a3b4c5d": "AUC" }
+    ]
+  }
+  ```
+
+  - Each sub-answer is checked by the same per-question check as a top-level answer, so length, option membership, selection limit and yes/no rules apply unchanged. `false` is an answer.
+  - Fully blank Entries (every sub-answer empty) are dropped. A required group with no Entries left fails with "This question needs an answer."; an optional one is omitted from `answers`. An Entry with any answer must satisfy its sub-questions' own `required` flags.
+  - More Entries than `maxEntries` (counted after blank ones are dropped), an answer that is not an array, an Entry that is not an object, and a key in an Entry that isn't a sub-question are rejected.
+  - Errors from a group use the path `<groupKey>.<index>.<childKey>`, where `index` is the Entry's position in the submitted array (blank Entries still take up an index). Errors about the group itself (too many Entries, not an array) use the group's key, and an Entry that isn't an object uses `<groupKey>.<index>`.
+  - `findKnockout()` ignores groups, and `toPublicFields()` passes them through whole (their sub-questions have no auto-reject rules to strip).
 - **Known gap (size):** nothing caps the total size of `answers` beyond the request limits: the API's JSON body is limited to body-parser's default `100kb` (no override in `main.ts`) and a Server Action to 1MB. A form with several `long_text` questions answered at their limit (up to 10,000 characters each) can already be refused with a 413. Not handled yet.
 
 ### 4.3 `application_events.data`
