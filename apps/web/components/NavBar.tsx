@@ -2,14 +2,14 @@ import React from "react";
 import { buttonVariants } from "@/components/ui/button";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import LogoName from "@/components/logo-name";
+
 
 function NavBar() {
   return (
     <nav className="fixed top-4 left-1/2 -translate-x-1/2 w-2/3 min-w-xs max-w-4xl bg-brand-accent/65 backdrop-blur-md z-99 rounded-full flex items-center justify-between p-1 shadow-lg">
       <div className="flex items-center gap-4 pl-2">
-        <span className="flex items-center text-sm font-bold">
-          <img src="/Logo_name.svg" alt="Logo" className="h-3.5" />
-        </span>
+        <LogoName className="h-3.5 fill-primary" />
         <div>
           {/* <Link
             className={cn(buttonVariants({ variant: "link" }), "text-foreground")}
