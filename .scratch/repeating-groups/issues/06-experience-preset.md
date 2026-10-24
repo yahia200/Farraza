@@ -17,3 +17,14 @@ This ticket tests the claim that a new Preset is data, not a code path. Adding i
 - [ ] Checked in the browser pane through the whole path (insert, save, publish, apply, review) with both Presets on one form; the pane shows no console errors
 - [ ] Any change outside the Preset definition and menu is recorded under "## Findings" with the reason, or the section states that none was needed
 - [ ] `pnpm lint` and `pnpm check-types` pass
+
+## Findings
+
+None needed. Adding Experience took only its definition in `apps/web/components/dashboard/jobs/form-builder/presets.ts` (one `experience` const, a small `longText` helper beside the existing `shortText`, and `PRESETS = [education, experience]`). The "Add question" menu already maps over `PRESETS`, so its entry (label "Work experience", `BriefcaseBusinessIcon`) and its greying-out by `presetKey` came with the array element. No change to the builder card, the apply step, the candidate sheet, the shared rules or the catalog (the six Experience keys already existed from ticket 02).
+
+Checked in the browser on a scratch database with both Presets on one form, with no SQL shortcuts:
+
+- The menu greys each Preset out independently (Education alone, then Work experience alone, then both). The two groups count as two toward `MAX_FIELDS`: 48 short-text questions added to them left the trigger enabled at 49 and disabled at 50.
+- The first shipped Preset with a long-text sub-question works inside the builder row (shows the type), the apply card (a textarea with "0 / 1,500 characters"; Enter adds a line and does not advance or submit) and the candidate sheet (line breaks and a blank line kept, the long answer wraps in the block).
+- Required Job title, Company and Start date are enforced per Entry on the apply page; a blank End date and a blank description are left out of the stored Entry, and a stray blank third card is dropped.
+- End date help text reads "Leave blank if you still work here." There is no "currently work here" question.
