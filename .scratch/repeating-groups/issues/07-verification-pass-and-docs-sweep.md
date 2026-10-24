@@ -6,7 +6,7 @@ The web pieces have no automated tests (the decision to test only through the sh
 
 **Blocked by:** 06.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] The spec's manual checklist is run in the browser pane and the results are written to this file under "## Results": insert both Presets, edit labels and limits, save, publish, apply with several Entries, trigger an error inside an Entry, review the candidate sheet, and open the builder as an interviewer
 - [ ] The full automated suite passes (`pnpm --filter @repo/shared test`, `pnpm --filter api test`), and `pnpm lint`, `pnpm check-types` and `pnpm build` pass
