@@ -389,6 +389,7 @@ An object keyed by field key, checked with `parseAnswers()` in `answers.ts` agai
 
 - Unanswered optional fields are omitted. Empty strings and empty arrays count as unanswered.
 - Keys that are not fields of the form are rejected.
+- **Known gap (size):** nothing caps the total size of `answers` beyond the request limits: the API's JSON body is limited to body-parser's default `100kb` (no override in `main.ts`) and a Server Action to 1MB. A form with several `long_text` questions answered at their limit (up to 10,000 characters each) can already be refused with a 413. Not handled yet.
 
 ### 4.3 `application_events.data`
 
