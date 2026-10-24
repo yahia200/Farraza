@@ -182,26 +182,26 @@
 }
 .dark {
   --background: oklch(0.201 0.02 284.5);
-  --foreground: oklch(0.933 0.011 286.2);
+  --foreground: var(--primary-50);
   --card: oklch(0.244 0.023 280.8);
-  --card-foreground: oklch(0.933 0.011 286.2);
+  --card-foreground: var(--primary-50);
   --popover: oklch(0.244 0.023 280.8);
-  --popover-foreground: oklch(0.933 0.011 286.2);
+  --popover-foreground: var(--primary-50);
   --secondary: oklch(0.268 0.019 280.6);
-  --secondary-foreground: oklch(0.933 0.011 286.2);
+  --secondary-foreground: var(--primary-50);
   --muted: oklch(0.268 0.019 280.6);
   --muted-foreground: oklch(0.696 0.033 283.5);
   --accent: oklch(0.276 0.039 277.3);
-  --accent-foreground: oklch(0.933 0.011 286.2);
+  --accent-foreground: var(--primary-50);
   --border: oklch(0.318 0.023 281.5);
   --input: oklch(0.318 0.023 281.5);
   --ring: oklch(0.633 0.161 273.7);
   --chart-1: oklch(0.633 0.161 273.7);
   --chart-2: oklch(0.74 0.11 275.3);
   --sidebar: oklch(0.226 0.021 280.5);
-  --sidebar-foreground: oklch(0.933 0.011 286.2);
+  --sidebar-foreground: var(--primary-50);
   --sidebar-accent: oklch(0.276 0.039 277.3);
-  --sidebar-accent-foreground: oklch(0.933 0.011 286.2);
+  --sidebar-accent-foreground: var(--primary-50);
   --sidebar-border: oklch(0.318 0.023 281.5);
   --sidebar-ring: oklch(0.633 0.161 273.7);
 }

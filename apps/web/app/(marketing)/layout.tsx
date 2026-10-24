@@ -8,7 +8,7 @@ import Footer from '@/components/Footer';
  */
 export default function MarketingLayout({ children }: LayoutProps<'/'>) {
   return (
-    <div className="light bg-primary-50 text-foreground">
+    <div className="bg-primary-50 dark:bg-background text-foreground">
       <NavBar />
       {children}
       <Footer />

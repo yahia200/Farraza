@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { cacheLife } from "next/cache";
-
+import LogoName from "@/components/logo-name";
 /**
  * Site footer for the marketing pages. It renders outside <main>, so the
  * browser exposes it as the page's `contentinfo` landmark. Its <nav> has a
@@ -11,7 +11,7 @@ import { cacheLife } from "next/cache";
 function Footer() {
   return (
     <footer className="p-4">
-      <div className="relative overflow-hidden flex flex-col items-center justify-between p-8 md:pt-12 md:pb-[13vw] bg-primary-950 text-primary-foreground rounded-4xl">
+      <div className="relative overflow-hidden flex flex-col items-center justify-between p-8 md:pt-12 md:pb-[13vw] bg-primary-950 dark:bg-brand-accent text-primary-foreground dark:text-background rounded-4xl">
         <div className="flex flex-col gap-8 w-full max-w-400 md:flex-row md:justify-between">
           <div className="flex flex-col gap-2 h-full">
             <Link
@@ -19,10 +19,10 @@ function Footer() {
               className="flex items-center gap-2 font-medium text-lg"
             >
               {/* Decorative: the brand name next to it is the link text. */}
-              <img src="/Logo_name_white.svg" alt="" className="h-5" />
+              <LogoName className="h-5 fill-white dark:fill-background" />
             </Link>
             <p>The applicant tracking system for small teams.</p>
-            <p className="text-sm text-primary-foreground/70 hidden md:block">
+            <p className="text-sm text-background/70 hidden md:block">
               <small>
                 © <CopyrightYear /> Farraza. All rights reserved.
               </small>
@@ -35,14 +35,11 @@ function Footer() {
           >
             <div>
               <h2 className="font-medium text-lg mb-1">Product</h2>
-              <ul className="flex flex-col">
+              <ul className="flex flex-col **:text-background **:p-0 **:h-auto">
                 <li>
                   <Link
                     href="/#landing-steps-heading"
-                    className={cn(
-                      buttonVariants({ variant: "link" }),
-                      "p-0 text-primary-foreground h-auto",
-                    )}
+                    className={cn(buttonVariants({ variant: "link" }))}
                   >
                     How it works
                   </Link>
@@ -50,10 +47,7 @@ function Footer() {
                 <li>
                   <Link
                     href="/dashboard"
-                    className={cn(
-                      buttonVariants({ variant: "link" }),
-                      "p-0 text-primary-foreground h-auto",
-                    )}
+                    className={cn(buttonVariants({ variant: "link" }))}
                   >
                     Dashboard
                   </Link>
@@ -62,14 +56,11 @@ function Footer() {
             </div>
             <div>
               <h2 className="font-medium text-lg mb-1">Account</h2>
-              <ul className="flex flex-col">
+              <ul className="flex flex-col **:text-background **:p-0 **:h-auto">
                 <li>
                   <Link
                     href="/sign-in"
-                    className={cn(
-                      buttonVariants({ variant: "link" }),
-                      "p-0 text-primary-foreground h-auto",
-                    )}
+                    className={cn(buttonVariants({ variant: "link" }))}
                   >
                     Sign in
                   </Link>
@@ -77,10 +68,7 @@ function Footer() {
                 <li>
                   <Link
                     href="/sign-up"
-                    className={cn(
-                      buttonVariants({ variant: "link" }),
-                      "p-0 text-primary-foreground h-auto",
-                    )}
+                    className={cn(buttonVariants({ variant: "link" }))}
                   >
                     Create an account
                   </Link>
@@ -89,13 +77,13 @@ function Footer() {
             </div>
           </nav>
         </div>
-        <p className="text-sm mt-8 text-primary-foreground/70 block md:hidden">
+        <p className="text-sm mt-8 text-primary-foreground/70 dark:text-background/70 block md:hidden">
           <small>
             © <CopyrightYear /> Farraza. All rights reserved.
           </small>
         </p>
 
-        <p className="hidden md:block text-[20vw] font-extrabold leading-0 text-center text-brand-accent absolute bottom-[0.125em] left-1/2 -translate-x-1/2 pointer-events-none select-none">
+        <p className="hidden md:block text-[20vw] font-extrabold leading-0 text-center text-brand-accent dark:text-primary absolute bottom-[0.125em] left-1/2 -translate-x-1/2 pointer-events-none select-none">
           farraza
         </p>
       </div>
@@ -105,7 +93,7 @@ function Footer() {
 
 async function CopyrightYear() {
   "use cache";
-    cacheLife('days')
+  cacheLife("days");
   return new Date().getFullYear();
 }
 
