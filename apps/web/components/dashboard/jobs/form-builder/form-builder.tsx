@@ -12,7 +12,6 @@ import {
   type CvMode,
   type FieldError,
   type FormFields,
-  type FormFieldType,
 } from "@repo/shared";
 import { publishForm, saveFormDraft } from "@/app/actions/forms";
 import {
@@ -49,7 +48,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
 import { CvCard } from "./cv-card";
-import { BUILDER_TYPES, FIELD_TYPES, newField } from "./field-types";
+import { BUILDER_TYPES, FIELD_TYPES, newField, type BuilderFieldType } from "./field-types";
 import { QuestionCard, type BuilderValues } from "./question-card";
 import { useFormBackup } from "./use-form-backup";
 
@@ -206,7 +205,7 @@ export function FormBuilder({
   const canPublish = isDirty || status.hasDraft;
   const editable = canEdit && !offerRestore;
 
-  function add(type: FormFieldType) {
+  function add(type: BuilderFieldType) {
     const field = newField(type);
     append(field);
     setJustAdded(field.key);

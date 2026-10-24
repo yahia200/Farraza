@@ -26,5 +26,8 @@ export function formatAnswer(field: FormField, value: AnswerValue | undefined): 
       // The answer is a file id, which text can't show: the sheet renders the file itself
       // (candidate-file.tsx) and never asks for this.
       return null;
+    case 'repeating_group':
+      // A list of Entries, which one string can't show: the sheet renders each Entry itself.
+      return null;
   }
 }

@@ -1,6 +1,7 @@
 import {
   CheckSquareIcon,
   CircleDotIcon,
+  ListIcon,
   PaperclipIcon,
   PilcrowIcon,
   ToggleLeftIcon,
@@ -9,7 +10,13 @@ import {
 } from 'lucide-react';
 import { suggestedMaxSizeMb, type FileKind, type FormField, type FormFieldType } from '@repo/shared';
 
-/** The question types the builder offers, with what a new one starts as. */
+/**
+ * The question types the type menu offers. A repeating group is left out on
+ * purpose: the builder only inserts one from a Preset (ADR-0004).
+ */
+export type BuilderFieldType = Exclude<FormFieldType, 'repeating_group'>;
+
+/** How the builder names each question type it can show. */
 export const FIELD_TYPES: Record<FormFieldType, { label: string; icon: LucideIcon }> = {
   short_text: { label: 'Short text', icon: TypeIcon },
   long_text: { label: 'Long text', icon: PilcrowIcon },
@@ -17,9 +24,12 @@ export const FIELD_TYPES: Record<FormFieldType, { label: string; icon: LucideIco
   multi_select: { label: 'Multiple choice', icon: CheckSquareIcon },
   yes_no: { label: 'Yes / No', icon: ToggleLeftIcon },
   file: { label: 'File upload', icon: PaperclipIcon },
+  repeating_group: { label: 'Repeating group', icon: ListIcon },
 };
 
-export const BUILDER_TYPES = Object.keys(FIELD_TYPES) as FormFieldType[];
+export const BUILDER_TYPES = (Object.keys(FIELD_TYPES) as FormFieldType[]).filter(
+  (type): type is BuilderFieldType => type !== 'repeating_group',
+);
 
 /** How the builder names each kind of file a file question can accept, and which formats that means. */
 export const FILE_KIND_OPTIONS: Record<FileKind, { label: string; formats: string }> = {
@@ -32,7 +42,7 @@ export const FILE_KIND_OPTIONS: Record<FileKind, { label: string; formats: strin
 /** Every id is a UUID made in the browser; question keys stay the same across versions. */
 const newOption = (label: string) => ({ id: crypto.randomUUID(), label });
 
-export function newField(type: FormFieldType): FormField {
+export function newField(type: BuilderFieldType): FormField {
   const base = { key: crypto.randomUUID(), label: '', helpText: null, required: true };
   switch (type) {
     case 'short_text':
