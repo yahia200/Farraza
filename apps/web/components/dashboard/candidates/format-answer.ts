@@ -1,12 +1,40 @@
-import type { AnswerValue, FormField } from '@repo/shared';
+import type { AnswerValue, Entry, FormField, LeafFormField } from '@repo/shared';
+
+/** One row of an Entry's block: the sub-question's label and its answer as text. */
+export type EntryRow = { label: string; answer: string | string[] };
+
+/**
+ * A repeating group's answer, ready to show: one list of rows per Entry, in the
+ * order the applicant gave them. Tagged as an object so a reader can tell it
+ * from a list of option labels (`string[]`) without looking at the question.
+ */
+export type GroupAnswer = { entries: EntryRow[][] };
+
+/** What the candidate view can show for one question; `null` means no answer. */
+export type FormattedAnswer = string | string[] | GroupAnswer | null;
 
 /**
  * An answer as text for the candidate view, using the question the candidate
  * actually saw (the form version stored with the application). Option ids are
  * turned back into their labels; answers stay readable if the job's current
- * form has since changed.
+ * form has since changed. A repeating group's answer comes back as rows per
+ * Entry (labels from the group's own sub-questions) rather than as one string.
  */
-export function formatAnswer(field: FormField, value: AnswerValue | undefined): string | string[] | null {
+export function formatAnswer(field: FormField, value: AnswerValue | undefined): FormattedAnswer {
+  switch (field.type) {
+    case 'file':
+      // The answer is a file id, which text can't show: the sheet renders the file itself
+      // (candidate-file.tsx) and never asks for this.
+      return null;
+    case 'repeating_group':
+      return formatGroup(field.config.fields, value);
+    default:
+      return formatLeaf(field, value);
+  }
+}
+
+/** The text of a single-answer question; `null` when it has no answer. */
+function formatLeaf(field: LeafFormField, value: AnswerValue | undefined): string | string[] | null {
   if (value === undefined) {
     return null;
   }
@@ -22,12 +50,28 @@ export function formatAnswer(field: FormField, value: AnswerValue | undefined): 
       return Array.isArray(value)
         ? value.map((id) => field.config.options.find((option) => option.id === id)?.label ?? 'Unknown option')
         : null;
-    case 'file':
-      // The answer is a file id, which text can't show: the sheet renders the file itself
-      // (candidate-file.tsx) and never asks for this.
-      return null;
-    case 'repeating_group':
-      // A list of Entries, which one string can't show: the sheet renders each Entry itself.
-      return null;
   }
+}
+
+/**
+ * Each Entry as its answered rows. A blank sub-answer is left out, and so is an
+ * Entry with nothing left (the API drops those on submit, so this is only a guard).
+ * No Entries at all, as with a skipped optional group, is `null`: "No answer".
+ */
+function formatGroup(children: readonly LeafFormField[], value: AnswerValue | undefined): GroupAnswer | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const entries = value
+    .filter((entry): entry is Entry => typeof entry === 'object' && entry !== null && !Array.isArray(entry))
+    .map((entry) =>
+      children.flatMap((child): EntryRow[] => {
+        const answer = formatLeaf(child, entry[child.key]);
+        return answer === null || answer === '' || (Array.isArray(answer) && answer.length === 0)
+          ? []
+          : [{ label: child.label, answer }];
+      }),
+    )
+    .filter((rows) => rows.length > 0);
+  return entries.length > 0 ? { entries } : null;
 }
