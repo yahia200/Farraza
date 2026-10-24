@@ -1,4 +1,4 @@
-import { GraduationCapIcon, type LucideIcon } from 'lucide-react';
+import { BriefcaseBusinessIcon, GraduationCapIcon, type LucideIcon } from 'lucide-react';
 import type { FormField, LeafFormField, PresetKey } from '@repo/shared';
 import { newOption } from './field-types';
 
@@ -33,6 +33,10 @@ function shortText(presetKey: PresetKey, label: string, maxLength: number, requi
   return { ...leafBase(presetKey, label, required, helpText), type: 'short_text', config: { maxLength } };
 }
 
+function longText(presetKey: PresetKey, label: string, maxLength: number, required: boolean, helpText?: string): LeafFormField {
+  return { ...leafBase(presetKey, label, required, helpText), type: 'long_text', config: { maxLength } };
+}
+
 const DEGREES = ['High school', 'Diploma', "Bachelor's", "Master's", 'Doctorate', 'Other'];
 
 const education: Preset = {
@@ -59,5 +63,25 @@ const education: Preset = {
   }),
 };
 
+const experience: Preset = {
+  presetKey: 'experience',
+  menuLabel: 'Work experience',
+  icon: BriefcaseBusinessIcon,
+  build: () => ({
+    ...leafBase('experience', 'Work experience', false),
+    type: 'repeating_group',
+    config: {
+      maxEntries: 5,
+      fields: [
+        shortText('experience.job_title', 'Job title', 100, true),
+        shortText('experience.company', 'Company', 100, true),
+        shortText('experience.start_date', 'Start date', 30, true, 'For example, Sep 2021.'),
+        shortText('experience.end_date', 'End date', 30, false, 'Leave blank if you still work here.'),
+        longText('experience.description', 'What you did there', 1500, false),
+      ],
+    },
+  }),
+};
+
 /** The Presets the "Add question" menu offers, in menu order. */
-export const PRESETS: Preset[] = [education];
+export const PRESETS: Preset[] = [education, experience];
