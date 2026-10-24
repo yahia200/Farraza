@@ -6,7 +6,7 @@ This ticket tests the claim that a new Preset is data, not a code path. Adding i
 
 **Blocked by:** 05.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] The "Presets" group lists Education and Experience; each is greyed out while it is on the form, independently of the other
 - [ ] Inserting Experience creates the group with fresh ids and its Preset keys; both Presets can be on the same form
