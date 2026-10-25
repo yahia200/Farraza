@@ -13,12 +13,16 @@ import { suggestedMaxSizeMb, type FileKind, type FormField, type FormFieldType }
 import type { BuilderValues } from './question-card';
 
 /**
- * The question types the type menu offers. A repeating group is left out on
- * purpose: the builder only inserts one from a Preset (ADR-0004).
+ * The question types a hand-built question can have, and the ones `newField` can make. A repeating
+ * group is left out on purpose: the builder only inserts one from a Preset (ADR-0004).
  */
 export type BuilderFieldType = Exclude<FormFieldType, 'repeating_group'>;
 
-/** How the builder names each question type it can show. */
+/**
+ * The label and icon for every question type the builder can show on a card, a repeating group
+ * included: a Preset inserts one, so `QuestionCard` needs its label and icon, and `GroupEditor`
+ * names each sub-question's type from here. It is a lookup, not the menu: see `BUILDER_TYPES`.
+ */
 export const FIELD_TYPES: Record<FormFieldType, { label: string; icon: LucideIcon }> = {
   short_text: { label: 'Short text', icon: TypeIcon },
   long_text: { label: 'Long text', icon: PilcrowIcon },
@@ -29,6 +33,7 @@ export const FIELD_TYPES: Record<FormFieldType, { label: string; icon: LucideIco
   repeating_group: { label: 'Repeating group', icon: ListIcon },
 };
 
+/** The question types the "Add question" menu lists: every type in `FIELD_TYPES` except `repeating_group`, which only a Preset adds. */
 export const BUILDER_TYPES = (Object.keys(FIELD_TYPES) as FormFieldType[]).filter(
   (type): type is BuilderFieldType => type !== 'repeating_group',
 );
