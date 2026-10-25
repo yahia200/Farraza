@@ -1,5 +1,12 @@
-import { formatIsoDate } from '@/lib/format';
-import { isBlankAnswer, isPlainObject, type AnswerValue, type Entry, type FormField, type LeafFormField } from '@repo/shared';
+import {
+  formatAnswerText,
+  isBlankAnswer,
+  isPlainObject,
+  type AnswerValue,
+  type Entry,
+  type FormField,
+  type LeafFormField,
+} from '@repo/shared';
 
 /** One row of an Entry's block: the sub-question's label and its answer as text. */
 export type EntryRow = { label: string; answer: string | string[] | LinkAnswer };
@@ -40,31 +47,15 @@ export function formatAnswer(field: FormField, value: AnswerValue | undefined): 
   }
 }
 
-/** The text of a single-answer question; `null` when it has no answer. */
+/**
+ * The text of a single-answer question; `null` when it has no answer. The text rules are shared with
+ * the candidate list (`formatAnswerText` in `@repo/shared`); the sheet only adds the link.
+ */
 function formatLeaf(field: LeafFormField, value: AnswerValue | undefined): string | string[] | LinkAnswer | null {
-  if (value === undefined) {
-    return null;
+  if (field.type === 'url' && typeof value === 'string') {
+    return formatUrl(value);
   }
-  switch (field.type) {
-    case 'short_text':
-    case 'long_text':
-      return typeof value === 'string' ? value : null;
-    case 'yes_no':
-      return value === true ? 'Yes' : value === false ? 'No' : null;
-    case 'number':
-      // `String(0)` is "0", so a zero is an answer.
-      return typeof value === 'number' && Number.isFinite(value) ? String(value) : null;
-    case 'date':
-      return typeof value === 'string' ? formatIsoDate(value) : null;
-    case 'url':
-      return typeof value === 'string' ? formatUrl(value) : null;
-    case 'single_select':
-      return field.config.options.find((option) => option.id === value)?.label ?? 'Unknown option';
-    case 'multi_select':
-      return Array.isArray(value)
-        ? value.map((id) => field.config.options.find((option) => option.id === id)?.label ?? 'Unknown option')
-        : null;
-  }
+  return formatAnswerText(field, value);
 }
 
 /**

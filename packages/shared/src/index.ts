@@ -2,6 +2,8 @@ export * from './cv-mode.js';
 export * from './form-fields.js';
 export * from './preset-keys.js';
 export * from './answers.js';
+export * from './answer-text.js';
+export { formatIsoDate } from './dates.js';
 export * from './auth.js';
 export * from './oidc.js';
 export * from './companies.js';
