@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { cvModeSchema } from './cv-mode.js';
 import { MAX_FIELDS } from './form-fields.js';
+import { highlightedQuestionKeysSchema } from './highlights.js';
 
 /** Request bodies for the API's /companies/:companySlug/jobs endpoints. */
 
@@ -33,6 +34,13 @@ export const saveFormSchema = z.strictObject({
   cvMode: cvModeSchema,
 });
 export type SaveFormInput = z.infer<typeof saveFormSchema>;
+
+/**
+ * Saving a Job's Highlighted questions (PUT .../jobs/:jobSlug/highlighted-questions): the whole new
+ * list of keys. The service then checks them against the latest published form (`checkHighlightKeys`).
+ */
+export const saveHighlightedQuestionsSchema = z.strictObject({ keys: highlightedQuestionKeysSchema });
+export type SaveHighlightedQuestionsInput = z.infer<typeof saveHighlightedQuestionsSchema>;
 
 /**
  * Response for the public company listing (GET /api/public/:companySlug): a
