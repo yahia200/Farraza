@@ -1412,6 +1412,13 @@
                   "kind": "scalar"
                 }
               },
+              "highlightedQuestionKeys": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/jsonb@1",
+                  "kind": "scalar"
+                }
+              },
               "id": {
                 "nullable": false,
                 "type": {
@@ -1526,6 +1533,9 @@
                 },
                 "description": {
                   "column": "description"
+                },
+                "highlightedQuestionKeys": {
+                  "column": "highlighted_question_keys"
                 },
                 "id": {
                   "column": "id"
@@ -3379,6 +3389,11 @@
             "jobs": {
               "checks": [
                 {
+                  "expression": "jsonb_typeof(highlighted_question_keys) = 'array'",
+                  "name": "jobs_highlighted_question_keys_array_b35d15b3",
+                  "prefix": "jobs_highlighted_question_keys_array"
+                },
+                {
                   "expression": "slug ~ '^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$'",
                   "name": "jobs_slug_format_8c6602b9",
                   "prefix": "jobs_slug_format"
@@ -3418,6 +3433,15 @@
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": true
+                },
+                "highlighted_question_keys": {
+                  "codecId": "pg/jsonb@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": []
+                  },
+                  "nativeType": "jsonb",
+                  "nullable": false
                 },
                 "id": {
                   "codecId": "pg/uuid@1",
@@ -4309,7 +4333,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "06c9c7f03a37af33a5340d6b9e267de5147655c0acd40b9b9c103705cdcc5502"
+    "storageHash": "0c8d65e2bb3ae93d467907843f360c84902e8ba011a488362edcd7771d6f3591"
   },
   "execution": {
     "executionHash": "c19b53563967fe1cdc97d45552456039c34d42f7b292484a823348d6f653f142",
