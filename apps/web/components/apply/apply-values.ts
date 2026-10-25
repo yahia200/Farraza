@@ -1,6 +1,8 @@
 import { toNestErrors } from '@hookform/resolvers';
 import type { FieldError as FormFieldError, FieldErrors, Resolver } from 'react-hook-form';
 import {
+  isBlankAnswer,
+  isPlainObject,
   parseAnswers,
   submitApplicationSchema,
   type Answers,
@@ -61,23 +63,23 @@ export function emptyValues(fields: readonly PublicFormField[]): ApplyValues {
   return { name: '', email: '', phone: '', website: '', cvFileId: null, answers };
 }
 
-function isUnanswered(value: LeafInput | undefined): boolean {
-  return value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0);
-}
-
-/** A group's answer holds cards (objects); a multiple-choice answer holds option ids (strings). */
+/**
+ * A group's answer holds cards (objects); a multiple-choice answer holds option ids (strings).
+ * An empty list can't be told apart and doesn't need to be: it is a blank answer either way, so
+ * it is not "cards" here and `compactAnswers` leaves it out as blank.
+ */
 function isEntries(value: AnswerInput): value is EntryInput[] {
-  return Array.isArray(value) && value.some((item) => typeof item === 'object');
+  return Array.isArray(value) && value.length > 0 && value.some(isPlainObject);
 }
 
 /** A group's cards, from its value in the form. */
 export function entriesOf(value: AnswerInput | undefined): EntryInput[] {
-  return Array.isArray(value) ? value.filter((item): item is EntryInput => typeof item === 'object') : [];
+  return Array.isArray(value) ? value.filter((item): item is EntryInput => isPlainObject(item)) : [];
 }
 
 /** An Entry's answers without its blanks, as the API expects (`false` is an answer and stays). */
 function compactEntry(entry: EntryInput): Entry {
-  return Object.fromEntries(Object.entries(entry).filter(([, value]) => !isUnanswered(value))) as Entry;
+  return Object.fromEntries(Object.entries(entry).filter(([, value]) => !isBlankAnswer(value))) as Entry;
 }
 
 /** The option ids of a multiple-choice answer (a group's cards are the other kind of array). */
@@ -87,9 +89,7 @@ export function chosenOptions(value: AnswerInput | undefined): string[] {
 
 /** Whether a card has something in it. Spaces alone don't count, as in `parseAnswers`. */
 export function entryHasAnswer(entry: EntryInput): boolean {
-  return Object.values(entry).some((value) =>
-    typeof value === 'string' ? value.trim() !== '' : !isUnanswered(value),
-  );
+  return Object.values(entry).some((value) => !isBlankAnswer(value));
 }
 
 /**
@@ -105,7 +105,7 @@ export function compactAnswers(answers: Record<string, AnswerInput>): Answers {
       if (value.some(entryHasAnswer)) {
         compact[key] = value.map(compactEntry);
       }
-    } else if (!isUnanswered(value as LeafInput)) {
+    } else if (!isBlankAnswer(value)) {
       compact[key] = value as string | string[] | boolean;
     }
   }

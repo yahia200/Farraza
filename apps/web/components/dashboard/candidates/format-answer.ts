@@ -1,4 +1,4 @@
-import type { AnswerValue, Entry, FormField, LeafFormField } from '@repo/shared';
+import { isBlankAnswer, isPlainObject, type AnswerValue, type Entry, type FormField, type LeafFormField } from '@repo/shared';
 
 /** One row of an Entry's block: the sub-question's label and its answer as text. */
 export type EntryRow = { label: string; answer: string | string[] };
@@ -63,13 +63,11 @@ function formatGroup(children: readonly LeafFormField[], value: AnswerValue | un
     return null;
   }
   const entries = value
-    .filter((entry): entry is Entry => typeof entry === 'object' && entry !== null && !Array.isArray(entry))
+    .filter((entry): entry is Entry => isPlainObject(entry))
     .map((entry) =>
       children.flatMap((child): EntryRow[] => {
         const answer = formatLeaf(child, entry[child.key]);
-        return answer === null || answer === '' || (Array.isArray(answer) && answer.length === 0)
-          ? []
-          : [{ label: child.label, answer }];
+        return answer === null || isBlankAnswer(answer) ? [] : [{ label: child.label, answer }];
       }),
     )
     .filter((rows) => rows.length > 0);
