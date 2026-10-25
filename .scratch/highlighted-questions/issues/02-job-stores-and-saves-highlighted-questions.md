@@ -8,20 +8,20 @@
 
 **Blocked by:** 01.
 
-**Status:** needs-triage
+**Status:** resolved
 
-- [ ] The column exists with its default and CHECK; existing jobs read as `[]`; contract files and snapshots are committed
-- [ ] A manager (owner, admin, recruiter) saves a valid list and gets it back
-- [ ] An interviewer gets 403
-- [ ] A job with no published form is 409
-- [ ] Keys not on the latest published form, over the cap, duplicated, or of an ineligible type are 400 with `errors` paths
-- [ ] Saving again replaces the previous list; an empty list clears it
-- [ ] Another company's job is 404, like the other job routes
-- [ ] The Job payload carries `highlightedQuestionKeys`
-- [ ] Service specs on the in-memory fake repository (pattern: `src/jobs/jobs.service.spec.ts`) for every case above (`pnpm --filter api test`)
-- [ ] `docs/db-schema.md` updated: the `jobs` table (§3.5) and the no-FK list and rules (§7)
-- [ ] `.claude/rules/api.md` updated for the jobs module
-- [ ] `pnpm lint` and `pnpm check-types` pass
+- [x] The column exists with its default and CHECK; existing jobs read as `[]`; contract files and snapshots are committed
+- [x] A manager (owner, admin, recruiter) saves a valid list and gets it back
+- [x] An interviewer gets 403
+- [x] A job with no published form is 409
+- [x] Keys not on the latest published form, over the cap, duplicated, or of an ineligible type are 400 with `errors` paths
+- [x] Saving again replaces the previous list; an empty list clears it
+- [x] Another company's job is 404, like the other job routes
+- [x] The Job payload carries `highlightedQuestionKeys`
+- [x] Service specs on the in-memory fake repository (pattern: `src/jobs/jobs.service.spec.ts`) for every case above (`pnpm --filter api test`)
+- [x] `docs/db-schema.md` updated: the `jobs` table (§3.5) and the no-FK list and rules (§7)
+- [x] `.claude/rules/api.md` updated for the jobs module
+- [x] `pnpm lint` and `pnpm check-types` pass
 
 ## Comments
 
