@@ -13,7 +13,7 @@ Considered options:
 v1 limits, deliberately narrow so they can widen later without breaking stored data:
 
 - Sub-questions are `short_text`, `long_text`, `single_select`, `multi_select` or `yes_no`: no `file`, no nested group, and no auto-reject rules inside a group (the schema refuses them).
-- `required` on the group means at least one Entry; the config has `maxEntries` (1–10) and no minimum. Fully blank Entries are dropped on submit.
+- `required` on the group means at least one Entry; the config has `maxEntries` (1–10) and no minimum. Fully blank Entries are dropped on submit, and `maxEntries` counts only the Entries left after that.
 - The builder only offers Presets. Recruiters can edit labels, help text and `required` on a preset group and its sub-questions, plus `maxEntries`; they cannot add, remove or reorder sub-questions or edit option lists.
 - On the apply page a group is one step with Entry cards inside it, not one step per Entry.
 
