@@ -29,12 +29,17 @@ const leafBase = (presetKey: PresetKey, label: string, required: boolean, helpTe
   required,
 });
 
-function shortText(presetKey: PresetKey, label: string, maxLength: number, required: boolean, helpText?: string): LeafFormField {
-  return { ...leafBase(presetKey, label, required, helpText), type: 'short_text', config: { maxLength } };
+/** What a text sub-question needs: a single line unless `long`, and not required unless said so. */
+interface TextSpec {
+  label: string;
+  maxLength: number;
+  required?: boolean;
+  helpText?: string;
+  long?: boolean;
 }
 
-function longText(presetKey: PresetKey, label: string, maxLength: number, required: boolean, helpText?: string): LeafFormField {
-  return { ...leafBase(presetKey, label, required, helpText), type: 'long_text', config: { maxLength } };
+function text(presetKey: PresetKey, { label, maxLength, required = false, helpText, long = false }: TextSpec): LeafFormField {
+  return { ...leafBase(presetKey, label, required, helpText), type: long ? 'long_text' : 'short_text', config: { maxLength } };
 }
 
 const DEGREES = ['High school', 'Diploma', "Bachelor's", "Master's", 'Doctorate', 'Other'];
@@ -49,15 +54,19 @@ const education: Preset = {
     config: {
       maxEntries: 5,
       fields: [
-        shortText('education.school', 'School', 150, true),
+        text('education.school', { label: 'School', maxLength: 150, required: true }),
         {
           ...leafBase('education.degree', 'Degree', true),
           type: 'single_select',
           config: { options: DEGREES.map(newOption), rejectOptionIds: [] },
         },
-        shortText('education.field_of_study', 'Field of study', 150, false),
-        shortText('education.start_year', 'Start year', 30, false),
-        shortText('education.end_year', 'End year', 30, false, 'An expected year is fine if you have not finished yet.'),
+        text('education.field_of_study', { label: 'Field of study', maxLength: 150 }),
+        text('education.start_year', { label: 'Start year', maxLength: 30 }),
+        text('education.end_year', {
+          label: 'End year',
+          maxLength: 30,
+          helpText: 'An expected year is fine if you have not finished yet.',
+        }),
       ],
     },
   }),
@@ -73,11 +82,11 @@ const experience: Preset = {
     config: {
       maxEntries: 5,
       fields: [
-        shortText('experience.job_title', 'Job title', 100, true),
-        shortText('experience.company', 'Company', 100, true),
-        shortText('experience.start_date', 'Start date', 30, true, 'For example, Sep 2021.'),
-        shortText('experience.end_date', 'End date', 30, false, 'Leave blank if you still work here.'),
-        longText('experience.description', 'What you did there', 1500, false),
+        text('experience.job_title', { label: 'Job title', maxLength: 100, required: true }),
+        text('experience.company', { label: 'Company', maxLength: 100, required: true }),
+        text('experience.start_date', { label: 'Start date', maxLength: 30, required: true, helpText: 'For example, Sep 2021.' }),
+        text('experience.end_date', { label: 'End date', maxLength: 30, helpText: 'Leave blank if you still work here.' }),
+        text('experience.description', { label: 'What you did there', maxLength: 1500, long: true }),
       ],
     },
   }),
