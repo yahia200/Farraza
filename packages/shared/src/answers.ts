@@ -1,10 +1,11 @@
+import { isoDateOrder, parseIsoDate } from './dates.js';
 import type { FieldError, FormField, FormFields } from './form-fields.js';
 
 /**
  * What an applicant can submit for one field. A repeating group's answer is a
  * list of Entries, each one an `Answers` object keyed by sub-question key.
  */
-export type AnswerValue = string | boolean | string[] | Entry[];
+export type AnswerValue = string | number | boolean | string[] | Entry[];
 
 /** One Entry of a repeating group: answers keyed by sub-question key. */
 export type Entry = Answers;
@@ -63,6 +64,9 @@ type Checked =
   | { errors: FieldError[] }
   | { absent: true };
 
+/** The longest link accepted, the same bound as `logo_url`. */
+const MAX_URL_LENGTH = 2048;
+
 const NO_LONGER_ON_FORM = 'This question is no longer on the form. Reload the page and try again.';
 
 function checkValue(field: PublicFormField, value: unknown): Checked {
@@ -104,6 +108,36 @@ function checkValue(field: PublicFormField, value: unknown): Checked {
 
     case 'yes_no':
       return typeof value === 'boolean' ? { value } : { error: 'Choose yes or no.' };
+
+    case 'number': {
+      if (typeof value !== 'number' || !Number.isFinite(value)) return { error: 'Enter a number.' };
+      const { min, max, integerOnly } = field.config;
+      if (integerOnly && !Number.isInteger(value)) return { error: 'Enter a whole number.' };
+      if (min !== null && value < min) return { error: `Enter a number of at least ${min}.` };
+      if (max !== null && value > max) return { error: `Enter a number of at most ${max}.` };
+      return { value };
+    }
+
+    case 'date': {
+      if (typeof value !== 'string' || parseIsoDate(value) === null) return { error: 'Enter a date.' };
+      const { min, max } = field.config;
+      if (min !== null && isoDateOrder(value, min) < 0) return { error: `Choose a date on or after ${min}.` };
+      if (max !== null && isoDateOrder(value, max) > 0) return { error: `Choose a date on or before ${max}.` };
+      return { value };
+    }
+
+    case 'url': {
+      const NOT_A_LINK = 'Enter a web address that starts with http:// or https://.';
+      if (typeof value !== 'string') return { error: NOT_A_LINK };
+      const text = value.trim();
+      if (text.length > MAX_URL_LENGTH) return { error: 'Keep the link to 2,048 characters or fewer.' };
+      try {
+        const { protocol } = new URL(text);
+        return protocol === 'http:' || protocol === 'https:' ? { value: text } : { error: NOT_A_LINK };
+      } catch {
+        return { error: NOT_A_LINK };
+      }
+    }
 
     case 'file':
       return typeof value === 'string' && UUID.test(value)

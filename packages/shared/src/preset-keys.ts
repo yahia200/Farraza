@@ -24,6 +24,9 @@ type PresetQuestionType =
   | 'single_select'
   | 'multi_select'
   | 'yes_no'
+  | 'number'
+  | 'date'
+  | 'url'
   | 'file'
   | 'repeating_group';
 

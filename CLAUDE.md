@@ -57,7 +57,7 @@ Prisma 8 differs most from older knowledge: there is no `PrismaClient`, no `pris
 
 ## Commands
 
-Run from the repo root unless noted. Node >= 24, pnpm 11.
+Run from the repo root unless noted. Node >= 26, pnpm 11.
 
 ```bash
 docker compose up -d                 # Postgres 17 on :5432 (user/pass/db: hiring) + RustFS S3 on :9000 with the dev bucket and its CORS rules (docker/rustfs-cors.json); re-apply CORS with `docker compose up createbuckets`

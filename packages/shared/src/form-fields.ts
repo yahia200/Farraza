@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { FILE_KINDS, MAX_FILE_SIZE_MB, MIN_FILE_SIZE_MB, kindsNeedDuration } from './files.js';
+import { isoDateOrder, isoDateSchema } from './dates.js';
 import { PRESET_KEYS, PRESET_KEY_TYPES, type PresetKey } from './preset-keys.js';
 
 export const MAX_FIELDS = 50;
@@ -122,10 +123,43 @@ const file = z.object({
   }),
 });
 
-/** The question types a repeating group's sub-questions may have (ADR-0004). */
-const leafFieldSchema = z.discriminatedUnion('type', [shortText, longText, singleSelect, multiSelect, yesNo], {
-  error: 'Only text, choice and yes/no questions can go inside a group.',
+const numberQuestion = z.object({
+  ...base,
+  type: z.literal('number'),
+  config: z.object({
+    /** Smallest answer allowed, or null for no minimum. */
+    min: z.number({ error: 'Enter a number.' }).nullable(),
+    /** Largest answer allowed, or null for no maximum. */
+    max: z.number({ error: 'Enter a number.' }).nullable(),
+    /** Whether only whole numbers are accepted. */
+    integerOnly: z.boolean({ error: RELOAD }),
+  }),
 });
+
+const dateQuestion = z.object({
+  ...base,
+  type: z.literal('date'),
+  config: z.object({
+    /** Earliest date allowed (ISO `YYYY-MM-DD`), or null. */
+    min: isoDateSchema.nullable(),
+    /** Latest date allowed (ISO `YYYY-MM-DD`), or null. */
+    max: isoDateSchema.nullable(),
+  }),
+});
+
+/** A link. Nothing to configure: the rules (http or https, 2,048 characters) are fixed. */
+const urlQuestion = z.object({
+  ...base,
+  type: z.literal('url'),
+  config: z.object({}),
+});
+
+/** The question types a repeating group's sub-questions may have (ADR-0004). */
+const leafFieldSchema = z.discriminatedUnion(
+  'type',
+  [shortText, longText, singleSelect, multiSelect, yesNo, numberQuestion, dateQuestion, urlQuestion],
+  { error: 'Only text, choice, yes/no, number, date and link questions can go inside a group.' },
+);
 
 export type LeafFormField = z.infer<typeof leafFieldSchema>;
 
@@ -145,6 +179,9 @@ export const formFieldSchema = z.discriminatedUnion('type', [
   singleSelect,
   multiSelect,
   yesNo,
+  numberQuestion,
+  dateQuestion,
+  urlQuestion,
   file,
   repeatingGroup,
 ]);
@@ -167,6 +204,30 @@ type Path = (string | number)[];
  * added later is checked inside groups with no group-specific code.
  */
 function checkLeafRules(field: LeafFormField, path: Path, ctx: z.RefinementCtx) {
+  if (field.type === 'number') {
+    const { min, max } = field.config;
+    if (min !== null && max !== null && min > max) {
+      ctx.addIssue({
+        code: 'custom',
+        message: "The minimum can't be more than the maximum.",
+        path: [...path, 'config', 'min'],
+      });
+    }
+    return;
+  }
+
+  if (field.type === 'date') {
+    const { min, max } = field.config;
+    if (min !== null && max !== null && isoDateOrder(min, max) > 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: "The earliest date can't be after the latest.",
+        path: [...path, 'config', 'min'],
+      });
+    }
+    return;
+  }
+
   if (field.type !== 'single_select' && field.type !== 'multi_select') {
     return;
   }

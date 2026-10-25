@@ -212,7 +212,7 @@ describe('parseFormFields', () => {
         errors: [
           {
             path: '0.config.fields.1.type',
-            message: 'Only text, choice and yes/no questions can go inside a group.',
+            message: 'Only text, choice, yes/no, number, date and link questions can go inside a group.',
           },
         ],
       });

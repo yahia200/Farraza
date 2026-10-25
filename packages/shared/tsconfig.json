@@ -3,7 +3,8 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "declaration": true
+    "declaration": true,
+    "lib": ["es2022", "DOM", "DOM.Iterable", "esnext.temporal"]
   },
   "include": ["src"]
 }
