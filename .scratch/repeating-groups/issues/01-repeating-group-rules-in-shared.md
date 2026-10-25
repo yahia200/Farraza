@@ -10,18 +10,18 @@ Prefactor first: pull the per-question answer check out of the answer parser so 
 
 **Status:** resolved
 
-- [ ] Form validation accepts a group whose sub-questions are valid leaf questions, and the group counts as one question toward the form's question limit
-- [ ] Form validation refuses, with a clear message on the right path: a file question or a nested group inside a group, a non-empty auto-reject rule on a sub-question, a duplicate sub-question key (including a clash with a top-level key), `maxEntries` outside 1 to 10, and an invalid sub-question (for example fewer than two options)
-- [ ] Answer parsing accepts Entries and trims text inside them; `false` counts as an answer inside an Entry
-- [ ] Fully blank Entries are dropped; a required group with no Entries left fails with the usual "needs an answer" message; an optional group with none is simply absent from the answers
-- [ ] An Entry with any answer must satisfy its sub-questions' own `required` flags
-- [ ] Answer parsing refuses: more Entries than `maxEntries`, an answer that is not an array, an Entry that is not an object, an unknown key inside an Entry, an invalid choice, and a multiple-choice selection over its limit inside an Entry
-- [ ] Group answer errors use the path `<groupKey>.<index>.<childKey>`, where the index is the Entry's position in the submitted array
-- [ ] Auto-reject evaluation ignores groups; the applicant-facing form still contains the group and all its sub-questions
-- [ ] The answer value type is recursive and every place that handles answers still type-checks (`pnpm check-types`)
-- [ ] Tests at the shared package's public functions cover every criterion above, written like the existing form-field and answer tests; `pnpm --filter @repo/shared test` passes
-- [ ] The shared package is rebuilt and `pnpm lint` and `pnpm check-types` pass for the whole repo
-- [ ] The schema doc's question types table, answer shape section and the rules across properties describe the group
+- [x] Form validation accepts a group whose sub-questions are valid leaf questions, and the group counts as one question toward the form's question limit
+- [x] Form validation refuses, with a clear message on the right path: a file question or a nested group inside a group, a non-empty auto-reject rule on a sub-question, a duplicate sub-question key (including a clash with a top-level key), `maxEntries` outside 1 to 10, and an invalid sub-question (for example fewer than two options)
+- [x] Answer parsing accepts Entries and trims text inside them; `false` counts as an answer inside an Entry
+- [x] Fully blank Entries are dropped; a required group with no Entries left fails with the usual "needs an answer" message; an optional group with none is simply absent from the answers
+- [x] An Entry with any answer must satisfy its sub-questions' own `required` flags
+- [x] Answer parsing refuses: more Entries than `maxEntries`, an answer that is not an array, an Entry that is not an object, an unknown key inside an Entry, an invalid choice, and a multiple-choice selection over its limit inside an Entry
+- [x] Group answer errors use the path `<groupKey>.<index>.<childKey>`, where the index is the Entry's position in the submitted array
+- [x] Auto-reject evaluation ignores groups; the applicant-facing form still contains the group and all its sub-questions
+- [x] The answer value type is recursive and every place that handles answers still type-checks (`pnpm check-types`)
+- [x] Tests at the shared package's public functions cover every criterion above, written like the existing form-field and answer tests; `pnpm --filter @repo/shared test` passes
+- [x] The shared package is rebuilt and `pnpm lint` and `pnpm check-types` pass for the whole repo
+- [x] The schema doc's question types table, answer shape section and the rules across properties describe the group
 
 ## Comments
 

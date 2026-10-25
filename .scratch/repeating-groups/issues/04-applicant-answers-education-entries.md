@@ -8,16 +8,16 @@ A group is one step in the questionnaire, with a card per Entry inside it and "A
 
 **Status:** resolved
 
-- [ ] A required group starts with one empty card; an optional group starts with none and offers "Add"; "Add another" is disabled at the group's `maxEntries`
-- [ ] The applicant can add, fill and remove cards; removing a card does not disturb the others' values
-- [ ] An optional group can be skipped; a required group blocks Next until at least one Entry has an answer; a blank extra card does not block sending
-- [ ] An Entry with some answers requires its required sub-questions; the error shows next to the exact input, inside the right card
-- [ ] Single choice, multiple choice (including the selection limit, applied per Entry), short text, long text and yes/no work inside a card
-- [ ] The step behaves like the others: back, next, skip when optional, progress, and no letter-shortcut or step-list errors in the console
-- [ ] Submitting stores the Entries; the answers pass the shared package's parser unchanged (no client-only format)
-- [ ] A server error with a group path sends the applicant back to the group's step and marks the right input in the right card
-- [ ] Checked in the browser pane: apply with several Entries, try an incomplete Entry, try exceeding the maximum, submit, and force a server error; the pane shows no console errors
-- [ ] `pnpm lint` and `pnpm check-types` pass; the web architecture notes describe the group step
+- [x] A required group starts with one empty card; an optional group starts with none and offers "Add"; "Add another" is disabled at the group's `maxEntries`
+- [x] The applicant can add, fill and remove cards; removing a card does not disturb the others' values
+- [x] An optional group can be skipped; a required group blocks Next until at least one Entry has an answer; a blank extra card does not block sending
+- [x] An Entry with some answers requires its required sub-questions; the error shows next to the exact input, inside the right card
+- [x] Single choice, multiple choice (including the selection limit, applied per Entry), short text, long text and yes/no work inside a card
+- [x] The step behaves like the others: back, next, skip when optional, progress, and no letter-shortcut or step-list errors in the console
+- [x] Submitting stores the Entries; the answers pass the shared package's parser unchanged (no client-only format)
+- [x] A server error with a group path sends the applicant back to the group's step and marks the right input in the right card
+- [x] Checked in the browser pane: apply with several Entries, try an incomplete Entry, try exceeding the maximum, submit, and force a server error; the pane shows no console errors
+- [x] `pnpm lint` and `pnpm check-types` pass; the web architecture notes describe the group step
 
 ## Comments
 

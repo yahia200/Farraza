@@ -8,14 +8,14 @@ Each Entry shows as its own block of label and answer rows. The labels come from
 
 **Status:** resolved
 
-- [ ] The Answers section shows a group as a heading (the question's label) followed by one block per Entry, in the order the applicant gave them
-- [ ] Each block shows the sub-question label and the answer for every answered sub-question; blank ones are skipped, and a multiple-choice answer lists its option labels
-- [ ] An application whose form version has since been relabelled or whose option was later renamed still shows the labels the applicant saw; an unknown option shows as "Unknown option", as today
-- [ ] An optional group the applicant skipped is not shown as an empty section (or shows the existing "no answer" treatment for unanswered questions)
-- [ ] Interviewers see the same blocks as recruiters
-- [ ] Existing question types render exactly as before
-- [ ] Checked in the browser pane against an application submitted in ticket 04: several Entries, a skipped optional group, and an interviewer's view; the pane shows no console errors
-- [ ] `pnpm lint` and `pnpm check-types` pass
+- [x] The Answers section shows a group as a heading (the question's label) followed by one block per Entry, in the order the applicant gave them
+- [x] Each block shows the sub-question label and the answer for every answered sub-question; blank ones are skipped, and a multiple-choice answer lists its option labels
+- [x] An application whose form version has since been relabelled or whose option was later renamed still shows the labels the applicant saw; an unknown option shows as "Unknown option", as today
+- [x] An optional group the applicant skipped is not shown as an empty section (or shows the existing "no answer" treatment for unanswered questions)
+- [x] Interviewers see the same blocks as recruiters
+- [x] Existing question types render exactly as before
+- [x] Checked in the browser pane against an application submitted in ticket 04: several Entries, a skipped optional group, and an interviewer's view; the pane shows no console errors
+- [x] `pnpm lint` and `pnpm check-types` pass
 
 ## Comments
 

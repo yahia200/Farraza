@@ -8,15 +8,15 @@ This ticket tests the claim that a new Preset is data, not a code path. Adding i
 
 **Status:** resolved
 
-- [ ] The "Presets" group lists Education and Experience; each is greyed out while it is on the form, independently of the other
-- [ ] Inserting Experience creates the group with fresh ids and its Preset keys; both Presets can be on the same form
-- [ ] The end-date help text says a blank end date means a current job, and there is no "currently work here" question
-- [ ] Both Presets together count as two questions toward the form's question limit
-- [ ] An applicant can add several jobs on the apply page, with the required Job title, Company and Start date enforced per Entry
-- [ ] The candidate sheet shows the jobs as blocks, with the long "What you did there" answer readable
-- [ ] Checked in the browser pane through the whole path (insert, save, publish, apply, review) with both Presets on one form; the pane shows no console errors
-- [ ] Any change outside the Preset definition and menu is recorded under "## Findings" with the reason, or the section states that none was needed
-- [ ] `pnpm lint` and `pnpm check-types` pass
+- [x] The "Presets" group lists Education and Experience; each is greyed out while it is on the form, independently of the other
+- [x] Inserting Experience creates the group with fresh ids and its Preset keys; both Presets can be on the same form
+- [x] The end-date help text says a blank end date means a current job, and there is no "currently work here" question
+- [x] Both Presets together count as two questions toward the form's question limit
+- [x] An applicant can add several jobs on the apply page, with the required Job title, Company and Start date enforced per Entry
+- [x] The candidate sheet shows the jobs as blocks, with the long "What you did there" answer readable
+- [x] Checked in the browser pane through the whole path (insert, save, publish, apply, review) with both Presets on one form; the pane shows no console errors
+- [x] Any change outside the Preset definition and menu is recorded under "## Findings" with the reason, or the section states that none was needed
+- [x] `pnpm lint` and `pnpm check-types` pass
 
 ## Findings
 

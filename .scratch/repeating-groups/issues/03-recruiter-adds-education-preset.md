@@ -10,18 +10,18 @@ Prefactor as part of this ticket: the builder card edits nested config through o
 
 **Status:** resolved
 
-- [ ] The "Add question" menu has a "Presets" group below the question types, containing Education; choosing it appends the group to the form and opens its card
-- [ ] Once Education is on the form its menu item is greyed out; it becomes available again if the group is deleted
-- [ ] The group counts as one question toward the form's question limit, and the menu's limit behaviour is unchanged
-- [ ] The group card lists its sub-questions; the recruiter can edit the group's label, help text, `required` and `maxEntries`, and each sub-question's label, help text and `required`
-- [ ] The recruiter cannot add, remove or reorder sub-questions, change their types, or edit the Degree options; there is no way to create a blank group
-- [ ] An invalid setting (empty label, `maxEntries` out of range) shows its error next to the setting, using the shared package's messages; a group or sub-question with an error opens itself
-- [ ] The group can be moved and deleted like any other question
-- [ ] Interviewers (people who can't manage jobs) see the group read-only: the card opens and shows everything, controls cannot be changed, and move, delete and add are hidden
-- [ ] Unsaved edits to the group are backed up and restored like other questions
-- [ ] Save draft, publish, reload and reopen round-trips the group and its Preset keys unchanged; API errors with group paths land on the right control
-- [ ] Checked in the browser pane: insert, edit, trigger an error, save, publish, reload, and view as an interviewer; the pane shows no console errors
-- [ ] `pnpm lint` and `pnpm check-types` pass; the web architecture notes describe the Presets menu and the group card
+- [x] The "Add question" menu has a "Presets" group below the question types, containing Education; choosing it appends the group to the form and opens its card
+- [x] Once Education is on the form its menu item is greyed out; it becomes available again if the group is deleted
+- [x] The group counts as one question toward the form's question limit, and the menu's limit behaviour is unchanged
+- [x] The group card lists its sub-questions; the recruiter can edit the group's label, help text, `required` and `maxEntries`, and each sub-question's label, help text and `required`
+- [x] The recruiter cannot add, remove or reorder sub-questions, change their types, or edit the Degree options; there is no way to create a blank group
+- [x] An invalid setting (empty label, `maxEntries` out of range) shows its error next to the setting, using the shared package's messages; a group or sub-question with an error opens itself
+- [x] The group can be moved and deleted like any other question
+- [x] Interviewers (people who can't manage jobs) see the group read-only: the card opens and shows everything, controls cannot be changed, and move, delete and add are hidden
+- [x] Unsaved edits to the group are backed up and restored like other questions
+- [x] Save draft, publish, reload and reopen round-trips the group and its Preset keys unchanged; API errors with group paths land on the right control
+- [x] Checked in the browser pane: insert, edit, trigger an error, save, publish, reload, and view as an interviewer; the pane shows no console errors
+- [x] `pnpm lint` and `pnpm check-types` pass; the web architecture notes describe the Presets menu and the group card
 
 ## Comments
 
