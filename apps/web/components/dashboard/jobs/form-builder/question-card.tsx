@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { at, errorAt, FIELD_TYPES } from './field-types';
 import { FileConfigEditor } from './file-config-editor';
 import { GroupEditor } from './group-editor';
+import { DateConfigEditor, NumberConfigEditor } from './limits-config-editor';
 import { OptionsEditor } from './options-editor';
 import { COLLAPSIBLE_PANEL_CLASS, QuestionBasics } from './question-basics';
 
@@ -204,6 +205,14 @@ export function QuestionCard({
                   </Field>
                 )}
               />
+            )}
+
+            {field.type === 'number' && (
+              <NumberConfigEditor form={form} path={path} idPrefix={idPrefix} readOnly={readOnly} disabled={disabled} />
+            )}
+
+            {field.type === 'date' && (
+              <DateConfigEditor form={form} path={path} idPrefix={idPrefix} readOnly={readOnly} disabled={disabled} />
             )}
 
             {field.type === 'file' && (

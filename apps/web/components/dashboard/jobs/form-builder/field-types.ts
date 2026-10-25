@@ -1,5 +1,8 @@
 import {
+  CalendarIcon,
   CheckSquareIcon,
+  HashIcon,
+  LinkIcon,
   CircleDotIcon,
   ListIcon,
   PaperclipIcon,
@@ -29,6 +32,9 @@ export const FIELD_TYPES: Record<FormFieldType, { label: string; icon: LucideIco
   single_select: { label: 'Single choice', icon: CircleDotIcon },
   multi_select: { label: 'Multiple choice', icon: CheckSquareIcon },
   yes_no: { label: 'Yes / No', icon: ToggleLeftIcon },
+  number: { label: 'Number', icon: HashIcon },
+  date: { label: 'Date', icon: CalendarIcon },
+  url: { label: 'Link (URL)', icon: LinkIcon },
   file: { label: 'File upload', icon: PaperclipIcon },
   repeating_group: { label: 'Repeating group', icon: ListIcon },
 };
@@ -63,6 +69,12 @@ export function newField(type: BuilderFieldType): FormField {
       return { ...base, type, config: { options: [newOption('Option 1'), newOption('Option 2')], maxSelections: null } };
     case 'yes_no':
       return { ...base, type, config: { rejectWhen: null } };
+    case 'number':
+      return { ...base, type, config: { min: null, max: null, integerOnly: false } };
+    case 'date':
+      return { ...base, type, config: { min: null, max: null } };
+    case 'url':
+      return { ...base, type, config: {} };
     case 'file':
       // Documents, with the size the builder suggests for them (spec: 10 MB); the length limit is only for video and audio, so it starts empty.
       return { ...base, type, config: { kinds: ['document'], maxSizeMb: suggestedMaxSizeMb(['document']), maxDurationSeconds: null } };
