@@ -58,6 +58,10 @@ _Avoid_: Template, snippet
 A stable name a Question carries when it came from a Preset, saying what it asks for (such as a school, or a notice period). It survives relabelling, so features like CV autofill can recognise the Question; a Question built by hand has none.
 _Avoid_: Tag, semantic role (role means a Member's permission level)
 
+**Highlighted question**:
+A Question whose answer is shown for every Application in a Job's candidate list, in both the table and the board, so a reviewer sees it without opening the Application. A Job has up to three, shared by everyone who views it. Only single-answer Questions can be highlighted: not a Repeating group, anything inside one, or a file Question.
+_Avoid_: Column (a Stage is not a column either), Pinned question, Preview question
+
 ## Pipeline
 
 **Pipeline**:
