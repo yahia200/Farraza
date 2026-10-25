@@ -7,18 +7,18 @@
 
 **Blocked by:** none.
 
-**Status:** needs-triage
+**Status:** resolved
 
-- [ ] `HIGHLIGHT_LIMIT` and the highlightable predicate are exported and cover all ten question types, a group's sub-question included
-- [ ] The highlightable list for a form is in form order
-- [ ] The key-list schema refuses more than 3, duplicates and non-UUIDs
-- [ ] The key check refuses a key not on the form, and a key whose Question is a group, a sub-question or a file, with a path per bad key
-- [ ] The shared text formatter covers each single-answer type: a choice becomes its label and an unknown id is `Unknown option`; `Yes`/`No`; `0` stays `0`; a date reads like `February 5, 2026`; a multi-select; a link; no answer is `null`
-- [ ] The list variant joins a multi-select with `, `, and cuts at 200 characters with `…` without splitting a surrogate pair
-- [ ] The candidate sheet shows exactly what it showed before (same labels, same date format, same link handling)
-- [ ] Tests in `packages/shared/src/` for every item above (`pnpm --filter @repo/shared test`); the `@repo/shared` build is rerun so the API sees the new exports
-- [ ] `pnpm lint` and `pnpm check-types` pass
-- [ ] Docs referenced for every library call; `Temporal` stays unpolyfilled in `@repo/shared`
+- [x] `HIGHLIGHT_LIMIT` and the highlightable predicate are exported and cover all ten question types, a group's sub-question included
+- [x] The highlightable list for a form is in form order
+- [x] The key-list schema refuses more than 3, duplicates and non-UUIDs
+- [x] The key check refuses a key not on the form, and a key whose Question is a group, a sub-question or a file, with a path per bad key
+- [x] The shared text formatter covers each single-answer type: a choice becomes its label and an unknown id is `Unknown option`; `Yes`/`No`; `0` stays `0`; a date reads like `February 5, 2026`; a multi-select; a link; no answer is `null`
+- [x] The list variant joins a multi-select with `, `, and cuts at 200 characters with `…` without splitting a surrogate pair
+- [x] The candidate sheet shows exactly what it showed before (same labels, same date format, same link handling)
+- [x] Tests in `packages/shared/src/` for every item above (`pnpm --filter @repo/shared test`); the `@repo/shared` build is rerun so the API sees the new exports
+- [x] `pnpm lint` and `pnpm check-types` pass
+- [x] Docs referenced for every library call; `Temporal` stays unpolyfilled in `@repo/shared`
 
 ## Comments
 
