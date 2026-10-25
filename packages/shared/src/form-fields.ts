@@ -152,6 +152,13 @@ export const formFieldSchema = z.discriminatedUnion('type', [
 export type FormField = z.infer<typeof formFieldSchema>;
 export type FormFieldType = FormField['type'];
 
+/**
+ * Compile-time check on the catalog in preset-keys.ts: every type a Preset key requires must be a
+ * real question type. It fails to compile ("not assignable to type 'never'") when a key names a
+ * type that `FormFieldType` doesn't have. It can't be derived the other way (circular types).
+ */
+const catalogTypesAreQuestionTypes: (typeof PRESET_KEY_TYPES)[PresetKey] extends FormFieldType ? true : never = true;
+
 type Path = (string | number)[];
 
 /**

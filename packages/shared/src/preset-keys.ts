@@ -12,7 +12,12 @@
  * To retire a Preset, stop offering it in the builder and leave its keys here.
  */
 
-/** The question types a key can require; the same names as `FormField['type']` (checked in form-fields.ts). */
+/**
+ * The question types a key can require; the same names as `FormField['type']`. This is a copy,
+ * not derived: form-fields.ts imports this file, so importing `FormFieldType` back makes the
+ * types circular. form-fields.ts asserts at compile time that every type used below is a real
+ * question type; `checkPresetKey` there guards each key's type at run time.
+ */
 type PresetQuestionType =
   | 'short_text'
   | 'long_text'
