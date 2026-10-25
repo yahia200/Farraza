@@ -1,17 +1,11 @@
 import { z } from 'zod';
 
-/*
- * Calendar dates without a time or timezone, as ISO `YYYY-MM-DD` text. The checks use the
- * platform's `Temporal` (Node >= 26 on the server; the web app loads a polyfill). This package
- * never imports a polyfill. Docs:
- * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Temporal/PlainDate
- */
+// Calendar dates as ISO `YYYY-MM-DD` text, checked with the platform's `Temporal` (this package never
+// imports a polyfill; the web app loads one): https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Temporal/PlainDate
 
 /**
- * The date as a `Temporal.PlainDate`, or null when the text isn't a real calendar date in exactly
- * the `YYYY-MM-DD` form. `{ overflow: 'reject' }` refuses 2026-02-30 instead of rolling it into
- * March, and the round trip refuses forms `from` accepts that we don't store (`2026-2-5`
- * isn't one of them, but extended years such as `+002026-02-05` and a trailing time are).
+ * The date as a `Temporal.PlainDate`, or null unless it is a real date in exactly `YYYY-MM-DD`
+ * (`overflow: 'reject'` refuses 2026-02-30; the round trip refuses `+002026-02-05` and times).
  */
 export function parseIsoDate(value: unknown): Temporal.PlainDate | null {
   if (typeof value !== 'string') return null;

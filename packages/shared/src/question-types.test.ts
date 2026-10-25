@@ -184,6 +184,11 @@ describe('number answers', () => {
     expect(answer({}, -4)).toEqual({ ok: true, answers: { [NUMBER]: -4 } });
   });
 
+  it('keeps 0 as the only answer, whether the question is optional or required', () => {
+    expect(answer({}, 0, false)).toEqual({ ok: true, answers: { [NUMBER]: 0 } });
+    expect(answer({}, 0, true)).toEqual({ ok: true, answers: { [NUMBER]: 0 } });
+  });
+
   it('accepts the limits themselves and refuses a number outside them', () => {
     const config = { min: 1, max: 10 };
     expect(answer(config, 1).ok).toBe(true);
