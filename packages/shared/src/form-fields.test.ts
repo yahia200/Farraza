@@ -396,6 +396,33 @@ describe('parseFormFields', () => {
       });
     });
 
+    it('takes the year and date Preset keys on number and date questions and refuses them on short text', () => {
+      const yearQuestion = {
+        key: ABOUT_2,
+        type: 'number',
+        label: 'Start year',
+        helpText: null,
+        required: false,
+        config: { min: 1950, max: 2100, integerOnly: true },
+      };
+      const dateQuestion = {
+        key: ABOUT,
+        type: 'date',
+        label: 'Start date',
+        helpText: null,
+        required: true,
+        config: { min: null, max: null },
+      };
+      expect(parseFormFields([group([{ ...yearQuestion, presetKey: 'education.end_year' }])])).toMatchObject({ ok: true });
+      expect(parseFormFields([group([{ ...dateQuestion, presetKey: 'experience.start_date' }])])).toMatchObject({ ok: true });
+      for (const presetKey of ['education.start_year', 'education.end_year', 'experience.start_date', 'experience.end_date']) {
+        expect(parseFormFields([group([{ ...schoolQuestion, presetKey }])])).toEqual({
+          ok: false,
+          errors: [{ path: '0.config.fields.0.presetKey', message: WRONG_TYPE_PRESET_KEY }],
+        });
+      }
+    });
+
     it('refuses the same top-level Preset key twice, pointing at the second, and accepts two different ones', () => {
       const company = { ...shortText, key: ABOUT_2, presetKey: 'experience.company' };
       const jobTitle = { ...shortText, presetKey: 'experience.job_title' };
