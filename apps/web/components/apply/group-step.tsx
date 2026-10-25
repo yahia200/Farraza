@@ -39,6 +39,8 @@ import {
   type LeafInput,
 } from './apply-values';
 
+import { limitHint } from './limit-hint';
+
 type SubQuestion = GroupField['config']['fields'][number];
 
 /**
@@ -163,7 +165,11 @@ function GroupCards({
       // pick choices. Inside the cards they would do the wrong thing, so they stop here.
       onKeyDown={(event) => {
         event.stopPropagation();
-        if (event.key === 'Enter' && event.target instanceof HTMLInputElement && event.target.type === 'text') {
+        if (
+          event.key === 'Enter' &&
+          event.target instanceof HTMLInputElement &&
+          ['text', 'number', 'date', 'url'].includes(event.target.type)
+        ) {
           event.preventDefault();
         }
       }}
@@ -299,6 +305,33 @@ function SubQuestionControl({
             </p>
           </>
         )}
+        {problem}
+      </Field>
+    );
+  }
+
+  if (child.type === 'number' || child.type === 'date' || child.type === 'url') {
+    const text = typeof value === 'string' ? value : '';
+    const hint = limitHint(child);
+    const hintId = `${id}-limit`;
+    return (
+      <Field data-invalid={Boolean(error)}>
+        <FieldLabel htmlFor={id}>{label}</FieldLabel>
+        {help}
+        {hint && <FieldDescription id={hintId}>{hint}</FieldDescription>}
+        <Input
+          id={id}
+          value={text}
+          type={child.type === 'number' ? 'number' : child.type === 'date' ? 'date' : 'url'}
+          {...(child.type === 'number'
+            ? { inputMode: child.config.integerOnly ? 'numeric' : 'decimal', step: child.config.integerOnly ? 1 : 'any' }
+            : child.type === 'date'
+              ? { min: child.config.min ?? undefined, max: child.config.max ?? undefined }
+              : { inputMode: 'url', autoComplete: 'url', placeholder: 'https://' })}
+          aria-invalid={Boolean(error)}
+          aria-describedby={[describedBy, hint ? hintId : null].filter(Boolean).join(' ') || undefined}
+          onChange={(event) => onChange(event.target.value)}
+        />
         {problem}
       </Field>
     );
