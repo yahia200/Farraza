@@ -17,7 +17,12 @@ import {
  * so the browser and the server agree on every rule and message.
  */
 
-/** A single-question answer while the form is being filled in: `null` / '' / [] mean "not answered yet". */
+/**
+ * A single-question answer while the form is being filled in: `null` / '' / [] mean "not answered yet".
+ * A Number, Date or URL question holds the box's text (a native number input gives text such as
+ * "0" or "2.5"; a date input gives `YYYY-MM-DD` or ''); `compactAnswers` turns a number's text into
+ * the JSON number the API expects.
+ */
 export type LeafInput = string | string[] | boolean | null;
 
 /**
@@ -45,7 +50,18 @@ export type GroupField = Extract<PublicFormField, { type: 'repeating_group' }>;
 
 /** What a single question holds before the applicant touches it. */
 function blankLeaf(field: Exclude<PublicFormField, GroupField>): LeafInput {
-  return field.type === 'multi_select' ? [] : field.type === 'short_text' || field.type === 'long_text' ? '' : null;
+  switch (field.type) {
+    case 'multi_select':
+      return [];
+    case 'short_text':
+    case 'long_text':
+    case 'number':
+    case 'date':
+    case 'url':
+      return '';
+    default:
+      return null;
+  }
 }
 
 /** A new card with every sub-question blank. */
@@ -77,9 +93,26 @@ export function entriesOf(value: AnswerInput | undefined): EntryInput[] {
   return Array.isArray(value) ? value.filter((item): item is EntryInput => isPlainObject(item)) : [];
 }
 
-/** An Entry's answers without its blanks, as the API expects (`false` is an answer and stays). */
-function compactEntry(entry: EntryInput): Entry {
-  return Object.fromEntries(Object.entries(entry).filter(([, value]) => !isBlankAnswer(value))) as Entry;
+/**
+ * A Number question's text as the JSON number the API expects; `0` stays an answer. Text that is
+ * not a number is left as it is, so `parseAnswers` words the error. Other types pass through.
+ */
+function toAnswerValue(field: PublicFormField | undefined, value: LeafInput): LeafInput | number {
+  if (field?.type === 'number' && typeof value === 'string' && value.trim() !== '') {
+    const number = Number(value);
+    return Number.isNaN(number) ? value : number;
+  }
+  return value;
+}
+
+/** An Entry's answers without its blanks, as the API expects (`false` and `0` are answers and stay). */
+function compactEntry(entry: EntryInput, group: GroupField): Entry {
+  const children = new Map<string, PublicFormField>(group.config.fields.map((child) => [child.key, child]));
+  return Object.fromEntries(
+    Object.entries(entry)
+      .filter(([, value]) => !isBlankAnswer(value))
+      .map(([key, value]) => [key, toAnswerValue(children.get(key), value)]),
+  ) as Entry;
 }
 
 /** The option ids of a multiple-choice answer (a group's cards are the other kind of array). */
@@ -98,15 +131,17 @@ export function entryHasAnswer(entry: EntryInput): boolean {
  * `parseAnswers` (the position in this list) is the card's position on the page. A group with
  * nothing in any card is left out.
  */
-export function compactAnswers(answers: Record<string, AnswerInput>): Answers {
+export function compactAnswers(answers: Record<string, AnswerInput>, fields: readonly PublicFormField[]): Answers {
   const compact: Answers = {};
+  const byKey = new Map(fields.map((field) => [field.key, field]));
   for (const [key, value] of Object.entries(answers)) {
+    const field = byKey.get(key);
     if (isEntries(value)) {
-      if (value.some(entryHasAnswer)) {
-        compact[key] = value.map(compactEntry);
+      if (value.some(entryHasAnswer) && field?.type === 'repeating_group') {
+        compact[key] = value.map((entry) => compactEntry(entry, field));
       }
     } else if (!isBlankAnswer(value)) {
-      compact[key] = value as string | string[] | boolean;
+      compact[key] = toAnswerValue(field, value as LeafInput) as string | number | string[] | boolean;
     }
   }
   return compact;
@@ -149,7 +184,7 @@ export function applyResolver(fields: readonly PublicFormField[], cvMode: CvMode
       }
     }
 
-    const answers = parseAnswers(fields, compactAnswers(values.answers));
+    const answers = parseAnswers(fields, compactAnswers(values.answers, fields));
     if (!answers.ok) {
       for (const { path, message } of answers.errors) {
         errors[`answers.${path}`] ??= { type: 'validation', message };

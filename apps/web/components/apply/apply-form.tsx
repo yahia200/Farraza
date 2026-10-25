@@ -302,7 +302,7 @@ export function ApplyForm({
           email: values.email,
           phone: values.phone,
           cvFileId: cvMode === "off" ? undefined : (values.cvFileId ?? undefined),
-          answers: compactAnswers(values.answers),
+          answers: compactAnswers(values.answers, fields),
           website: values.website,
           source,
         });

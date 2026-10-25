@@ -11,6 +11,7 @@ import {
   QuestionnaireItem,
   QuestionnaireTitle,
 } from '@/components/ui/questionnaire';
+import { limitHint } from './limit-hint';
 import { chosenOptions, isLockedOption, type AnswerInput, type ApplyValues } from './apply-values';
 
 /**
@@ -56,7 +57,51 @@ export function QuestionStep({
               </QuestionnaireDescription>
             )}
 
+            {(field.type === 'number' || field.type === 'date') && limitHint(field) && (
+              <QuestionnaireDescription>{limitHint(field)}</QuestionnaireDescription>
+            )}
+
             <QuestionnaireChoices>
+              {/* Number, Date and URL keep the box's text in the form (apply-values.ts turns a
+                  number's text into a JSON number). The native number and date inputs only yield
+                  a valid value or '', and `min`/`max` limit the date picker where the browser allows. */}
+              {field.type === 'number' && (
+                <QuestionnaireInput
+                  ref={input.ref}
+                  type="number"
+                  inputMode={field.config.integerOnly ? 'numeric' : 'decimal'}
+                  step={field.config.integerOnly ? 1 : 'any'}
+                  aria-label={label}
+                  value={typeof value === 'string' ? value : ''}
+                  onChange={(event) => answer(event.target.value)}
+                />
+              )}
+
+              {field.type === 'date' && (
+                <QuestionnaireInput
+                  ref={input.ref}
+                  type="date"
+                  min={field.config.min ?? undefined}
+                  max={field.config.max ?? undefined}
+                  aria-label={label}
+                  value={typeof value === 'string' ? value : ''}
+                  onChange={(event) => answer(event.target.value)}
+                />
+              )}
+
+              {field.type === 'url' && (
+                <QuestionnaireInput
+                  ref={input.ref}
+                  type="url"
+                  inputMode="url"
+                  autoComplete="url"
+                  placeholder="https://"
+                  aria-label={label}
+                  value={typeof value === 'string' ? value : ''}
+                  onChange={(event) => answer(event.target.value)}
+                />
+              )}
+
               {field.type === 'short_text' && (
                 <QuestionnaireInput
                   ref={input.ref}
@@ -144,7 +189,13 @@ export function QuestionStep({
                 default ("Choose an answer to continue."), which suits choices. */}
             <QuestionnaireError>
               {fieldState.error?.message ??
-                (field.type === 'short_text' || field.type === 'long_text' ? 'This question needs an answer.' : undefined)}
+                (field.type === 'short_text' ||
+              field.type === 'long_text' ||
+              field.type === 'number' ||
+              field.type === 'date' ||
+              field.type === 'url'
+                ? 'This question needs an answer.'
+                : undefined)}
             </QuestionnaireError>
           </QuestionnaireItem>
         );
