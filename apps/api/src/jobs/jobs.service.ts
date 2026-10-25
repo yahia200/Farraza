@@ -1,10 +1,13 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { AuthorizationService } from '@nestjs/authorization';
+import { checkHighlightKeys } from '@repo/shared';
 import { randomBytes } from 'node:crypto';
 import { slugify } from '../common/slugify.js';
 import type { Membership } from '../companies/company.js';
 import type { User } from '../users/user.js';
+import { FormsRepository } from '../forms/forms.repository.js';
 import type { CreateJobDto } from './dto/create-job.dto.js';
+import type { SaveHighlightedQuestionsDto } from './dto/save-highlighted-questions.dto.js';
 import type { UpdateJobDto } from './dto/update-job.dto.js';
 import type { Job, JobWithStages } from './job.js';
 import { JobPolicy } from './job.policy.js';
@@ -15,6 +18,7 @@ import { isUniqueViolation } from '../common/db-errors.js';
 export class JobsService {
   constructor(
     private readonly jobs: JobsRepository,
+    private readonly forms: FormsRepository,
     private readonly authorization: AuthorizationService,
   ) { }
 
@@ -66,6 +70,35 @@ export class JobsService {
       throw new NotFoundException();
     }
     return updated;
+  }
+
+  async saveHighlightedQuestions(
+    user: User,
+    membership: Membership,
+    jobSlug: string,
+    dto: SaveHighlightedQuestionsDto,
+  ): Promise<{ keys: string[] }> {
+    await this.authorization.authorize(JobPolicy, 'update', user, membership);
+
+    const job = await this.get(membership, jobSlug);
+    const form = await this.forms.findLatestPublished(job.id);
+    if (!form) {
+      throw new ConflictException('Publish the application form first.');
+    }
+    // The body schema already capped the list and refused repeats; this compares it with the form.
+    const checked = checkHighlightKeys(dto.keys, form.fields);
+    if (!checked.ok) {
+      throw new BadRequestException({
+        message: 'Some questions can’t be shown in the list.',
+        errors: checked.errors,
+      });
+    }
+
+    const saved = await this.jobs.replaceHighlightedQuestionKeys(job.id, checked.keys);
+    if (!saved) {
+      throw new NotFoundException();
+    }
+    return { keys: saved.highlightedQuestionKeys };
   }
 
   private async availableSlug(companyId: string, title: string): Promise<string> {

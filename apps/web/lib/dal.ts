@@ -156,6 +156,8 @@ export interface CompanyJob {
   openedAt: string | null;
   closedAt: string | null;
   createdAt: string;
+  /** Keys of the Job's Highlighted questions as last saved; may include keys the latest published form no longer has. */
+  highlightedQuestionKeys: string[];
 }
 
 /** Mirrors Stage in apps/api/src/jobs/job.ts. */
@@ -254,8 +256,18 @@ export async function getJobForm(
   return { draft: pick(form.draft), published: pick(form.published) };
 }
 
-function toCompanyJob({ id, title, slug, description, status, openedAt, closedAt, createdAt }: CompanyJob): CompanyJob {
-  return { id, title, slug, description, status, openedAt, closedAt, createdAt };
+function toCompanyJob({
+  id,
+  title,
+  slug,
+  description,
+  status,
+  openedAt,
+  closedAt,
+  createdAt,
+  highlightedQuestionKeys,
+}: CompanyJob): CompanyJob {
+  return { id, title, slug, description, status, openedAt, closedAt, createdAt, highlightedQuestionKeys };
 }
 
 /** Expose only what the UI needs. */

@@ -66,6 +66,17 @@ export class JobsRepository {
     return row ? toJob(row) : null;
   }
 
+  /**
+   * Replaces the job's whole list of Highlighted questions in one statement. Returns null if the job
+   * is gone. Deliberately unconditional, unlike the other writes here (`.claude/rules/api.md`,
+   * "Concurrency"): the list is a display preference, so two people saving at once is
+   * last-write-wins and no data is lost.
+   */
+  async replaceHighlightedQuestionKeys(id: string, keys: string[]): Promise<Job | null> {
+    const row = await this.jobs.where({ id }).update({ highlightedQuestionKeys: keys });
+    return row ? toJob(row) : null;
+  }
+
   async hasPublishedForm(jobId: string): Promise<boolean> {
     const row = await this.formVersions
       .where({ jobId })
@@ -104,6 +115,7 @@ function toJob(row: {
   closedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  highlightedQuestionKeys: unknown;
 }): Job {
   return {
     id: row.id,
@@ -115,6 +127,8 @@ function toJob(row: {
     closedAt: row.closedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+    // The column is CHECKed to be a JSON array, and the service writes only checked UUID strings.
+    highlightedQuestionKeys: row.highlightedQuestionKeys as string[],
   };
 }
 

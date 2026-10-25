@@ -20,6 +20,11 @@ export interface Job {
   closedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  /**
+   * Keys of the Questions shown on every Application in the candidate list, as last saved. A key can
+   * be stale (the latest published form no longer has it); readers filter against that form.
+   */
+  highlightedQuestionKeys: string[];
 }
 
 export interface JobWithStages extends Job {
