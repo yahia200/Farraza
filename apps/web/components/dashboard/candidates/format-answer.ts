@@ -1,3 +1,4 @@
+import { formatIsoDate } from '@/lib/format';
 import { isBlankAnswer, isPlainObject, type AnswerValue, type Entry, type FormField, type LeafFormField } from '@repo/shared';
 
 /** One row of an Entry's block: the sub-question's label and its answer as text. */
@@ -51,7 +52,7 @@ function formatLeaf(field: LeafFormField, value: AnswerValue | undefined): strin
     case 'yes_no':
       return value === true ? 'Yes' : value === false ? 'No' : null;
     case 'number':
-      // As entered: `String(0)` is "0", so a zero is an answer (isBlankAnswer only skips missing/blank/empty).
+      // `String(0)` is "0", so a zero is an answer.
       return typeof value === 'number' && Number.isFinite(value) ? String(value) : null;
     case 'date':
       return typeof value === 'string' ? formatIsoDate(value) : null;
@@ -85,22 +86,6 @@ function formatGroup(children: readonly LeafFormField[], value: AnswerValue | un
     )
     .filter((rows) => rows.length > 0);
   return entries.length > 0 ? { entries } : null;
-}
-
-/**
- * An ISO `YYYY-MM-DD` date as "February 5, 2026". A date has no time or timezone, so it goes through
- * `Temporal.PlainDate`, never `new Date(iso)` (which reads it as UTC midnight and can show the
- * previous day to viewers west of UTC). The format is fixed to `en-US` with `dateStyle: 'long'`,
- * not the viewer's locale, so every viewer (and the server render) reads the same day and text,
- * and the month name avoids the 02/05 day-month ambiguity. Text that isn't a date is shown as stored.
- * Docs: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Temporal/PlainDate/toLocaleString
- */
-function formatIsoDate(value: string): string {
-  try {
-    return Temporal.PlainDate.from(value, { overflow: 'reject' }).toLocaleString('en-US', { dateStyle: 'long' });
-  } catch {
-    return value;
-  }
 }
 
 /**

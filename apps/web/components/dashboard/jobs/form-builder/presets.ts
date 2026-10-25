@@ -91,7 +91,7 @@ const experience: Preset = {
         text('experience.job_title', { label: 'Job title', maxLength: 100, required: true }),
         text('experience.company', { label: 'Company', maxLength: 100, required: true }),
         date('experience.start_date', 'Start date', true),
-        date('experience.end_date', 'End date', false, 'Leave blank if you still work here.'),
+        date('experience.end_date', 'End date', false, 'Leave blank if this is your current job'),
         text('experience.description', { label: 'What you did there', maxLength: 1500, long: true }),
       ],
     },

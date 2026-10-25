@@ -40,6 +40,7 @@ import {
 } from './apply-values';
 
 import { limitHint } from './limit-hint';
+import { ENTER_CANCELLED_INPUT_TYPES, isTypedField, typedInputProps } from './typed-input';
 
 type SubQuestion = GroupField['config']['fields'][number];
 
@@ -168,7 +169,7 @@ function GroupCards({
         if (
           event.key === 'Enter' &&
           event.target instanceof HTMLInputElement &&
-          ['text', 'number', 'date', 'url'].includes(event.target.type)
+          ENTER_CANCELLED_INPUT_TYPES.includes(event.target.type)
         ) {
           event.preventDefault();
         }
@@ -310,7 +311,7 @@ function SubQuestionControl({
     );
   }
 
-  if (child.type === 'number' || child.type === 'date' || child.type === 'url') {
+  if (isTypedField(child)) {
     const text = typeof value === 'string' ? value : '';
     const hint = limitHint(child);
     const hintId = `${id}-limit`;
@@ -322,12 +323,7 @@ function SubQuestionControl({
         <Input
           id={id}
           value={text}
-          type={child.type === 'number' ? 'number' : child.type === 'date' ? 'date' : 'url'}
-          {...(child.type === 'number'
-            ? { inputMode: child.config.integerOnly ? 'numeric' : 'decimal', step: child.config.integerOnly ? 1 : 'any' }
-            : child.type === 'date'
-              ? { min: child.config.min ?? undefined, max: child.config.max ?? undefined }
-              : { inputMode: 'url', autoComplete: 'url', placeholder: 'https://' })}
+          {...typedInputProps(child)}
           aria-invalid={Boolean(error)}
           aria-describedby={[describedBy, hint ? hintId : null].filter(Boolean).join(' ') || undefined}
           onChange={(event) => onChange(event.target.value)}

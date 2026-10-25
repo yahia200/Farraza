@@ -10,6 +10,7 @@ import {
   type Entry,
   type PublicFormField,
 } from '@repo/shared';
+import { isTextBox } from './typed-input';
 
 /**
  * The apply form's values and validation. Answers are checked with
@@ -50,18 +51,8 @@ export type GroupField = Extract<PublicFormField, { type: 'repeating_group' }>;
 
 /** What a single question holds before the applicant touches it. */
 function blankLeaf(field: Exclude<PublicFormField, GroupField>): LeafInput {
-  switch (field.type) {
-    case 'multi_select':
-      return [];
-    case 'short_text':
-    case 'long_text':
-    case 'number':
-    case 'date':
-    case 'url':
-      return '';
-    default:
-      return null;
-  }
+  if (field.type === 'multi_select') return [];
+  return isTextBox(field) ? '' : null;
 }
 
 /** A new card with every sub-question blank. */
