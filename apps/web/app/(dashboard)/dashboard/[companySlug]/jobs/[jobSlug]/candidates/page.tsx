@@ -42,7 +42,7 @@ async function Candidates({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   // One fetch of the board feeds both views.
-  const [columns, { application, view: viewParam }] = await Promise.all([
+  const [{ columns }, { application, view: viewParam }] = await Promise.all([
     getPipelineBoard(company.slug, job.slug),
     searchParams,
   ]);
