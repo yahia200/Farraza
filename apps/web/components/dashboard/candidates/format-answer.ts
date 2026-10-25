@@ -1,7 +1,13 @@
 import { isBlankAnswer, isPlainObject, type AnswerValue, type Entry, type FormField, type LeafFormField } from '@repo/shared';
 
 /** One row of an Entry's block: the sub-question's label and its answer as text. */
-export type EntryRow = { label: string; answer: string | string[] };
+export type EntryRow = { label: string; answer: string | string[] | LinkAnswer };
+
+/**
+ * A web link, ready to show. Tagged by `href` so a reader can tell it from a group (`entries`).
+ * Only ever built for an `http:` or `https:` address; anything else comes back as plain text.
+ */
+export type LinkAnswer = { href: string; text: string };
 
 /**
  * A repeating group's answer, ready to show: one list of rows per Entry, in the
@@ -11,7 +17,7 @@ export type EntryRow = { label: string; answer: string | string[] };
 export type GroupAnswer = { entries: EntryRow[][] };
 
 /** What the candidate view can show for one question; `null` means no answer. */
-export type FormattedAnswer = string | string[] | GroupAnswer | null;
+export type FormattedAnswer = string | string[] | LinkAnswer | GroupAnswer | null;
 
 /**
  * An answer as text for the candidate view, using the question the candidate
@@ -34,7 +40,7 @@ export function formatAnswer(field: FormField, value: AnswerValue | undefined): 
 }
 
 /** The text of a single-answer question; `null` when it has no answer. */
-function formatLeaf(field: LeafFormField, value: AnswerValue | undefined): string | string[] | null {
+function formatLeaf(field: LeafFormField, value: AnswerValue | undefined): string | string[] | LinkAnswer | null {
   if (value === undefined) {
     return null;
   }
@@ -44,6 +50,13 @@ function formatLeaf(field: LeafFormField, value: AnswerValue | undefined): strin
       return typeof value === 'string' ? value : null;
     case 'yes_no':
       return value === true ? 'Yes' : value === false ? 'No' : null;
+    case 'number':
+      // As entered: `String(0)` is "0", so a zero is an answer (isBlankAnswer only skips missing/blank/empty).
+      return typeof value === 'number' && Number.isFinite(value) ? String(value) : null;
+    case 'date':
+      return typeof value === 'string' ? formatIsoDate(value) : null;
+    case 'url':
+      return typeof value === 'string' ? formatUrl(value) : null;
     case 'single_select':
       return field.config.options.find((option) => option.id === value)?.label ?? 'Unknown option';
     case 'multi_select':
@@ -72,4 +85,35 @@ function formatGroup(children: readonly LeafFormField[], value: AnswerValue | un
     )
     .filter((rows) => rows.length > 0);
   return entries.length > 0 ? { entries } : null;
+}
+
+/**
+ * An ISO `YYYY-MM-DD` date as "February 5, 2026". A date has no time or timezone, so it goes through
+ * `Temporal.PlainDate`, never `new Date(iso)` (which reads it as UTC midnight and can show the
+ * previous day to viewers west of UTC). The format is fixed to `en-US` with `dateStyle: 'long'`,
+ * not the viewer's locale, so every viewer (and the server render) reads the same day and text,
+ * and the month name avoids the 02/05 day-month ambiguity. Text that isn't a date is shown as stored.
+ * Docs: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Temporal/PlainDate/toLocaleString
+ */
+function formatIsoDate(value: string): string {
+  try {
+    return Temporal.PlainDate.from(value, { overflow: 'reject' }).toLocaleString('en-US', { dateStyle: 'long' });
+  } catch {
+    return value;
+  }
+}
+
+/**
+ * A link only when the address parses and its scheme is `http:` or `https:` (the server already
+ * refuses others; this guards bad data, such as `javascript:`, reaching the sheet). Anything else
+ * is plain text, never an `href`.
+ * Docs: https://developer.mozilla.org/en-US/docs/Web/API/URL/protocol
+ */
+function formatUrl(value: string): string | LinkAnswer {
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'http:' || url.protocol === 'https:' ? { href: url.href, text: value.trim() } : value;
+  } catch {
+    return value;
+  }
 }
