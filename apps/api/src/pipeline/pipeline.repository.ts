@@ -3,8 +3,9 @@ import type { Answers, FilePurpose, FormFields } from '@repo/shared';
 import type { StageKind } from '../jobs/job.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
-  ApplicationCard,
   ApplicationDetail,
+  CardRow,
+  CardRowWithAnswers,
   ApplicationFile,
   ApplicationStatus,
   DownloadableFile,
@@ -32,6 +33,24 @@ function toApplicationFile(row: {
   };
 }
 
+function toCardRow(row: {
+  id: string;
+  stageId: string;
+  status: ApplicationStatus;
+  submittedAt: Date;
+  email: string;
+  candidate: { name: string };
+}): CardRow {
+  return {
+    id: row.id,
+    stageId: row.stageId,
+    status: row.status,
+    submittedAt: row.submittedAt,
+    // The email this application was sent with (the candidate row keeps the latest).
+    candidate: { name: row.candidate.name, email: row.email },
+  };
+}
+
 @Injectable()
 export class PipelineRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -48,21 +67,50 @@ export class PipelineRepository {
     return this.prisma.db.orm.public.Note;
   }
 
-  async findCards(jobId: string): Promise<ApplicationCard[]> {
+  /**
+   * A job's cards, newest first. Only the card's own columns are read (`select`), never `answers`:
+   * the board reads those through `findCardsWithAnswers`, and only when the Job has Highlighted
+   * questions.
+   */
+  async findCards(jobId: string): Promise<CardRow[]> {
     const rows = await this.applications
+      .select('id', 'stageId', 'status', 'submittedAt', 'email')
+      .where({ jobId })
+      .include('candidate')
+      .orderBy((application) => application.submittedAt.desc())
+      .all();
+
+    return rows.map(toCardRow);
+  }
+
+  /**
+   * A job's cards, newest first, with each Application's answers and the id of the form version
+   * they answer. The versions themselves are not joined (`include('formVersion')` would repeat a
+   * version's whole `fields` on every row); `findFormFields` reads each distinct one once.
+   */
+  async findCardsWithAnswers(jobId: string): Promise<CardRowWithAnswers[]> {
+    const rows = await this.applications
+      .select('id', 'stageId', 'status', 'submittedAt', 'email', 'formVersionId', 'answers')
       .where({ jobId })
       .include('candidate')
       .orderBy((application) => application.submittedAt.desc())
       .all();
 
     return rows.map((row) => ({
-      id: row.id,
-      stageId: row.stageId,
-      status: row.status,
-      submittedAt: row.submittedAt,
-      // The email this application was sent with (the candidate row keeps the latest).
-      candidate: { name: row.candidate.name, email: row.email },
+      ...toCardRow(row),
+      formVersionId: row.formVersionId,
+      answers: row.answers as Answers,
     }));
+  }
+
+  /** The `fields` of each of these form versions, by version id. Unknown ids are left out. */
+  async findFormFields(versionIds: readonly string[]): Promise<Map<string, FormFields>> {
+    if (versionIds.length === 0) return new Map();
+    const rows = await this.prisma.db.orm.public.FormVersion
+      .select('id', 'fields')
+      .where((version) => version.id.in(versionIds))
+      .all();
+    return new Map(rows.map((row) => [row.id, row.fields as FormFields]));
   }
 
   /** The application's current stage, or null if it isn't in this job. */
