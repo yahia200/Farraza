@@ -51,7 +51,7 @@ export function JobStatusActions({
   if (status === 'open') {
     return (
       <>
-        <Button variant="ghost" onClick={() => setConfirmClose(true)}>
+        <Button variant="destructive" onClick={() => setConfirmClose(true)}>
           Close job
         </Button>
         <AlertDialog open={confirmClose} onOpenChange={(open) => !pending && setConfirmClose(open)}>

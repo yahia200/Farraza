@@ -383,9 +383,9 @@ export function ApplyForm({
       <Card>
         {cardHeader()}
         <CardFooter>
-          <Button type="button" size="lg" onClick={() => setStarted(true)}>
+          <Button type="button" onClick={() => setStarted(true)}>
             Apply now
-            <ArrowRightIcon data-icon="inline-end" />
+            <ArrowRightIcon />
           </Button>
         </CardFooter>
       </Card>

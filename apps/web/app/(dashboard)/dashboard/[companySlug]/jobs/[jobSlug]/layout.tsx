@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowLeftIcon } from 'lucide-react';
 import { canManageJobs } from '@repo/shared';
+import { CopyJobLinkButton } from '@/components/dashboard/jobs/copy-job-link-button';
 import { JobPage } from '@/components/dashboard/jobs/job-page';
 import { JobStatusActions } from '@/components/dashboard/jobs/job-status-actions';
 import { JobStatusBadge } from '@/components/dashboard/jobs/job-status-badge';
@@ -32,7 +33,10 @@ export default function JobLayout({ children, params }: LayoutProps<'/dashboard/
                 <JobStatusBadge status={job.status} />
               </div>
             </div>
-            {canManageJobs(company.role) && <JobStatusActionsSlot companySlug={company.slug} job={job} />}
+            <div className="flex items-start gap-2">
+              <CopyJobLinkButton companySlug={company.slug} jobSlug={job.slug} status={job.status} variant="label" />
+              {canManageJobs(company.role) && <JobStatusActionsSlot companySlug={company.slug} job={job} />}
+            </div>
           </div>
         )}
       </JobPage>
