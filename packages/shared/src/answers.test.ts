@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findKnockout, parseAnswers, toPublicFields } from './answers.js';
+import { findKnockout, isBlankAnswer, isPlainObject, parseAnswers, toPublicFields } from './answers.js';
 import { parseFormFields, type FormFields } from './form-fields.js';
 
 const ONSITE = '3f1c9a52-6f0e-4b7a-9a43-1d2c8e5b7f10';
@@ -424,5 +424,46 @@ describe('findKnockout', () => {
 
   it('returns null when nothing triggers', () => {
     expect(findKnockout(fields, { [ONSITE]: true, [LEVEL]: SENIOR })).toBeNull();
+  });
+});
+
+describe('isBlankAnswer', () => {
+  it.each([
+    ['undefined', undefined],
+    ['null', null],
+    ['an empty string', ''],
+    ['spaces only', '   '],
+    ['an empty list', []],
+  ])('counts %s as blank', (_name, value) => {
+    expect(isBlankAnswer(value)).toBe(true);
+  });
+
+  it.each([
+    ['text', 'Cairo'],
+    ['text with spaces around it', ' Cairo '],
+    ['false (a "no" is an answer)', false],
+    ['true', true],
+    ['a list of choices', [JUNIOR]],
+    ['a list holding a blank Entry', [{}]],
+  ])('counts %s as an answer', (_name, value) => {
+    expect(isBlankAnswer(value)).toBe(false);
+  });
+});
+
+describe('isPlainObject', () => {
+  it('accepts an object such as an Entry', () => {
+    expect(isPlainObject({})).toBe(true);
+    expect(isPlainObject({ [ONSITE]: true })).toBe(true);
+  });
+
+  it.each([
+    ['null', null],
+    ['undefined', undefined],
+    ['a list', []],
+    ['a list of Entries', [{}]],
+    ['text', 'text'],
+    ['a boolean', false],
+  ])('refuses %s', (_name, value) => {
+    expect(isPlainObject(value)).toBe(false);
   });
 });

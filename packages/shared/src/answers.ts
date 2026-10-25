@@ -42,7 +42,12 @@ export type AnswersResult =
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function isEmpty(value: unknown): boolean {
+/**
+ * Whether an answer, as typed by an applicant, counts as no answer: missing, `null`, text with
+ * only spaces, or an empty list. `false` is an answer ("no"). The server and the apply page use
+ * this one rule, so they agree on what a blank question or card is.
+ */
+export function isBlankAnswer(value: unknown): boolean {
   return (
     value === undefined ||
     value === null ||
@@ -112,7 +117,8 @@ function checkValue(field: PublicFormField, value: unknown): Checked {
 
 type GroupField = Extract<PublicFormField, { type: 'repeating_group' }>;
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
+/** An Entry (or any object), as opposed to `null`, a list or a primitive. */
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
@@ -136,7 +142,7 @@ function checkEntries(field: GroupField, value: unknown): Checked {
     }
 
     const unknownKeys = Object.keys(raw).filter((key) => !childKeys.has(key));
-    if (unknownKeys.length === 0 && children.every((child) => isEmpty(raw[child.key]))) {
+    if (unknownKeys.length === 0 && children.every((child) => isBlankAnswer(raw[child.key]))) {
       return;
     }
 
@@ -170,7 +176,7 @@ function checkEntries(field: GroupField, value: unknown): Checked {
  * unless the question is required, anything else must pass `checkValue`.
  */
 function checkQuestion(field: PublicFormField, value: unknown): Checked {
-  const checked = isEmpty(value) ? ({ absent: true } as const) : checkValue(field, value);
+  const checked = isBlankAnswer(value) ? ({ absent: true } as const) : checkValue(field, value);
   return 'absent' in checked && field.required
     ? { error: 'This question needs an answer.' }
     : checked;
