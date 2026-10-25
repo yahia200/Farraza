@@ -11,7 +11,7 @@ import {
   QuestionnaireItem,
   QuestionnaireTitle,
 } from '@/components/ui/questionnaire';
-import { isLockedOption, type AnswerInput, type ApplyValues } from './apply-values';
+import { chosenOptions, isLockedOption, type AnswerInput, type ApplyValues } from './apply-values';
 
 /**
  * One job question as a questionnaire step (shadcn Questionnaire:
@@ -117,7 +117,7 @@ export function QuestionStep({
 
               {field.type === 'multi_select' &&
                 field.config.options.map((option) => {
-                  const selected = Array.isArray(value) ? value : [];
+                  const selected = chosenOptions(value);
                   return (
                     <QuestionnaireChoice
                       key={option.id}
