@@ -42,6 +42,16 @@ function text(presetKey: PresetKey, { label, maxLength, required = false, helpTe
   return { ...leafBase(presetKey, label, required, helpText), type: long ? 'long_text' : 'short_text', config: { maxLength } };
 }
 
+/** A whole-number sub-question (a year): optional unless said so. */
+function year(presetKey: PresetKey, label: string, min: number, max: number, helpText?: string): LeafFormField {
+  return { ...leafBase(presetKey, label, false, helpText), type: 'number', config: { min, max, integerOnly: true } };
+}
+
+/** A date sub-question with no limits: optional unless `required`. */
+function date(presetKey: PresetKey, label: string, required: boolean, helpText?: string): LeafFormField {
+  return { ...leafBase(presetKey, label, required, helpText), type: 'date', config: { min: null, max: null } };
+}
+
 const DEGREES = ['High school', 'Diploma', "Bachelor's", "Master's", 'Doctorate', 'Other'];
 
 const education: Preset = {
@@ -61,12 +71,8 @@ const education: Preset = {
           config: { options: DEGREES.map(newOption), rejectOptionIds: [] },
         },
         text('education.field_of_study', { label: 'Field of study', maxLength: 150 }),
-        text('education.start_year', { label: 'Start year', maxLength: 30 }),
-        text('education.end_year', {
-          label: 'End year',
-          maxLength: 30,
-          helpText: 'An expected year is fine if you have not finished yet.',
-        }),
+        year('education.start_year', 'Start year', 1950, 2100),
+        year('education.end_year', 'End year', 1950, 2100, 'An expected year is fine if you have not finished yet.'),
       ],
     },
   }),
@@ -84,8 +90,8 @@ const experience: Preset = {
       fields: [
         text('experience.job_title', { label: 'Job title', maxLength: 100, required: true }),
         text('experience.company', { label: 'Company', maxLength: 100, required: true }),
-        text('experience.start_date', { label: 'Start date', maxLength: 30, required: true, helpText: 'For example, Sep 2021.' }),
-        text('experience.end_date', { label: 'End date', maxLength: 30, helpText: 'Leave blank if you still work here.' }),
+        date('experience.start_date', 'Start date', true),
+        date('experience.end_date', 'End date', false, 'Leave blank if you still work here.'),
         text('experience.description', { label: 'What you did there', maxLength: 1500, long: true }),
       ],
     },
