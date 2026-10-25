@@ -82,6 +82,7 @@ Loaded when you work in `apps/web`. The shared facts, docs table, and commands a
   - Or, to avoid a flash, reset in a `useLayoutEffect` cleanup, which runs as the page is hidden (as in `AddCompanyWizard`).
 - **Keep element `id`s unique across the app.** Next.js 16 keeps recently visited routes mounted but hidden, so the same id on two pages, such as a dialog and a form, can break `<label for>`.
 - Dates shown in the UI are formatted on the server with `formatDate` (`lib/format.ts`).
+- **`Temporal` polyfill.** `@repo/shared` date checks (`dates.ts`) use the global `Temporal` and never import a polyfill; Node >= 26 has it natively, browsers may not. `apps/web/instrumentation-client.ts` imports `temporal-polyfill/global` (installs only when `Temporal` is missing, so native wins) and `temporal-polyfill/types/global` (global types; web is on TypeScript 5.9, which has no `esnext.temporal` lib, so drop the second import if web moves to TypeScript >= 6 with `lib: ["esnext"]`). Next runs that file on the client before hydration (`03-api-reference/03-file-conventions/instrumentation-client.md`, `03-architecture/supported-browsers.md` "Custom Polyfills"); the server needs nothing. Polyfill docs: `node_modules/temporal-polyfill/README.md`.
 - **Toasts:** shadcn's `toast` (Base UI Toast, no extra package). Call `toast.add({ type, title, description })` from client code; the `<Toaster />` is in the dashboard layout.
 - **Base UI gotchas:**
   - `DropdownMenuLabel` (`Menu.GroupLabel`) must sit inside a `DropdownMenuGroup`, or opening the menu crashes.
