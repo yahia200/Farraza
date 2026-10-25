@@ -9,20 +9,20 @@
 
 **Blocked by:** 01, 02.
 
-**Status:** needs-triage
+**Status:** resolved
 
-- [ ] With no Highlighted questions, `highlights` is `{}` on every card and answers are not read
-- [ ] With Highlighted questions, each card has only those keys, formatted as display text or `null`
-- [ ] An Application on an older form version shows its own applicant's option labels
-- [ ] An Application whose version lacks the Question gets `null`
-- [ ] A stored key the latest published form no longer has is absent from `highlightedQuestions` and from every card
-- [ ] `highlightedQuestions` is in form order with the latest labels
-- [ ] Long text is cut at 200 characters
-- [ ] Another company's job is 404; an interviewer can read the board
-- [ ] Service specs on the in-memory fake repository for every case above
-- [ ] The DAL and its types are updated; the existing table and board still render exactly as before
-- [ ] `.claude/rules/api.md` updated for the board payload
-- [ ] `pnpm lint` and `pnpm check-types` pass
+- [x] With no Highlighted questions, `highlights` is `{}` on every card and answers are not read
+- [x] With Highlighted questions, each card has only those keys, formatted as display text or `null`
+- [x] An Application on an older form version shows its own applicant's option labels
+- [x] An Application whose version lacks the Question gets `null`
+- [x] A stored key the latest published form no longer has is absent from `highlightedQuestions` and from every card
+- [x] `highlightedQuestions` is in form order with the latest labels
+- [x] Long text is cut at 200 characters
+- [x] Another company's job is 404; an interviewer can read the board
+- [x] Service specs on the in-memory fake repository for every case above
+- [x] The DAL and its types are updated; the existing table and board still render exactly as before
+- [x] `.claude/rules/api.md` updated for the board payload
+- [x] `pnpm lint` and `pnpm check-types` pass
 
 ## Comments
 
