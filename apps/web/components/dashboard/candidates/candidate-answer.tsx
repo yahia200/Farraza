@@ -2,7 +2,7 @@ import type { FormattedAnswer, GroupAnswer } from './format-answer';
 
 /**
  * One formatted answer for the sheet: "No answer" when there is none, a bulleted
- * list for several labels, plain text otherwise, and for a repeating group a
+ * list for several labels, a new-tab link for a URL, plain text otherwise, and for a repeating group a
  * block per Entry. Shared by a top-level question and (as rows) by each Entry.
  */
 export function CandidateAnswer({ answer }: { answer: FormattedAnswer }) {
@@ -10,6 +10,18 @@ export function CandidateAnswer({ answer }: { answer: FormattedAnswer }) {
     return <span className="italic">No answer</span>;
   }
   if (typeof answer === 'object' && !Array.isArray(answer)) {
+    if ('href' in answer) {
+      return (
+        <a
+          href={answer.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="break-all text-foreground underline underline-offset-4"
+        >
+          {answer.text}
+        </a>
+      );
+    }
     return <EntryBlocks answer={answer} />;
   }
   if (Array.isArray(answer)) {
