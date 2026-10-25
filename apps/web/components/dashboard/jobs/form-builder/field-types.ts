@@ -50,7 +50,8 @@ export const FILE_KIND_OPTIONS: Record<FileKind, { label: string; formats: strin
 const newOption = (label: string) => ({ id: crypto.randomUUID(), label });
 
 export function newField(type: BuilderFieldType): FormField {
-  const base = { key: crypto.randomUUID(), label: '', helpText: null, required: true };
+  // A hand-built question has no Preset key (ADR-0004: null when built by hand).
+  const base = { key: crypto.randomUUID(), presetKey: null, label: '', helpText: null, required: true };
   switch (type) {
     case 'short_text':
       return { ...base, type, config: { maxLength: 200 } };
