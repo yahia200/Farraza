@@ -27,4 +27,4 @@ Checked in the browser on a scratch database with both Presets on one form, with
 - The menu greys each Preset out independently (Education alone, then Work experience alone, then both). The two groups count as two toward `MAX_FIELDS`: 48 short-text questions added to them left the trigger enabled at 49 and disabled at 50.
 - The first shipped Preset with a long-text sub-question works inside the builder row (shows the type), the apply card (a textarea with "0 / 1,500 characters"; Enter adds a line and does not advance or submit) and the candidate sheet (line breaks and a blank line kept, the long answer wraps in the block).
 - Required Job title, Company and Start date are enforced per Entry on the apply page; a blank End date and a blank description are left out of the stored Entry, and a stray blank third card is dropped.
-- End date help text reads "Leave blank if you still work here." There is no "currently work here" question.
+- End date help text reads "Leave blank if this is your current job" There is no "currently work here" question.

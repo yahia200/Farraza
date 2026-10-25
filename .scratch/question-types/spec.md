@@ -63,9 +63,9 @@ None of the three has auto-reject rules. The Education Preset's start and end ye
 
 **Temporal**
 
-- Node 26 ships Temporal natively (checked: Node 26.12 has `Temporal.PlainDate`, and `{ overflow: 'reject' }` throws a `RangeError` for 2026-02-30; Node 25.5 has no `Temporal`). The repo's `engines` field and the Node version in `CLAUDE.md` move from `>=24` to `>=26`. No polyfill is added.
+- Node 26 ships Temporal natively (checked: Node 26.12 has `Temporal.PlainDate`, and `{ overflow: 'reject' }` throws a `RangeError` for 2026-02-30; Node 25.5 has no `Temporal`). The repo's `engines` field and the Node version in `CLAUDE.md` move from `>=24` to `>=26`. The server needs no polyfill. Owner decision (2026-10-25, ticket 01 "Owner decisions"): `apps/web` alone loads `temporal-polyfill` for browsers that lack `Temporal`; `@repo/shared` never imports one.
 - The installed TypeScript (6.0.3) has no Temporal lib in `node_modules/typescript/lib`, and the shared config's `lib` is `ES2022`/`ES2023`. Typing Temporal needs a decision during implementation (a types package, or a small local declaration of only what is used); record the choice and its docs reference in the ticket.
-- **Browser risk, to settle before the web tickets.** `@repo/shared` also runs in the browser (the apply page and builder run the same checks). Temporal is not available in every browser yet (as of this writing, Safari lacks it). Options: do the date checks in the browser without Temporal and keep Temporal on the server only; load a polyfill in the web app; or accept the browser support as is. This spec does not choose. Ticket 01 must verify current browser support from MDN and put the options to the owner before code.
+- **Browser risk (settled 2026-10-25: polyfill in the web app, see above).** `@repo/shared` also runs in the browser (the apply page and builder run the same checks). Temporal is not available in every browser yet (as of this writing, Safari lacks it). Options: do the date checks in the browser without Temporal and keep Temporal on the server only; load a polyfill in the web app; or accept the browser support as is. This spec does not choose. Ticket 01 must verify current browser support from MDN and put the options to the owner before code.
 
 **Web app**
 
