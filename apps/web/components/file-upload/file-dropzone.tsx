@@ -137,7 +137,7 @@ export function FileDropzone({
       />
       {children ?? (
         <>
-          <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-foreground transition-colors group-data-[dragging=true]/dropzone:bg-background">
+          <span className="flex size-10 items-center justify-center text-foreground transition-colors group-data-[dragging=true]/dropzone:bg-background">
             <UploadIcon className="size-5" aria-hidden="true" />
           </span>
           <span className="text-sm font-medium">
