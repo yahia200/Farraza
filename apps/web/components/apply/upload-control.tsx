@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { FileTextIcon, RotateCcwIcon, UploadIcon, XIcon } from 'lucide-react';
 import {
   contentTypeOf,
   declaredDuration,
@@ -10,15 +9,13 @@ import {
   type FieldError,
 } from '@repo/shared';
 import { createUpload } from '@/app/actions/applications';
-import { Button, buttonVariants } from '@/components/ui/button';
-import { Progress, ProgressValue } from '@/components/ui/progress';
-import { Spinner } from '@/components/ui/spinner';
+import { FileDropzone } from '@/components/file-upload/file-dropzone';
+import { FileUploadItem } from '@/components/file-upload/file-upload-item';
 import { QuestionnaireChoices, QuestionnaireInput } from '@/components/ui/questionnaire';
 import { compressImageForUpload } from '@/lib/compress-image';
 import { formatFileSize } from '@/lib/format';
 import { readMediaDuration } from '@/lib/media-duration';
 import { putFile } from '@/lib/put-file';
-import { cn } from '@/lib/utils';
 
 type Upload =
   /** A large image being shrunk in the browser before it is sent (ticket 08). */
@@ -33,10 +30,11 @@ type Upload =
 export type UploadTarget = { purpose: 'cv' } | { purpose: 'answer'; fieldKey: string };
 
 /**
- * The file picker shared by the CV step and every Attachment step: choosing a file checks it in
- * the browser first (`check`), then asks the Server Action for a presigned URL and PUTs the bytes
+ * The file picker shared by the CV step and every Attachment step: choosing or dropping a file
+ * (`FileDropzone`, one file) checks it in the browser first (`check`), then asks the Server Action for a presigned URL and PUTs the bytes
  * straight to the bucket with progress. Only the file's id goes into the form, through `onChange`;
- * the file itself stays in memory and is never saved locally.
+ * the file itself stays in memory and is never saved locally. The chosen file is shown as a
+ * `FileUploadItem` (a shadcn Attachment).
  *
  * The questionnaire's Input has no file type, so this is a custom control inside a regular
  * `QuestionnaireItem` (shadcn Questionnaire: https://ui.shadcn.com/docs/react/questionnaire). The
@@ -193,74 +191,55 @@ export function UploadControl({
     onBusyChange(false);
   }
 
+  const state =
+    shown?.status === 'compressing' ? 'processing' : shown?.status === 'failed' ? 'error' : shown?.status === 'sent' ? 'done' : 'uploading';
+
   return (
     <QuestionnaireChoices className="flex flex-col gap-3">
-      {/* A real file input, visually hidden and placed first, so it is the control that gets
-          keyboard focus (Enter or Space opens the chooser) and the label below shows a ring for it. */}
-      <input
-        id={inputId}
-        type="file"
+      {/* The zone's file input is what gets keyboard focus (Enter or Space opens the chooser);
+          dropping a file is an addition for pointers. Several files at once are refused. */}
+      <FileDropzone
         accept={accept}
-        className="peer sr-only"
         disabled={sending}
         aria-describedby={`${inputId}-status`}
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          // Clearing the value lets the same file be chosen again after removing it.
-          event.target.value = '';
-          if (file) void send(file);
+        title={shown ? 'Drop a different file here, or browse' : undefined}
+        onFiles={([file]) => void send(file)}
+        onReject={(message) => {
+          setUpload(null);
+          setRejection(message);
         }}
       />
-      <label
-        htmlFor={inputId}
-        className={cn(
-          buttonVariants({ variant: 'outline', size: 'lg' }),
-          'w-fit cursor-pointer peer-focus-visible:border-ring peer-focus-visible:ring-3 peer-focus-visible:ring-ring/30',
-          sending && 'pointer-events-none opacity-50',
-        )}
-      >
-        <UploadIcon data-icon="inline-start" />
-        {shown ? 'Choose a different file' : 'Choose a file'}
-      </label>
 
       <div id={`${inputId}-status`} aria-live="polite" className="flex flex-col gap-2">
         {measuring && <p className="text-sm text-muted-foreground">Checking the length of your file…</p>}
         {rejection && <p className="text-sm text-destructive">{rejection}</p>}
 
         {shown && (
-          <div className="flex flex-col gap-2 rounded-2xl border p-3">
-            <div className="flex items-center gap-2 text-sm">
-              <FileTextIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate font-medium">{shown.file.name}</span>
-              <span className="shrink-0 text-muted-foreground">{formatFileSize(shown.file.size)}</span>
-              {shown.status === 'failed' && (
-                <Button type="button" variant="outline" size="sm" onClick={() => void send(shown.file, { reduce: false, reducedFrom: shown.reducedFrom })}>
-                  <RotateCcwIcon data-icon="inline-start" />
-                  Try again
-                </Button>
-              )}
-              <Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove ${shown.file.name}`} onClick={remove}>
-                <XIcon />
-              </Button>
-            </div>
-
-            {shown.status === 'compressing' && (
-              <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Spinner aria-hidden="true" role="presentation" />
-                Reducing the image size…
-              </p>
-            )}
-            {shown.status === 'sending' && (
-              <Progress value={shown.percent} aria-label="Upload progress">
-                <ProgressValue />
-              </Progress>
-            )}
-            {shown.status !== 'compressing' && shown.reducedFrom !== undefined && (
-              <p className="text-sm text-muted-foreground">Reduced from {formatFileSize(shown.reducedFrom)}.</p>
-            )}
-            {shown.status === 'sent' && <p className="text-sm text-muted-foreground">Uploaded.</p>}
-            {shown.status === 'failed' && <p className="text-sm text-destructive">{shown.message}</p>}
-          </div>
+          <FileUploadItem
+            name={shown.file.name}
+            sizeBytes={shown.file.size}
+            state={state}
+            percent={shown.status === 'sending' ? shown.percent : undefined}
+            description={
+              shown.status === 'compressing'
+                ? 'Reducing the image size…'
+                : shown.status === 'failed'
+                  ? shown.message
+                  : [
+                      formatFileSize(shown.file.size),
+                      shown.reducedFrom !== undefined && `reduced from ${formatFileSize(shown.reducedFrom)}`,
+                      shown.status === 'sent' && 'uploaded',
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')
+            }
+            onRemove={remove}
+            onRetry={
+              shown.status === 'failed'
+                ? () => void send(shown.file, { reduce: false, reducedFrom: shown.reducedFrom })
+                : undefined
+            }
+          />
         )}
       </div>
 

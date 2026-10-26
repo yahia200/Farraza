@@ -20,6 +20,7 @@ export function DownloadFileButton({
   applicationId,
   fileId,
   fileName,
+  iconOnly = false,
 }: {
   companySlug: string;
   jobSlug: string;
@@ -27,6 +28,8 @@ export function DownloadFileButton({
   fileId: string;
   /** For the accessible name only; the saved name comes from the bucket's header. */
   fileName: string;
+  /** Just the icon, for inside a card (`FileCard`); the label is the accessible name. */
+  iconOnly?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
 
@@ -55,14 +58,18 @@ export function DownloadFileButton({
   return (
     <Button
       type="button"
-      variant="outline"
-      size="sm"
+      variant={iconOnly ? 'ghost' : 'outline'}
+      size={iconOnly ? 'icon-sm' : 'sm'}
       onClick={download}
       disabled={pending}
       aria-label={`Download ${fileName}`}
     >
-      {pending ? <Spinner data-icon="inline-start" /> : <DownloadIcon data-icon="inline-start" />}
-      Download
+      {pending ? (
+        <Spinner data-icon={iconOnly ? undefined : 'inline-start'} />
+      ) : (
+        <DownloadIcon data-icon={iconOnly ? undefined : 'inline-start'} />
+      )}
+      {!iconOnly && 'Download'}
     </Button>
   );
 }

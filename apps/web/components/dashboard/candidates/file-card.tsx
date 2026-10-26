@@ -1,20 +1,28 @@
 'use client';
 
-import { EyeIcon } from 'lucide-react';
+import { FileTextIcon } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import type { PreviewKind } from '@repo/shared';
-import { buttonVariants } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import {
+  Attachment,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentMedia,
+  AttachmentTrigger,
+} from '@/components/ui/attachment';
 import { usePdfPreviewSupported } from '@/hooks/use-pdf-preview-supported';
 import { DownloadFileButton } from './download-file-button';
 import { filePreviewHref } from './file-preview-href';
 import type { ViewerFile } from './file-viewers';
 
 /**
- * One file's card: the row the server renders (`children`: icon, name, details), a Download button
- * that is always there, and, for a file the browser can show, a Preview link that opens the file's
- * own page (app/(viewer)/…) in a new tab.
+ * One file's card, a shadcn Attachment (https://ui.shadcn.com/docs/components/base/attachment):
+ * the text the server renders (`children`: an `AttachmentTitle` and `AttachmentDescription`) beside
+ * a file icon, and a Download icon button that is always there. For a file the browser can show,
+ * the whole card is a link (`AttachmentTrigger` rendered as a `Link`) that opens the file's own
+ * page (app/(viewer)/…) in a new tab; the Download button sits above it (`AttachmentActions` is
+ * `z-20`, the trigger `z-10`), so it never opens the preview.
  *
  * Nothing is fetched here: the preview page mints the view link and loads the bytes when it opens, so
  * the sheet stays light however many files an application has. To teach it a new kind, see
@@ -36,34 +44,35 @@ export function FileCard({
     kind === 'docx' || kind === 'image' || kind === 'video' || kind === 'audio' || (kind === 'pdf' && pdfSupported);
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border p-3">
-      {/* The buttons drop under the name when the sheet is narrow, instead of squeezing it. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <div className="flex min-w-0 flex-1 basis-44 items-center gap-3">{children}</div>
-        <div className="ml-auto flex items-center gap-2 text-primary">
-          {canPreview && (
-            // A real link, so "open in new tab" and middle-click work. `target="_blank"` already
-            // implies `rel="noopener"` in current browsers; the explicit rel keeps older ones safe.
+    <Attachment className="w-full">
+      <AttachmentMedia>
+        <FileTextIcon aria-hidden="true" />
+      </AttachmentMedia>
+      <AttachmentContent>{children}</AttachmentContent>
+      <AttachmentActions>
+        <DownloadFileButton
+          iconOnly
+          companySlug={file.companySlug}
+          jobSlug={file.jobSlug}
+          applicationId={file.applicationId}
+          fileId={file.fileId}
+          fileName={file.fileName}
+        />
+      </AttachmentActions>
+      {canPreview && (
+        // A real link, so "open in new tab" and middle-click work. `target="_blank"` already
+        // implies `rel="noopener"` in current browsers; the explicit rel keeps older ones safe.
+        <AttachmentTrigger
+          render={
             <Link
               href={filePreviewHref(file)}
               target="_blank"
               rel="noopener"
-              className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
               aria-label={`Preview ${file.fileName} (opens in a new tab)`}
-            >
-              <EyeIcon data-icon="inline-start" />
-              Preview
-            </Link>
-          )}
-          <DownloadFileButton
-            companySlug={file.companySlug}
-            jobSlug={file.jobSlug}
-            applicationId={file.applicationId}
-            fileId={file.fileId}
-            fileName={file.fileName}
-          />
-        </div>
-      </div>
-    </div>
+            />
+          }
+        />
+      )}
+    </Attachment>
   );
 }
