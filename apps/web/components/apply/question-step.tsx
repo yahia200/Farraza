@@ -11,7 +11,9 @@ import {
   QuestionnaireItem,
   QuestionnaireTitle,
 } from '@/components/ui/questionnaire';
-import { isLockedOption, type AnswerInput, type ApplyValues } from './apply-values';
+import { limitHint } from './limit-hint';
+import { isTextBox, isTypedField, typedInputProps } from './typed-input';
+import { chosenOptions, isLockedOption, type AnswerInput, type ApplyValues } from './apply-values';
 
 /**
  * One job question as a questionnaire step (shadcn Questionnaire:
@@ -40,6 +42,7 @@ export function QuestionStep({
       render={({ field: input, fieldState }) => {
         const value: AnswerInput = input.value;
         const answer = (next: AnswerInput) => onAnswer(path, next);
+        const hint = isTypedField(field) ? limitHint(field) : null;
 
         return (
           <QuestionnaireItem
@@ -56,7 +59,22 @@ export function QuestionStep({
               </QuestionnaireDescription>
             )}
 
+            {hint && <QuestionnaireDescription>{hint}</QuestionnaireDescription>}
+
             <QuestionnaireChoices>
+              {/* Number, Date and URL keep the box's text in the form (apply-values.ts turns a
+                  number's text into a JSON number). The native number and date inputs only yield
+                  a valid value or '', and `min`/`max` limit the date picker where the browser allows. */}
+              {isTypedField(field) && (
+                <QuestionnaireInput
+                  ref={input.ref}
+                  {...typedInputProps(field)}
+                  aria-label={label}
+                  value={typeof value === 'string' ? value : ''}
+                  onChange={(event) => answer(event.target.value)}
+                />
+              )}
+
               {field.type === 'short_text' && (
                 <QuestionnaireInput
                   ref={input.ref}
@@ -117,7 +135,7 @@ export function QuestionStep({
 
               {field.type === 'multi_select' &&
                 field.config.options.map((option) => {
-                  const selected = Array.isArray(value) ? value : [];
+                  const selected = chosenOptions(value);
                   return (
                     <QuestionnaireChoice
                       key={option.id}
@@ -144,7 +162,7 @@ export function QuestionStep({
                 default ("Choose an answer to continue."), which suits choices. */}
             <QuestionnaireError>
               {fieldState.error?.message ??
-                (field.type === 'short_text' || field.type === 'long_text' ? 'This question needs an answer.' : undefined)}
+                (isTextBox(field) ? 'This question needs an answer.' : undefined)}
             </QuestionnaireError>
           </QuestionnaireItem>
         );

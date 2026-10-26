@@ -54,6 +54,7 @@ import {
 } from "./apply-values";
 import { AttachmentStep } from "./attachment-step";
 import { CvStep } from "./cv-step";
+import { GroupStep } from "./group-step";
 import { QuestionStep } from "./question-step";
 import type { PublicJob } from "@/lib/public-jobs";
 import { initials } from "@/components/dashboard/initials";
@@ -242,6 +243,19 @@ export function ApplyForm({
     }
   }
 
+  /**
+   * The step an error path belongs to: the path itself, except inside a repeating group, whose
+   * errors are `<group key>.<card>.<question key>` and belong to the group's one step.
+   */
+  function stepOf(path: string) {
+    const head = path.split(".")[0]!;
+    return fields.some(
+      (field) => field.key === head && field.type === "repeating_group",
+    )
+      ? head
+      : path;
+  }
+
   /** Opens the first step that has an error (handleSubmit's onInvalid). */
   function showFirstError(errors: FieldErrors<ApplyValues>) {
     const first = order.find((step) => hasError(errors, step));
@@ -253,21 +267,26 @@ export function ApplyForm({
   /** Puts the server's errors on their steps; anything else is shown by the buttons. */
   function applyServerErrors(errors: FieldError[]) {
     for (const { path, message } of errors) {
+      const step = stepOf(path);
       if (path === CV_STEP) {
         // The API refused this file id, so the upload no longer counts: the step asks for it again.
         form.setValue("cvFileId", null);
       } else if (fields.some((field) => field.key === path && field.type === "file")) {
         form.setValue(`answers.${path}`, null);
       }
-      if (order.includes(path)) {
-        form.setError(pathFor(path), { type: "server", message });
+      if (order.includes(step)) {
+        // A group's path goes on past the step (`<group>.<card>.<question>`), down to the input.
+        form.setError(`${pathFor(step)}${path.slice(step.length)}` as Path<ApplyValues>, {
+          type: "server",
+          message,
+        });
       } else {
         // For example a question that was removed while they were filling the form in.
         setFormError(message);
       }
     }
     const first = order.find((step) =>
-      errors.some((error) => error.path === step),
+      errors.some((error) => stepOf(error.path) === step),
     );
     if (first) {
       setItem(first);
@@ -283,7 +302,7 @@ export function ApplyForm({
           email: values.email,
           phone: values.phone,
           cvFileId: cvMode === "off" ? undefined : (values.cvFileId ?? undefined),
-          answers: compactAnswers(values.answers),
+          answers: compactAnswers(values.answers, fields),
           website: values.website,
           source,
         });
@@ -364,9 +383,9 @@ export function ApplyForm({
       <Card>
         {cardHeader()}
         <CardFooter>
-          <Button type="button" size="lg" onClick={() => setStarted(true)}>
+          <Button type="button" onClick={() => setStarted(true)}>
             Apply now
-            <ArrowRightIcon data-icon="inline-end" />
+            <ArrowRightIcon />
           </Button>
         </CardFooter>
       </Card>
@@ -453,6 +472,13 @@ export function ApplyForm({
                 jobSlug={jobSlug}
                 onAnswer={answer}
                 onBusyChange={(busy) => setStepUploading(field.key, busy)}
+              />
+            ) : field.type === "repeating_group" ? (
+              <GroupStep
+                key={field.key}
+                form={form}
+                field={field}
+                onAnswer={answer}
               />
             ) : (
               <QuestionStep

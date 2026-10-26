@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getApplication, getApplicationFiles } from '@/lib/dal';
 import { formatDate } from '@/lib/format';
 import { toActivityItems } from './activity-items';
+import { CandidateAnswer } from './candidate-answer';
 import { CandidateActivity } from './candidate-activity';
 import { CandidateFile } from './candidate-file';
 import { CandidateMove } from './candidate-move';
@@ -166,16 +167,8 @@ export async function CandidateDetail({
                             {files === null ? "Couldn't load the files." : 'This file is no longer available.'}
                           </span>
                         )
-                      ) : answer === null ? (
-                        <span className="italic">No answer</span>
-                      ) : Array.isArray(answer) ? (
-                        <ul className="list-inside list-disc">
-                          {answer.map((label, index) => (
-                            <li key={index}>{label}</li>
-                          ))}
-                        </ul>
                       ) : (
-                        <p className="whitespace-pre-line text-foreground">{answer}</p>
+                        <CandidateAnswer answer={answer} />
                       )}
                     </dd>
                   </div>

@@ -15,6 +15,19 @@ export function formatDate(iso: string): string {
   return dateFormat.format(new Date(iso));
 }
 
+/**
+ * An ISO `YYYY-MM-DD` date as "February 5, 2026": fixed `en-US` and `Temporal.PlainDate` (no `new Date(iso)`,
+ * which shifts the day west of UTC), so server and browser match; other text is returned as stored.
+ * Docs: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Temporal/PlainDate/toLocaleString
+ */
+export function formatIsoDate(value: string): string {
+  try {
+    return Temporal.PlainDate.from(value, { overflow: 'reject' }).toLocaleString('en-US', { dateStyle: 'long' });
+  } catch {
+    return value;
+  }
+}
+
 const dateTimeFormat = new Intl.DateTimeFormat('en-GB', {
   day: 'numeric',
   month: 'short',

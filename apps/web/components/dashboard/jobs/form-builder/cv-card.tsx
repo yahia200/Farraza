@@ -1,15 +1,23 @@
-'use client';
+"use client";
 
-import { Controller, type Control } from 'react-hook-form';
-import { FileTextIcon } from 'lucide-react';
-import type { CvMode } from '@repo/shared';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import type { BuilderValues } from './question-card';
+import { Controller, type Control } from "react-hook-form";
+import { FileTextIcon } from "lucide-react";
+import type { CvMode } from "@repo/shared";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import type { BuilderValues } from "./question-card";
 
 const CV_OPTIONS: readonly { value: CvMode; label: string; hint: string }[] = [
-  { value: 'off', label: 'Off', hint: "Applicants aren't asked for a CV." },
-  { value: 'optional', label: 'Optional', hint: 'Applicants can add a CV, or skip it.' },
-  { value: 'required', label: 'Required', hint: 'Applicants must add a CV to apply.' },
+  { value: "off", label: "Off", hint: "Applicants aren't asked for a CV." },
+  {
+    value: "optional",
+    label: "Optional",
+    hint: "Applicants can add a CV, or skip it.",
+  },
+  {
+    value: "required",
+    label: "Required",
+    hint: "Applicants must add a CV to apply.",
+  },
 ];
 
 /**
@@ -39,18 +47,34 @@ export function CvCard({
       name="cvMode"
       control={control}
       render={({ field }) => {
-        const current = CV_OPTIONS.find((option) => option.value === field.value);
+        const current = CV_OPTIONS.find(
+          (option) => option.value === field.value,
+        );
         return (
-          <section aria-labelledby="cv-card-title" className="rounded-2xl border bg-card p-4">
+          <section
+            aria-labelledby="cv-card-title"
+            className="rounded-2xl border bg-card p-4"
+          >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex min-w-0 flex-col gap-1">
-                <h2 id="cv-card-title" className="flex items-center gap-2 text-sm font-medium">
-                  <FileTextIcon className="size-4 text-muted-foreground" aria-hidden />
+                <h2
+                  id="cv-card-title"
+                  className="flex items-center gap-2 text-sm font-medium"
+                >
+                  <FileTextIcon
+                    className="size-4 text-muted-foreground"
+                    aria-hidden
+                  />
                   CV
                 </h2>
-                <p className="text-sm text-muted-foreground">
-                  The first step of the application. CVs must be PDF or DOCX files up to 5&nbsp;MB.
-                </p>
+                {current && (
+                  <p
+                    className="text-sm text-muted-foreground"
+                    aria-live="polite"
+                  >
+                    {current.hint}
+                  </p>
+                )}
               </div>
               <ToggleGroup
                 aria-labelledby="cv-card-title"
@@ -66,17 +90,12 @@ export function CvCard({
                 }}
               >
                 {CV_OPTIONS.map((option) => (
-                  <ToggleGroupItem key={option.value} value={option.value}>
+                  <ToggleGroupItem key={option.value} value={option.value} className="px-6">
                     {option.label}
                   </ToggleGroupItem>
                 ))}
               </ToggleGroup>
             </div>
-            {current && (
-              <p className="mt-3 text-sm" aria-live="polite">
-                {current.hint}
-              </p>
-            )}
           </section>
         );
       }}

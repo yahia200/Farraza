@@ -36,6 +36,28 @@ _Avoid_: Resume
 A file an applicant uploads to answer a file question on the form. It belongs to that question and is distinct from the CV.
 _Avoid_: Upload, document
 
+## Forms
+
+**Question**:
+One prompt on a Job's application form that an applicant answers, such as a short text, a choice, or a file upload. A form is an ordered list of Questions.
+_Avoid_: Field (the code's word for it), input
+
+**Repeating group**:
+A Question whose answer is a list of Entries, so an applicant can describe as many jobs or degrees as they have. Its own sub-questions are the same for every Entry.
+_Avoid_: Section, repeater, list question
+
+**Entry**:
+One filled-in set of a Repeating group's sub-questions, such as a single past job.
+_Avoid_: Row, item, record
+
+**Preset**:
+A built-in, ready-made Question or Repeating group (such as Education or Experience) that a recruiter inserts into a form instead of building it. Inserting copies it into the form; the form keeps no link back to the Preset's current definition.
+_Avoid_: Template, snippet
+
+**Preset key**:
+A stable name a Question carries when it came from a Preset, saying what it asks for (such as a school, or a notice period). It survives relabelling, so features like CV autofill can recognise the Question; a Question built by hand has none.
+_Avoid_: Tag, semantic role (role means a Member's permission level)
+
 ## Pipeline
 
 **Pipeline**:
@@ -55,7 +77,7 @@ A free-text comment a Member leaves on an Application. Append-only — notes are
 _Avoid_: Comment, remark
 
 **Application Event**:
-An entry in an Application's append-only history: applied, auto-rejected, moved, hired, rejected, or note added. Together these form the audit trail of everything that has happened to an Application.
+A record in an Application's append-only history: applied, auto-rejected, moved, hired, rejected, or note added. Together these form the audit trail of everything that has happened to an Application.
 _Avoid_: Log, activity, audit record
 
 **Auto-reject rule**:

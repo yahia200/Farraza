@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { createColumnHelper } from '@tanstack/react-table';
 import { DataTableSortButton } from '@/components/data-table/data-table';
 import type { JobRow, JobsTableFeatures } from './data-table-features';
+import { CopyJobLinkButton } from './copy-job-link-button';
 import { JobStatusBadge } from './job-status-badge';
 
 const columnHelper = createColumnHelper<JobsTableFeatures, JobRow>();
@@ -35,5 +36,18 @@ export const jobColumns = columnHelper.columns([
     sortFn: 'text',
     cell: ({ row }) => <span className="text-muted-foreground">{row.original.createdLabel}</span>,
     meta: { className: 'w-px whitespace-nowrap' },
+  }),
+  columnHelper.display({
+    id: 'link',
+    header: () => <span className="sr-only">Copy link</span>,
+    cell: ({ row, table }) => (
+      <CopyJobLinkButton
+        companySlug={table.options.meta?.companySlug ?? ''}
+        jobSlug={row.original.slug}
+        status={row.original.status}
+        variant="icon"
+      />
+    ),
+    meta: { className: 'w-px' },
   }),
 ]);

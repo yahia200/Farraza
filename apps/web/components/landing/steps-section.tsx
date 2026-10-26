@@ -16,12 +16,12 @@ type Step = {
 const steps: Step[] = [
   {
     title: 'Post a job',
-    text: "Create a job, keep it as a draft while you write it, then open it to applicants. Close it once you've hired.",
+    text: "Create a job, then open it to applicants. Close it once you've hired.",
     image: {
       src: '/landing/jobs-list.webp',
       alt: 'Jobs list with open, draft and closed jobs and a New job button',
     },
-    colorClassName: 'bg-primary-200 text-card-foreground',
+    colorClassName: 'bg-primary-200 text-card-foreground dark:text-brand-accent-foreground',
   },
   {
     title: 'Build the form',

@@ -1,12 +1,16 @@
 import { toNestErrors } from '@hookform/resolvers';
 import type { FieldError as FormFieldError, FieldErrors, Resolver } from 'react-hook-form';
 import {
+  isBlankAnswer,
+  isPlainObject,
   parseAnswers,
   submitApplicationSchema,
   type Answers,
   type CvMode,
+  type Entry,
   type PublicFormField,
 } from '@repo/shared';
+import { isTextBox } from './typed-input';
 
 /**
  * The apply form's values and validation. Answers are checked with
@@ -14,8 +18,22 @@ import {
  * so the browser and the server agree on every rule and message.
  */
 
-/** An answer while the form is being filled in: `null` / '' / [] mean "not answered yet". */
-export type AnswerInput = string | string[] | boolean | null;
+/**
+ * A single-question answer while the form is being filled in: `null` / '' / [] mean "not answered yet".
+ * A Number, Date or URL question holds the box's text (a native number input gives text such as
+ * "0" or "2.5"; a date input gives `YYYY-MM-DD` or ''); `compactAnswers` turns a number's text into
+ * the JSON number the API expects.
+ */
+export type LeafInput = string | string[] | boolean | null;
+
+/**
+ * One card of a repeating group while it is filled in, keyed by sub-question key (the same shape
+ * as an Entry in `Answers`, with the blanks still in).
+ */
+export type EntryInput = Record<string, LeafInput>;
+
+/** An answer while the form is being filled in. A repeating group's answer is its cards, in order. */
+export type AnswerInput = LeafInput | EntryInput[];
 
 export interface ApplyValues {
   name: string;
@@ -29,33 +47,107 @@ export interface ApplyValues {
   answers: Record<string, AnswerInput>;
 }
 
+export type GroupField = Extract<PublicFormField, { type: 'repeating_group' }>;
+
+/** What a single question holds before the applicant touches it. */
+function blankLeaf(field: Exclude<PublicFormField, GroupField>): LeafInput {
+  if (field.type === 'multi_select') return [];
+  return isTextBox(field) ? '' : null;
+}
+
+/** A new card with every sub-question blank. */
+export function emptyEntry(group: GroupField): EntryInput {
+  return Object.fromEntries(group.config.fields.map((child) => [child.key, blankLeaf(child)]));
+}
+
 export function emptyValues(fields: readonly PublicFormField[]): ApplyValues {
   const answers: Record<string, AnswerInput> = {};
   for (const field of fields) {
+    // A required group starts with one empty card; an optional one starts with none.
     answers[field.key] =
-      field.type === 'multi_select' ? [] : field.type === 'short_text' || field.type === 'long_text' ? '' : null;
+      field.type === 'repeating_group' ? (field.required ? [emptyEntry(field)] : []) : blankLeaf(field);
   }
   return { name: '', email: '', phone: '', website: '', cvFileId: null, answers };
 }
 
-/** Leaves out unanswered questions, as the API expects (an optional question is simply absent). */
-export function compactAnswers(answers: Record<string, AnswerInput>): Answers {
+/**
+ * A group's answer holds cards (objects); a multiple-choice answer holds option ids (strings).
+ * An empty list can't be told apart and doesn't need to be: it is a blank answer either way, so
+ * it is not "cards" here and `compactAnswers` leaves it out as blank.
+ */
+function isEntries(value: AnswerInput): value is EntryInput[] {
+  return Array.isArray(value) && value.length > 0 && value.some(isPlainObject);
+}
+
+/** A group's cards, from its value in the form. */
+export function entriesOf(value: AnswerInput | undefined): EntryInput[] {
+  return Array.isArray(value) ? value.filter((item): item is EntryInput => isPlainObject(item)) : [];
+}
+
+/**
+ * A Number question's text as the JSON number the API expects; `0` stays an answer. Text that is
+ * not a number is left as it is, so `parseAnswers` words the error. Other types pass through.
+ */
+function toAnswerValue(field: PublicFormField | undefined, value: LeafInput): LeafInput | number {
+  if (field?.type === 'number' && typeof value === 'string' && value.trim() !== '') {
+    const number = Number(value);
+    return Number.isNaN(number) ? value : number;
+  }
+  return value;
+}
+
+/** An Entry's answers without its blanks, as the API expects (`false` and `0` are answers and stay). */
+function compactEntry(entry: EntryInput, group: GroupField): Entry {
+  const children = new Map<string, PublicFormField>(group.config.fields.map((child) => [child.key, child]));
+  return Object.fromEntries(
+    Object.entries(entry)
+      .filter(([, value]) => !isBlankAnswer(value))
+      .map(([key, value]) => [key, toAnswerValue(children.get(key), value)]),
+  ) as Entry;
+}
+
+/** The option ids of a multiple-choice answer (a group's cards are the other kind of array). */
+export function chosenOptions(value: AnswerInput | undefined): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+/** Whether a card has something in it. Spaces alone don't count, as in `parseAnswers`. */
+export function entryHasAnswer(entry: EntryInput): boolean {
+  return Object.values(entry).some((value) => !isBlankAnswer(value));
+}
+
+/**
+ * Leaves out unanswered questions, as the API expects (an optional question is simply absent).
+ * A group keeps all its cards, blank ones as `{}`, in their order, so an error index from
+ * `parseAnswers` (the position in this list) is the card's position on the page. A group with
+ * nothing in any card is left out.
+ */
+export function compactAnswers(answers: Record<string, AnswerInput>, fields: readonly PublicFormField[]): Answers {
   const compact: Answers = {};
+  const byKey = new Map(fields.map((field) => [field.key, field]));
   for (const [key, value] of Object.entries(answers)) {
-    if (value === null || value === '' || (Array.isArray(value) && value.length === 0)) {
-      continue;
+    const field = byKey.get(key);
+    if (isEntries(value)) {
+      if (value.some(entryHasAnswer) && field?.type === 'repeating_group') {
+        compact[key] = value.map((entry) => compactEntry(entry, field));
+      }
+    } else if (!isBlankAnswer(value)) {
+      compact[key] = toAnswerValue(field, value as LeafInput) as string | number | string[] | boolean;
     }
-    compact[key] = value;
   }
   return compact;
 }
 
-/** At a multiple-choice question's limit, the options not chosen yet can't be added. */
+/**
+ * At a multiple-choice question's limit, the options not chosen yet can't be added. Pass the
+ * question's own answer: for a sub-question, the card's, so each card counts on its own.
+ */
 export function isLockedOption(field: PublicFormField, answer: AnswerInput | undefined, optionId: string): boolean {
   if (field.type !== 'multi_select' || field.config.maxSelections === null || !Array.isArray(answer)) {
     return false;
   }
-  return !answer.includes(optionId) && answer.length >= field.config.maxSelections;
+  const chosen = chosenOptions(answer);
+  return !chosen.includes(optionId) && chosen.length >= field.config.maxSelections;
 }
 
 const contactSchema =submitApplicationSchema.pick({ name: true, email: true, phone: true });
@@ -83,7 +175,7 @@ export function applyResolver(fields: readonly PublicFormField[], cvMode: CvMode
       }
     }
 
-    const answers = parseAnswers(fields, compactAnswers(values.answers));
+    const answers = parseAnswers(fields, compactAnswers(values.answers, fields));
     if (!answers.ok) {
       for (const { path, message } of answers.errors) {
         errors[`answers.${path}`] ??= { type: 'validation', message };

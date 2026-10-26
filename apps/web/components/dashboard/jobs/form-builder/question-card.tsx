@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Controller, useWatch, type Path, type UseFormReturn } from 'react-hook-form';
+import { Controller, useWatch, type UseFormReturn } from 'react-hook-form';
 import { ArrowDownIcon, ArrowUpIcon, ChevronRightIcon, Trash2Icon } from 'lucide-react';
 import type { CvMode, FormField, FormFields } from '@repo/shared';
 import { Badge } from '@/components/ui/badge';
@@ -10,21 +10,16 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { errorAt, FIELD_TYPES } from './field-types';
+import { at, errorAt, FIELD_TYPES } from './field-types';
 import { FileConfigEditor } from './file-config-editor';
+import { GroupEditor } from './group-editor';
+import { DateConfigEditor, NumberConfigEditor } from './limits-config-editor';
 import { OptionsEditor } from './options-editor';
+import { COLLAPSIBLE_PANEL_CLASS, QuestionBasics } from './question-basics';
 
 export type BuilderValues = { fields: FormFields; cvMode: CvMode };
 type Form = UseFormReturn<BuilderValues>;
-
-/**
- * RHF paths to type-specific settings. Cast once here: the question types are a
- * union, and a path like `config.maxLength` exists only on some of them.
- * Fields every type has (label, helpText, required) use plain template literals.
- */
-const at = (index: number, rest: string) => `fields.${index}.${rest}` as Path<BuilderValues>;
 
 const REJECT_WHEN_ITEMS = [
   { value: 'none', label: 'No auto-reject' },
@@ -78,6 +73,7 @@ export function QuestionCard({
   const autoRejects =
     (field.type === 'single_select' && field.config.rejectOptionIds.length > 0) ||
     (field.type === 'yes_no' && field.config.rejectWhen !== null);
+  const path = `fields.${index}`;
   const idPrefix = `question-${field.key}`;
   const editable = !readOnly && !disabled;
 
@@ -98,6 +94,11 @@ export function QuestionCard({
           <span className="sr-only">({FIELD_TYPES[field.type].label})</span>
           {field.required && <Badge variant="secondary">Required</Badge>}
           {autoRejects && <Badge variant="outline">Auto-reject</Badge>}
+          {field.type === 'repeating_group' && Number.isFinite(field.config.maxEntries) && (
+            <Badge variant="outline" className="hidden sm:inline-flex">
+              Up to {field.config.maxEntries} entries
+            </Badge>
+          )}
         </CollapsibleTrigger>
         {editable && (
           <div className="flex shrink-0 items-center">
@@ -114,70 +115,15 @@ export function QuestionCard({
         )}
       </div>
 
-      {/* Height animation from Base UI's Collapsible docs: the panel animates between 0 and
-          --collapsible-panel-height, so its padding and border live on the inner div. */}
-      <CollapsibleContent className="h-(--collapsible-panel-height) overflow-hidden transition-[height] duration-200 ease-out data-starting-style:h-0 data-ending-style:h-0 motion-reduce:transition-none">
+      {/* Height animation: see COLLAPSIBLE_PANEL_CLASS. */}
+      <CollapsibleContent className={COLLAPSIBLE_PANEL_CLASS}>
         <div className="border-t p-4">
           <FieldGroup>
-            <Controller
-              name={`fields.${index}.label`}
-              control={form.control}
-              render={({ field: input, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={`${idPrefix}-label`}>Question</FieldLabel>
-                  <Input
-                    {...input}
-                    id={`${idPrefix}-label`}
-                    readOnly={readOnly}
-                    disabled={disabled}
-                    aria-invalid={fieldState.invalid}
-                  />
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                </Field>
-              )}
-            />
-            <Controller
-              name={`fields.${index}.helpText`}
-              control={form.control}
-              render={({ field: input, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={`${idPrefix}-help`}>Help text</FieldLabel>
-                  <Input
-                    id={`${idPrefix}-help`}
-                    readOnly={readOnly}
-                    disabled={disabled}
-                    value={input.value ?? ''}
-                    // Empty means no help text: the schema stores null.
-                    onChange={(event) => input.onChange(event.target.value === '' ? null : event.target.value)}
-                    onBlur={input.onBlur}
-                    aria-describedby={`${idPrefix}-help-description`}
-                    aria-invalid={fieldState.invalid}
-                  />
-                  <FieldDescription id={`${idPrefix}-help-description`}>Optional. Shown under the question.</FieldDescription>
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                </Field>
-              )}
-            />
-            <Controller
-              name={`fields.${index}.required`}
-              control={form.control}
-              render={({ field: input }) => (
-                <Field orientation="horizontal">
-                  <Switch
-                    id={`${idPrefix}-required`}
-                    checked={input.value}
-                    onCheckedChange={input.onChange}
-                    readOnly={readOnly}
-                    disabled={disabled}
-                  />
-                  <FieldLabel htmlFor={`${idPrefix}-required`}>Required</FieldLabel>
-                </Field>
-              )}
-            />
+            <QuestionBasics form={form} path={path} idPrefix={idPrefix} readOnly={readOnly} disabled={disabled} />
 
             {(field.type === 'short_text' || field.type === 'long_text') && (
               <Controller
-                name={at(index, 'config.maxLength')}
+                name={at(path, 'config.maxLength')}
                 control={form.control}
                 render={({ field: input, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
@@ -203,7 +149,7 @@ export function QuestionCard({
 
             {(field.type === 'single_select' || field.type === 'multi_select') && (
               <Controller
-                name={at(index, 'config.options')}
+                name={at(path, 'config.options')}
                 control={form.control}
                 render={({ field: input }) => (
                   <OptionsEditor
@@ -214,7 +160,7 @@ export function QuestionCard({
                     onRejectChange={
                       field.type === 'single_select'
                         ? (ids) =>
-                            form.setValue(at(index, 'config.rejectOptionIds'), ids, {
+                            form.setValue(at(path, 'config.rejectOptionIds'), ids, {
                               shouldDirty: true,
                               shouldValidate: form.formState.isSubmitted,
                             })
@@ -235,7 +181,7 @@ export function QuestionCard({
 
             {field.type === 'multi_select' && (
               <Controller
-                name={at(index, 'config.maxSelections')}
+                name={at(path, 'config.maxSelections')}
                 control={form.control}
                 render={({ field: input, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
@@ -261,6 +207,14 @@ export function QuestionCard({
               />
             )}
 
+            {field.type === 'number' && (
+              <NumberConfigEditor form={form} path={path} idPrefix={idPrefix} readOnly={readOnly} disabled={disabled} />
+            )}
+
+            {field.type === 'date' && (
+              <DateConfigEditor form={form} path={path} idPrefix={idPrefix} readOnly={readOnly} disabled={disabled} />
+            )}
+
             {field.type === 'file' && (
               <FileConfigEditor
                 form={form}
@@ -275,9 +229,20 @@ export function QuestionCard({
               />
             )}
 
+            {field.type === 'repeating_group' && (
+              <GroupEditor
+                form={form}
+                path={path}
+                idPrefix={idPrefix}
+                questions={field.config.fields}
+                readOnly={readOnly}
+                disabled={disabled}
+              />
+            )}
+
             {field.type === 'yes_no' && (
               <Controller
-                name={at(index, 'config.rejectWhen')}
+                name={at(path, 'config.rejectWhen')}
                 control={form.control}
                 render={({ field: input }) => {
                   const value = input.value === null ? 'none' : String(input.value);

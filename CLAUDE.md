@@ -40,6 +40,8 @@ Use the local docs first: they match the installed version. Paths are relative t
 | Nest Standard Schema validation | 12.1 | `apps/api/node_modules/@nestjs/common/pipes/standard-schema-validation.pipe.d.ts` | https://docs.nestjs.com/application/validation |
 | React Hook Form, `@hookform/resolvers` | 7.90 / 5.9 | `.d.ts` in `apps/web/node_modules/react-hook-form` | https://react-hook-form.com, https://ui.shadcn.com/docs/forms/react-hook-form |
 | Zod | 4.4.3 | `packages/shared/node_modules/zod/README.md`, or `apps/api/node_modules/zod/` (also a direct `apps/api` dependency, for the env schema and API-only query schemas); types in `v4/classic/schemas.d.ts` | https://zod.dev |
+| TypeScript | 6.0.3 (`packages/shared`, `apps/api`); 5.9.3 (`apps/web`) | `lib.esnext.temporal.d.ts` and the other libs in `apps/api/node_modules/typescript/lib/` (6.x only; web's 5.9 has no Temporal lib) | https://www.typescriptlang.org/docs/ |
+| `temporal-polyfill` (web only) | 1.0.6 | `apps/web/node_modules/temporal-polyfill/README.md`; loaded in `apps/web/instrumentation-client.ts` (decision: question-types ticket 01, Owner decisions) | https://github.com/fullcalendar/temporal-polyfill |
 | Vitest | 4.1.11 | `.d.ts` in `apps/api/node_modules/vitest` | https://vitest.dev |
 | oxlint | 1.87.0 | `apps/api/node_modules/oxlint/README.md` | https://oxc.rs/docs/guide/usage/linter |
 | ESLint | 9.39.5 | — | https://eslint.org |
@@ -57,7 +59,7 @@ Prisma 8 differs most from older knowledge: there is no `PrismaClient`, no `pris
 
 ## Commands
 
-Run from the repo root unless noted. Node >= 24, pnpm 11.
+Run from the repo root unless noted. Node >= 26, pnpm 11.
 
 ```bash
 docker compose up -d                 # Postgres 17 on :5432 (user/pass/db: hiring) + RustFS S3 on :9000 with the dev bucket and its CORS rules (docker/rustfs-cors.json); re-apply CORS with `docker compose up createbuckets`

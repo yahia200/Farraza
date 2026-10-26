@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { FILE_KINDS, MAX_FILE_SIZE_MB, MIN_FILE_SIZE_MB, kindsNeedDuration } from './files.js';
+import { isoDateOrder, isoDateSchema } from './dates.js';
+import { PRESET_KEYS, PRESET_KEY_TYPES, type PresetKey } from './preset-keys.js';
 
 export const MAX_FIELDS = 50;
 
@@ -9,6 +11,7 @@ export const MAX_FIELDS = 50;
  * or a stale page rather than something to fix by typing.
  */
 const RELOAD = 'Something went wrong with this form. Reload the page and try again.';
+const UNKNOWN_PRESET_KEY = "This question's Preset isn't recognised. Reload the page and try again.";
 
 /** A whole number from `min` to `max`, with one message for every way it can fail. */
 function wholeNumber(min: number, max: number, error: string) {
@@ -43,6 +46,11 @@ const base = {
     .max(500, { error: 'Help text must be 500 characters or fewer.' })
     .nullable(),
   required: z.boolean(),
+  /**
+   * Which Preset this question came from (see preset-keys.ts), or null or
+   * absent for a question built by hand. Absent on forms saved before Presets.
+   */
+  presetKey: z.enum(PRESET_KEYS, { error: UNKNOWN_PRESET_KEY }).nullish(),
 };
 
 const shortText = z.object({
@@ -115,29 +123,222 @@ const file = z.object({
   }),
 });
 
+const numberQuestion = z.object({
+  ...base,
+  type: z.literal('number'),
+  config: z.object({
+    /** Smallest answer allowed, or null for no minimum. */
+    min: z.number({ error: 'Enter a number.' }).nullable(),
+    /** Largest answer allowed, or null for no maximum. */
+    max: z.number({ error: 'Enter a number.' }).nullable(),
+    /** Whether only whole numbers are accepted. */
+    integerOnly: z.boolean({ error: RELOAD }),
+  }),
+});
+
+const dateQuestion = z.object({
+  ...base,
+  type: z.literal('date'),
+  config: z.object({
+    /** Earliest date allowed (ISO `YYYY-MM-DD`), or null. */
+    min: isoDateSchema.nullable(),
+    /** Latest date allowed (ISO `YYYY-MM-DD`), or null. */
+    max: isoDateSchema.nullable(),
+  }),
+});
+
+/** A link. Nothing to configure: the rules (http or https, 2,048 characters) are fixed. */
+const urlQuestion = z.object({
+  ...base,
+  type: z.literal('url'),
+  config: z.object({}),
+});
+
+/** The question types a repeating group's sub-questions may have (ADR-0004). */
+const leafFieldSchema = z.discriminatedUnion(
+  'type',
+  [shortText, longText, singleSelect, multiSelect, yesNo, numberQuestion, dateQuestion, urlQuestion],
+  { error: 'Only text, choice, yes/no, number, date and link questions can go inside a group.' },
+);
+
+export type LeafFormField = z.infer<typeof leafFieldSchema>;
+
+const repeatingGroup = z.object({
+  ...base,
+  type: z.literal('repeating_group'),
+  config: z.object({
+    /** The questions every Entry answers. */
+    fields: z.array(leafFieldSchema).min(1, { error: 'Add at least one question to this group.' }),
+    maxEntries: wholeNumber(1, 10, 'Set an entry limit from 1 to 10.'),
+  }),
+});
+
 export const formFieldSchema = z.discriminatedUnion('type', [
   shortText,
   longText,
   singleSelect,
   multiSelect,
   yesNo,
+  numberQuestion,
+  dateQuestion,
+  urlQuestion,
   file,
+  repeatingGroup,
 ]);
 
 export type FormField = z.infer<typeof formFieldSchema>;
 export type FormFieldType = FormField['type'];
 
+/**
+ * Compile-time check on the catalog in preset-keys.ts: every type a Preset key requires must be a
+ * real question type. It fails to compile ("not assignable to type 'never'") when a key names a
+ * type that `FormFieldType` doesn't have. It can't be derived the other way (circular types).
+ */
+const catalogTypesAreQuestionTypes: (typeof PRESET_KEY_TYPES)[PresetKey] extends FormFieldType ? true : never = true;
+
+type Path = (string | number)[];
+
+/**
+ * The rules that look across a question's own properties. A repeating group's
+ * sub-questions go through the same function as top-level ones, so a leaf type
+ * added later is checked inside groups with no group-specific code.
+ */
+function checkLeafRules(field: LeafFormField, path: Path, ctx: z.RefinementCtx) {
+  if (field.type === 'number') {
+    const { min, max } = field.config;
+    if (min !== null && max !== null && min > max) {
+      ctx.addIssue({
+        code: 'custom',
+        message: "The minimum can't be more than the maximum.",
+        path: [...path, 'config', 'min'],
+      });
+    }
+    return;
+  }
+
+  if (field.type === 'date') {
+    const { min, max } = field.config;
+    if (min !== null && max !== null && isoDateOrder(min, max) > 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: "The earliest date can't be after the latest.",
+        path: [...path, 'config', 'min'],
+      });
+    }
+    return;
+  }
+
+  if (field.type !== 'single_select' && field.type !== 'multi_select') {
+    return;
+  }
+
+  const optionIds = new Set(field.config.options.map((option) => option.id));
+  if (optionIds.size !== field.config.options.length) {
+    ctx.addIssue({ code: 'custom', message: RELOAD, path: [...path, 'config', 'options'] });
+  }
+
+  if (field.type === 'single_select') {
+    const unknown = field.config.rejectOptionIds.some((id) => !optionIds.has(id));
+    if (unknown) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'An auto-reject rule points to an option that no longer exists. Update the rule.',
+        path: [...path, 'config', 'rejectOptionIds'],
+      });
+    }
+  }
+
+  if (
+    field.type === 'multi_select' &&
+    field.config.maxSelections !== null &&
+    field.config.maxSelections > field.config.options.length
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      message: "The selection limit can't be more than the number of options.",
+      path: [...path, 'config', 'maxSelections'],
+    });
+  }
+}
+
+const NO_RULES_IN_GROUPS = "Auto-reject rules aren't available inside a group.";
+
+/**
+ * Checks a question's Preset key against the catalog and a scope. The scope is
+ * the set of keys already used there: the form's top level, or one group.
+ * Whether the key is in the catalog at all is checked by the schema itself.
+ */
+function checkPresetKey(
+  field: { type: string; presetKey?: PresetKey | null },
+  path: Path,
+  scope: Set<PresetKey>,
+  ctx: z.RefinementCtx,
+) {
+  const { presetKey } = field;
+  if (presetKey == null) {
+    return;
+  }
+  if (PRESET_KEY_TYPES[presetKey] !== field.type) {
+    ctx.addIssue({
+      code: 'custom',
+      message: "This question's type doesn't match its Preset. Reload the page and try again.",
+      path: [...path, 'presetKey'],
+    });
+  }
+  if (scope.has(presetKey)) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'This Preset is already on the form.',
+      path: [...path, 'presetKey'],
+    });
+  }
+  scope.add(presetKey);
+}
+
 export const formFieldsSchema = z
   .array(formFieldSchema)
   .max(MAX_FIELDS, { error: `A form can have at most ${MAX_FIELDS} questions.` })
   .superRefine((fields, ctx) => {
+    // Keys are unique across the whole form, sub-questions included.
     const keys = new Set<string>();
+    const claimKey = (key: string, path: Path) => {
+      if (keys.has(key)) {
+        ctx.addIssue({ code: 'custom', message: RELOAD, path });
+      }
+      keys.add(key);
+    };
+
+    // A Preset key is used once per scope: once on the form's top level, and once inside each group.
+    const topLevelPresetKeys = new Set<PresetKey>();
 
     fields.forEach((field, index) => {
-      if (keys.has(field.key)) {
-        ctx.addIssue({ code: 'custom', message: RELOAD, path: [index, 'key'] });
+      claimKey(field.key, [index, 'key']);
+      checkPresetKey(field, [index], topLevelPresetKeys, ctx);
+
+      if (field.type === 'repeating_group') {
+        const groupPresetKeys = new Set<PresetKey>();
+        field.config.fields.forEach((child, childIndex) => {
+          const childPath = [index, 'config', 'fields', childIndex];
+          claimKey(child.key, [...childPath, 'key']);
+          checkPresetKey(child, childPath, groupPresetKeys, ctx);
+          if (child.type === 'single_select' && child.config.rejectOptionIds.length > 0) {
+            ctx.addIssue({
+              code: 'custom',
+              message: NO_RULES_IN_GROUPS,
+              path: [...childPath, 'config', 'rejectOptionIds'],
+            });
+          }
+          if (child.type === 'yes_no' && child.config.rejectWhen !== null) {
+            ctx.addIssue({
+              code: 'custom',
+              message: NO_RULES_IN_GROUPS,
+              path: [...childPath, 'config', 'rejectWhen'],
+            });
+          }
+          checkLeafRules(child, childPath, ctx);
+        });
+        return;
       }
-      keys.add(field.key);
 
       if (field.type === 'file') {
         const { kinds, maxDurationSeconds } = field.config;
@@ -163,41 +364,7 @@ export const formFieldsSchema = z
         return;
       }
 
-      if (field.type !== 'single_select' && field.type !== 'multi_select') {
-        return;
-      }
-
-      const optionIds = new Set(field.config.options.map((option) => option.id));
-      if (optionIds.size !== field.config.options.length) {
-        ctx.addIssue({
-          code: 'custom',
-          message: RELOAD,
-          path: [index, 'config', 'options'],
-        });
-      }
-
-      if (field.type === 'single_select') {
-        const unknown = field.config.rejectOptionIds.some((id) => !optionIds.has(id));
-        if (unknown) {
-          ctx.addIssue({
-            code: 'custom',
-            message: 'An auto-reject rule points to an option that no longer exists. Update the rule.',
-            path: [index, 'config', 'rejectOptionIds'],
-          });
-        }
-      }
-
-      if (
-        field.type === 'multi_select' &&
-        field.config.maxSelections !== null &&
-        field.config.maxSelections > field.config.options.length
-      ) {
-        ctx.addIssue({
-          code: 'custom',
-          message: "The selection limit can't be more than the number of options.",
-          path: [index, 'config', 'maxSelections'],
-        });
-      }
+      checkLeafRules(field, [index], ctx);
     });
   });
 
