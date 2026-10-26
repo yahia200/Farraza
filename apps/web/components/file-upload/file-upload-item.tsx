@@ -1,6 +1,15 @@
 'use client';
 
-import { FileTextIcon, FileWarningIcon, RotateCcwIcon, XIcon } from 'lucide-react';
+import {
+  FileAudioIcon,
+  FileIcon,
+  FileImageIcon,
+  FileTextIcon,
+  FileVideoIcon,
+  FileWarningIcon,
+  RotateCcwIcon,
+  XIcon,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import {
   Attachment,
@@ -11,25 +20,41 @@ import {
   AttachmentMedia,
   AttachmentTitle,
 } from '@/components/ui/attachment';
-import { Progress, ProgressValue } from '@/components/ui/progress';
 import { Spinner } from '@/components/ui/spinner';
 import { formatFileSize } from '@/lib/format';
 
 /** The shadcn Attachment states a file being picked and sent goes through (`idle` is for an empty placeholder). */
 export type FileUploadState = 'uploading' | 'processing' | 'error' | 'done';
 
+/** The icon for a file's content type: image, audio and video get their own, documents a page, anything else a plain file. */
+function FileTypeIcon({ contentType }: { contentType: string }) {
+  if (contentType.startsWith('image/')) return <FileImageIcon aria-hidden="true" />;
+  if (contentType.startsWith('audio/')) return <FileAudioIcon aria-hidden="true" />;
+  if (contentType.startsWith('video/')) return <FileVideoIcon aria-hidden="true" />;
+  if (
+    contentType === 'application/pdf' ||
+    contentType.startsWith('text/') ||
+    contentType.includes('wordprocessingml') ||
+    contentType === 'application/msword'
+  ) {
+    return <FileTextIcon aria-hidden="true" />;
+  }
+  return <FileIcon aria-hidden="true" />;
+}
+
 /**
  * One chosen file as a shadcn Attachment (https://ui.shadcn.com/docs/components/base/attachment):
- * icon, name, a line under it, and Remove (plus Try again when it failed). The Attachment's
- * `state` drives the look: the name shimmers while uploading or processing, and an error is red.
+ * a file-type icon, name, a line under it, and Remove (plus Try again when it failed). The
+ * Attachment's `state` drives the look: the name shimmers while uploading or processing (there is
+ * no progress bar), and an error is red.
  * Show several in an `AttachmentGroup` or a plain column. It only displays; the consumer owns the
  * upload and passes its progress in (`FileDropzone` is the picker that goes with it).
  */
 export function FileUploadItem({
   name,
   sizeBytes,
+  contentType,
   state,
-  percent,
   description,
   onRemove,
   onRetry,
@@ -37,9 +62,9 @@ export function FileUploadItem({
   /** The user's own file name: React escapes it, and it can be long (it is truncated, with the full name on hover). */
   name: string;
   sizeBytes: number;
+  /** The file's content type, which picks the icon. */
+  contentType: string;
   state: FileUploadState;
-  /** 0 to 100; the progress bar shows only while `state` is `uploading` and this is set. */
-  percent?: number;
   /** The line under the name; defaults to the size. An error's message goes here. */
   description?: ReactNode;
   /** Shows the Remove button. */
@@ -56,7 +81,7 @@ export function FileUploadItem({
         ) : state === 'error' ? (
           <FileWarningIcon aria-hidden="true" />
         ) : (
-          <FileTextIcon aria-hidden="true" />
+          <FileTypeIcon contentType={contentType} />
         )}
       </AttachmentMedia>
       <AttachmentContent>
@@ -76,11 +101,6 @@ export function FileUploadItem({
             </AttachmentAction>
           )}
         </AttachmentActions>
-      )}
-      {state === 'uploading' && percent !== undefined && (
-        <Progress value={percent} aria-label={`Uploading ${name}`} className="w-full basis-full">
-          <ProgressValue />
-        </Progress>
       )}
     </Attachment>
   );

@@ -218,8 +218,8 @@ export function UploadControl({
           <FileUploadItem
             name={shown.file.name}
             sizeBytes={shown.file.size}
+            contentType={contentTypeOf(shown.file)}
             state={state}
-            percent={shown.status === 'sending' ? shown.percent : undefined}
             description={
               shown.status === 'compressing'
                 ? 'Reducing the image size…'
@@ -228,6 +228,7 @@ export function UploadControl({
                   : [
                       formatFileSize(shown.file.size),
                       shown.reducedFrom !== undefined && `reduced from ${formatFileSize(shown.reducedFrom)}`,
+                      shown.status === 'sending' && `${shown.percent}%`,
                       shown.status === 'sent' && 'uploaded',
                     ]
                       .filter(Boolean)
