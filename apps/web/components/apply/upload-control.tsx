@@ -220,19 +220,21 @@ export function UploadControl({
             sizeBytes={shown.file.size}
             contentType={contentTypeOf(shown.file)}
             state={state}
+            percent={shown.status === 'sending' ? shown.percent : undefined}
             description={
               shown.status === 'compressing'
                 ? 'Reducing the image size…'
                 : shown.status === 'failed'
                   ? shown.message
-                  : [
-                      formatFileSize(shown.file.size),
-                      shown.reducedFrom !== undefined && `reduced from ${formatFileSize(shown.reducedFrom)}`,
-                      shown.status === 'sending' && `${shown.percent}%`,
-                      shown.status === 'sent' && 'uploaded',
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')
+                  : shown.status === 'sending'
+                    ? undefined // the item's own "Uploading · 42%"
+                    : [
+                        formatFileSize(shown.file.size),
+                        shown.reducedFrom !== undefined && `reduced from ${formatFileSize(shown.reducedFrom)}`,
+                        shown.status === 'sent' && 'uploaded',
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')
             }
             onRemove={remove}
             onRetry={

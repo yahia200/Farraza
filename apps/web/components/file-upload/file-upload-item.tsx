@@ -45,8 +45,9 @@ function FileTypeIcon({ contentType }: { contentType: string }) {
 /**
  * One chosen file as a shadcn Attachment (https://ui.shadcn.com/docs/components/base/attachment):
  * a file-type icon, name, a line under it, and Remove (plus Try again when it failed). The
- * Attachment's `state` drives the look: the name shimmers while uploading or processing (there is
- * no progress bar), and an error is red.
+ * Attachment's `state` drives the look: the name shimmers while uploading or processing, and an
+ * error is red. An upload reads like the docs' first example: a spinner, "Uploading · 64%" under
+ * the name, and a button that cancels it. There is no progress bar.
  * Show several in an `AttachmentGroup` or a plain column. It only displays; the consumer owns the
  * upload and passes its progress in (`FileDropzone` is the picker that goes with it).
  */
@@ -55,6 +56,7 @@ export function FileUploadItem({
   sizeBytes,
   contentType,
   state,
+  percent,
   description,
   onRemove,
   onRetry,
@@ -65,9 +67,11 @@ export function FileUploadItem({
   /** The file's content type, which picks the icon. */
   contentType: string;
   state: FileUploadState;
-  /** The line under the name; defaults to the size. An error's message goes here. */
+  /** 0 to 100, for `state` `uploading`: the default line under the name is "Uploading · 64%". */
+  percent?: number;
+  /** The line under the name; defaults to the upload progress, else the size. An error's message goes here. */
   description?: ReactNode;
-  /** Shows the Remove button. */
+  /** Shows the Remove button (Cancel upload while `state` is `uploading`). */
   onRemove?: () => void;
   /** Shows Try again, only for `state` `error`. */
   onRetry?: () => void;
@@ -75,7 +79,7 @@ export function FileUploadItem({
   return (
     <Attachment state={state} className="w-full">
       <AttachmentMedia>
-        {state === 'processing' ? (
+        {state === 'processing' || state === 'uploading' ? (
           // Spinner is a status role by default; the line under the name already says what is going on.
           <Spinner aria-hidden="true" role="presentation" />
         ) : state === 'error' ? (
@@ -86,7 +90,13 @@ export function FileUploadItem({
       </AttachmentMedia>
       <AttachmentContent>
         <AttachmentTitle title={name}>{name}</AttachmentTitle>
-        <AttachmentDescription>{description ?? formatFileSize(sizeBytes)}</AttachmentDescription>
+        {/* The percent changes many times a second; the caller's live region must not read each one out. */}
+        <AttachmentDescription aria-live={state === 'uploading' ? 'off' : undefined}>
+          {description ??
+            (state === 'uploading'
+              ? `Uploading${percent !== undefined ? ` · ${percent}%` : ''}`
+              : formatFileSize(sizeBytes))}
+        </AttachmentDescription>
       </AttachmentContent>
       {(onRemove || (state === 'error' && onRetry)) && (
         <AttachmentActions>
@@ -96,7 +106,7 @@ export function FileUploadItem({
             </AttachmentAction>
           )}
           {onRemove && (
-            <AttachmentAction size="icon-sm" aria-label={`Remove ${name}`} onClick={onRemove}>
+            <AttachmentAction size="icon-sm" aria-label={state === 'uploading' ? `Cancel uploading ${name}` : `Remove ${name}`} onClick={onRemove}>
               <XIcon />
             </AttachmentAction>
           )}
