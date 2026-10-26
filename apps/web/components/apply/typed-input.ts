@@ -4,7 +4,8 @@ import type { PublicFormField } from '@repo/shared';
 /**
  * What the apply page's Number, Date and URL questions share, so `question-step.tsx`,
  * `group-step.tsx` and `apply-values.ts` agree. All three keep the box's text in the form (`''`
- * when blank); the native number and date inputs report `''` for text they can't parse.
+ * when blank); the native number input reports `''` for text it can't parse, and a date is chosen
+ * with a `DatePicker` (components/date-picker.tsx), which only yields a real ISO date or `''`.
  */
 
 type TypedField = Extract<PublicFormField, { type: 'number' | 'date' | 'url' }>;
@@ -19,16 +20,16 @@ export function isTextBox(field: { type: string }): boolean {
   return field.type === 'short_text' || field.type === 'long_text' || isTypedField(field);
 }
 
-/** Input types whose Enter key is cancelled inside an Entry card (it would go to the next step or submit). */
-export const ENTER_CANCELLED_INPUT_TYPES = ['text', 'number', 'date', 'url'];
+/** Input types whose Enter key is cancelled inside an Entry card (it would go to the next step or submit). Dates are a `DatePicker` button, not an input. */
+export const ENTER_CANCELLED_INPUT_TYPES = ['text', 'number', 'url'];
 
 type TypedInputProps = Pick<
   InputHTMLAttributes<HTMLInputElement>,
   'inputMode' | 'step' | 'min' | 'max' | 'autoComplete' | 'placeholder'
-> & { type: 'number' | 'date' | 'url' };
+> & { type: 'number' | 'url' };
 
-/** The native input's `type` and limits for a Number, Date or URL question. */
-export function typedInputProps(field: TypedField): TypedInputProps {
+/** The native input's `type` and limits for a Number or URL question (a Date question uses `DatePicker`). */
+export function typedInputProps(field: Exclude<TypedField, { type: 'date' }>): TypedInputProps {
   switch (field.type) {
     case 'number':
       return {
@@ -36,8 +37,6 @@ export function typedInputProps(field: TypedField): TypedInputProps {
         inputMode: field.config.integerOnly ? 'numeric' : 'decimal',
         step: field.config.integerOnly ? 1 : 'any',
       };
-    case 'date':
-      return { type: 'date', min: field.config.min ?? undefined, max: field.config.max ?? undefined };
     case 'url':
       return { type: 'url', inputMode: 'url', autoComplete: 'url', placeholder: 'https://' };
   }

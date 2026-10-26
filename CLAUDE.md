@@ -47,6 +47,7 @@ Use the local docs first: they match the installed version. Paths are relative t
 | ESLint | 9.39.5 | — | https://eslint.org |
 | Tailwind CSS | 4.3.3 | — | https://tailwindcss.com/docs |
 | Base UI (`@base-ui/react`) | 1.8.0 | `apps/web/node_modules/@base-ui/react/docs/` | https://base-ui.com |
+| `react-day-picker` (behind shadcn `calendar`, used by `components/date-picker.tsx`) | 10.0.2 | `apps/web/node_modules/react-day-picker/README.md`; props in `dist/esm/types/props.d.ts` | https://daypicker.dev, https://ui.shadcn.com/docs/components/base/date-picker |
 | docx-preview | 0.4.1 | `apps/web/node_modules/docx-preview/README.md` (API and options), `dist/docx-preview.d.ts`, readable source `dist/docx-preview.mjs` | https://github.com/VolodymyrBaydalka/docxjs |
 | shadcn | 4.21.3 | `apps/web/node_modules/shadcn/README.md` | https://ui.shadcn.com/docs |
 | Hairline kernel (`@lucasmarkes/hairline` core, vendored) | skill copy, sha256 `3a19aa26…` | `apps/web/components/landing/hairline/kernel.js` (the index comment at the top lists every call); the hairline-create skill's `rules.md` and `look.md` | https://lucasmarkes.com/lab/hairline, https://www.npmjs.com/package/@lucasmarkes/hairline |

@@ -40,6 +40,7 @@ import {
 } from './apply-values';
 
 import { limitHint } from './limit-hint';
+import { DatePicker } from '@/components/date-picker';
 import { ENTER_CANCELLED_INPUT_TYPES, isTypedField, typedInputProps } from './typed-input';
 
 type SubQuestion = GroupField['config']['fields'][number];
@@ -320,14 +321,27 @@ function SubQuestionControl({
         <FieldLabel htmlFor={id}>{label}</FieldLabel>
         {help}
         {hint && <FieldDescription id={hintId}>{hint}</FieldDescription>}
-        <Input
-          id={id}
-          value={text}
-          {...typedInputProps(child)}
-          aria-invalid={Boolean(error)}
-          aria-describedby={[describedBy, hint ? hintId : null].filter(Boolean).join(' ') || undefined}
-          onChange={(event) => onChange(event.target.value)}
-        />
+        {child.type === 'date' ? (
+          <DatePicker
+            id={id}
+            label={label}
+            value={text}
+            onChange={onChange}
+            min={child.config.min ?? undefined}
+            max={child.config.max ?? undefined}
+            invalid={Boolean(error)}
+            describedBy={[describedBy, hint ? hintId : null].filter(Boolean).join(' ') || undefined}
+          />
+        ) : (
+          <Input
+            id={id}
+            value={text}
+            {...typedInputProps(child)}
+            aria-invalid={Boolean(error)}
+            aria-describedby={[describedBy, hint ? hintId : null].filter(Boolean).join(' ') || undefined}
+            onChange={(event) => onChange(event.target.value)}
+          />
+        )}
         {problem}
       </Field>
     );

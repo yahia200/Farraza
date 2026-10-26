@@ -11,6 +11,7 @@ import {
   QuestionnaireItem,
   QuestionnaireTitle,
 } from '@/components/ui/questionnaire';
+import { DatePicker } from '@/components/date-picker';
 import { limitHint } from './limit-hint';
 import { isTextBox, isTypedField, typedInputProps } from './typed-input';
 import { chosenOptions, isLockedOption, type AnswerInput, type ApplyValues } from './apply-values';
@@ -63,9 +64,34 @@ export function QuestionStep({
 
             <QuestionnaireChoices>
               {/* Number, Date and URL keep the box's text in the form (apply-values.ts turns a
-                  number's text into a JSON number). The native number and date inputs only yield
-                  a valid value or '', and `min`/`max` limit the date picker where the browser allows. */}
-              {isTypedField(field) && (
+                  number's text into a JSON number). The native number input only yields a valid
+                  value or ''. A date is picked from a calendar (`DatePicker`), limited by `min`/`max`. */}
+              {field.type === 'date' && (
+                <>
+                  <DatePicker
+                    ref={input.ref}
+                    label={label}
+                    value={typeof value === 'string' ? value : ''}
+                    onChange={answer}
+                    min={field.config.min ?? undefined}
+                    max={field.config.max ?? undefined}
+                    invalid={fieldState.invalid}
+                  />
+                  {/* The questionnaire counts a step as answered only when one of its own
+                      controls has a value, and a button has none, so this read-only input
+                      mirrors the date (as `UploadControl` does for a file id). */}
+                  <QuestionnaireInput
+                    readOnly
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className="sr-only"
+                    value={typeof value === 'string' ? value : ''}
+                    onChange={() => {}}
+                  />
+                </>
+              )}
+
+              {(field.type === 'number' || field.type === 'url') && (
                 <QuestionnaireInput
                   ref={input.ref}
                   {...typedInputProps(field)}
