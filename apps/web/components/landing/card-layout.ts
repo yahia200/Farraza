@@ -9,7 +9,7 @@ export const PEEK = '1.25rem';
 /** The tallest a card gets on a tall screen. */
 export const MAX_CARD_HEIGHT = '43rem';
 /** Space kept under the lowest card. */
-export const BOTTOM_GAP = '1.5rem';
+export const BOTTOM_GAP = '1rem';
 /** How much narrower a card gets for each card in front of it. */
 export const COVERED_SCALE_STEP = 0.0125;
 

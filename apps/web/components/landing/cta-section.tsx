@@ -24,8 +24,8 @@ const figurePalette: HairlinePalette = {
 export function CtaSection() {
   return (
     <section aria-labelledby="landing-cta-heading" className="mx-auto mt-40 w-full max-w-400">
-      <Card className="grid gap-0 py-0 text-base md:grid-cols-2 md:items-center" ghost>
-        <div className="order-2 flex flex-col items-start gap-6 p-6 pt-0 md:order-1 md:p-12 xl:p-16">
+      <Card className="grid gap-0 py-0 text-base md:grid-cols-2 md:items-center w-full" ghost>
+        <div className="order-2 flex flex-col items-start gap-6 p-4 md:order-1 md:p-12 xl:p-16">
           <h2
             id="landing-cta-heading"
             className="font-display text-[max(4.5vw,2.5rem)] leading-[0.85] font-black uppercase text-center md:text-left"
@@ -36,7 +36,7 @@ export function CtaSection() {
             Create your company, post a job and share its link. Every applicant lands in your
             pipeline, ready to move forward.
           </p>
-          <Link href="/sign-up" className={cn(buttonVariants({ size: 'lg',  }), 'w-full')}>
+          <Link href="/sign-up" className={cn(buttonVariants({ size: 'lg',  }), 'px-14 mx-auto md:w-full')}>
             Set up your company
           </Link>
         </div>

@@ -1,9 +1,15 @@
 'use client';
 
-import { CopyIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { CheckIcon, CopyIcon } from 'lucide-react';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { toast } from '@/components/ui/toast';
 import type { JobStatus } from '@/lib/dal';
+import {
+  CopyButton,
+  CopyButtonIcon,
+} from '@animate-ui/react/primitives/buttons/copy';
+import { cn } from '@/lib/utils';
+
 
 /**
  * Copies a job's public apply link (`/{companySlug}/{jobSlug}`) to the clipboard.
@@ -44,16 +50,19 @@ export function CopyJobLinkButton({
 
   if (variant === 'icon') {
     return (
-      <Button type="button" variant="ghost" size="icon-sm" onClick={copy} aria-label="Copy job link" title="Copy job link">
-        <CopyIcon />
-      </Button>
+      <CopyButton content="npx animate-ui init" type="button" onClick={copy} aria-label="Copy job link" title="Copy job link" className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }))}>
+        <CopyButtonIcon icon={<CopyIcon />} copiedIcon={<CheckIcon />} />
+      </CopyButton>
     );
   }
 
   return (
-    <Button type="button" variant="ghost" onClick={copy}>
-      <CopyIcon data-icon="inline-start" />
-      Copy link
-    </Button>
+
+
+    <CopyButton content="npx animate-ui init" type="button" onClick={copy} aria-label="Copy job link" title="Copy job link" className={cn(buttonVariants({ variant: 'ghost' }))}>
+        <CopyButtonIcon icon={<CopyIcon />} copiedIcon={<CheckIcon />} />
+        Copy link
+      </CopyButton>
   );
+  
 }

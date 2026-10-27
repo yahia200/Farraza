@@ -5,7 +5,7 @@ import { CtaSection } from "@/components/landing/cta-section";
 
 function page() {
   return (
-    <main data-landing className="min-h-screen pb-24 px-8">
+    <main data-landing className="min-h-screen pb-24">
       <Hero />
       <StepsSection />
       <FeaturesSection />

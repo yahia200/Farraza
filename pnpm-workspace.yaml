@@ -16,3 +16,10 @@ overrides:
   "@effect/sql-d1": "4.0.0-rc.115"
   "@effect/sql-sqlite-do": "4.0.0-rc.115"
   "@effect/vitest": "4.0.0-rc.115"
+permissions:
+  '@prisma/orm-postgres':
+    skills: true
+  '@tanstack/react-table':
+    skills: true
+  prisma:
+    skills: true

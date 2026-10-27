@@ -68,7 +68,7 @@ const tilePlacement: Record<FeatureId, string> = {
  */
 export function FeaturesSection() {
   return (
-    <section aria-labelledby="landing-features-heading" className="mx-auto w-full max-w-400 mt-80">
+    <section aria-labelledby="landing-features-heading" className="mx-auto w-full max-w-400 mt-56 md:mt-80 px-4 md:px-8">
       <h2
         id="landing-features-heading"
         className="my-12 text-center font-display text-[max(6vw,2.75rem)] leading-[0.85] font-black uppercase"
