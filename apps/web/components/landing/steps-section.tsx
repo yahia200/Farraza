@@ -33,7 +33,7 @@ const steps: Step[] = [
     colorClassName: 'bg-primary-500/65 backdrop-blur-md text-primary-foreground',
   },
   {
-    title: 'Share one link',
+    title: 'Share the link',
     text: 'Every job gets its own public page. Applicants answer one question at a time, on any phone, and attach their CV as they go.',
     image: {
       src: '/landing/apply-on-phone.webp',

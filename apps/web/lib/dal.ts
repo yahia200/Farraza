@@ -25,6 +25,8 @@ export interface CurrentUser {
   emailVerified: boolean;
 }
 
+
+
 /**
  * The signed-in user, or a redirect to /sign-in.
  * `use cache: private` may read cookies and keeps the result in the browser

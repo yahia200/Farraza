@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Controller, useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { PlusIcon } from 'lucide-react';
-import { createJobSchema, type CreateJobInput } from '@repo/shared';
-import { createJob } from '@/app/actions/jobs';
-import { applyActionFailure } from '@/components/forms/apply-action-failure';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Controller, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { PlusIcon } from "lucide-react";
+import { createJobSchema, type CreateJobInput } from "@repo/shared";
+import { createJob } from "@/app/actions/jobs";
+import { applyActionFailure } from "@/components/forms/apply-action-failure";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -18,11 +18,17 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
-import { Spinner } from '@/components/ui/spinner';
-import { Textarea } from '@/components/ui/textarea';
+} from "@/components/ui/dialog";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 
 /** "New job": same Dialog + form pattern as "Add member". Creates a draft and opens it. */
 export function NewJobDialog({ companySlug }: { companySlug: string }) {
@@ -31,7 +37,7 @@ export function NewJobDialog({ companySlug }: { companySlug: string }) {
   const [formError, setFormError] = useState<string>();
   const form = useForm<CreateJobInput>({
     resolver: zodResolver(createJobSchema),
-    defaultValues: { title: '', description: '' },
+    defaultValues: { title: "", description: "" },
   });
 
   function onOpenChange(next: boolean) {
@@ -66,7 +72,10 @@ export function NewJobDialog({ companySlug }: { companySlug: string }) {
         <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
           <DialogHeader>
             <DialogTitle>New job</DialogTitle>
-            <DialogDescription>It starts as a draft. You can open it once its application form is ready.</DialogDescription>
+            <DialogDescription>
+              It starts as a draft. You can open it once its application form is
+              ready.
+            </DialogDescription>
           </DialogHeader>
           <FieldGroup className="py-4">
             {formError && (
@@ -80,8 +89,15 @@ export function NewJobDialog({ companySlug }: { companySlug: string }) {
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="new-job-title">Job title</FieldLabel>
-                  <Input {...field} id="new-job-title" autoFocus aria-invalid={fieldState.invalid} />
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  <Input
+                    {...field}
+                    id="new-job-title"
+                    autoFocus
+                    aria-invalid={fieldState.invalid}
+                  />
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
                 </Field>
               )}
             />
@@ -90,24 +106,33 @@ export function NewJobDialog({ companySlug }: { companySlug: string }) {
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="new-job-description">Description</FieldLabel>
+                  <FieldLabel htmlFor="new-job-description">
+                    Description
+                  </FieldLabel>
                   <Textarea
                     {...field}
-                    value={field.value ?? ''}
+                    value={field.value ?? ""}
                     id="new-job-description"
                     rows={5}
                     aria-describedby="new-job-description-help"
                     aria-invalid={fieldState.invalid}
                   />
-                  <FieldDescription id="new-job-description-help">Optional. Plain text; you can edit it later.</FieldDescription>
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  <FieldDescription id="new-job-description-help">
+                    The description will be displayed to applicants & used in
+                    the Candidate Rating system. You can edit it later.
+                  </FieldDescription>
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
                 </Field>
               )}
             />
           </FieldGroup>
           <DialogFooter>
             <Button type="submit" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting && <Spinner data-icon="inline-start" />}
+              {form.formState.isSubmitting && (
+                <Spinner data-icon="inline-start" />
+              )}
               Create job
             </Button>
           </DialogFooter>

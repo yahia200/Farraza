@@ -3,11 +3,11 @@
 import { useActionState, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CheckIcon, CopyIcon } from 'lucide-react';
+import { CheckIcon, CircleAlertIcon, CopyIcon } from 'lucide-react';
 import { createCompanySchema, type CreateCompanyInput } from '@repo/shared';
 import { checkMembership, createCompany } from '@/app/actions/companies';
 import { applyActionFailure } from '@/components/forms/apply-action-failure';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
   Field,
@@ -153,8 +153,10 @@ function JoinInstructions({ email }: { email: string }) {
       </Field>
 
       {result?.message && (
-        <Alert>
-          <AlertDescription>{result.message}</AlertDescription>
+        <Alert variant={'warning'}>
+            <CircleAlertIcon data-icon="inline-start" />
+          <AlertTitle>
+            {result.message}</AlertTitle>
         </Alert>
       )}
 

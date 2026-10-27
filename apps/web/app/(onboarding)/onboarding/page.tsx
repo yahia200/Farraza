@@ -4,9 +4,11 @@ import { redirect } from 'next/navigation';
 import { signOut } from '@/app/actions/auth';
 import { OnboardingChoice } from '@/components/onboarding/onboarding-choice';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
+
+
 import { getCurrentUser, getMyCompanies } from '@/lib/dal';
+import { AuthCard } from '@/components/auth/auth-card';
 
 export const metadata: Metadata = { title: 'Get started · Farraza' };
 
@@ -30,22 +32,21 @@ async function Onboarding() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Welcome, {user.name}</CardTitle>
-        <CardDescription>One quick step before you start hiring.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <OnboardingChoice email={user.email} />
-      </CardContent>
-      <CardFooter className="justify-center text-sm text-muted-foreground">
-        Not {user.name}?
-        <form action={signOut}>
-          <Button type="submit" variant="link" size="sm">
-            Sign out
-          </Button>
-        </form>
-      </CardFooter>
-    </Card>
+    <AuthCard
+      title={`Welcome, ${user.name.split(' ')[0]}!`}
+      description="One quick step before you start hiring."
+      footer={
+        <div className='flex'>
+          Not {user.name}?{' '}
+          <form action={signOut}>
+            <Button type="submit" variant="link" size="sm" className="px-0 font-normal ml-0.5 h-auto">
+              Sign out
+            </Button>
+          </form>
+        </div>
+      }
+    >
+      <OnboardingChoice email={user.email} />
+    </AuthCard>
   );
 }

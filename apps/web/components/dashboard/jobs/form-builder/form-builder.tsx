@@ -223,7 +223,7 @@ export function FormBuilder({
   return (
     <div className="flex flex-col gap-4">
       {offerRestore && backup && (
-        <Alert className="bg-warning/10 p-4 text-warning-foreground">
+        <Alert variant="warning" className="p-4">
           <ArchiveRestoreIcon data-icon="inline-start" />
           <AlertTitle>
             You have unsaved changes from{" "}
