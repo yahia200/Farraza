@@ -123,9 +123,11 @@ export function HighlightedQuestionsPicker({
               const checked = keys.includes(question.key);
               return (
                 // The Checkbox is a span, so the Label's `peer-disabled` never matches; dim the row from its data-disabled.
+                // `shrink-0`: once the list reaches its max height, the flex column would otherwise squeeze each row
+                // down to its `min-h`, and a Question that wraps would overlap the rows around it instead of scrolling.
                 <Label
                   key={question.key}
-                  className="min-h-11 py-1 leading-snug font-normal has-data-disabled:cursor-not-allowed has-data-disabled:opacity-50 sm:min-h-8"
+                  className="min-h-11 shrink-0 py-1 leading-snug font-normal has-data-disabled:cursor-not-allowed has-data-disabled:opacity-50 sm:min-h-8"
                 >
                   <Checkbox
                     checked={checked}
