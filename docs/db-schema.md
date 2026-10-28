@@ -353,7 +353,7 @@ An array of at most 50 field objects (`formFieldsSchema` in `form-fields.ts`, ch
 
 | Property | Type | Rules |
 |---|---|---|
-| `key` | uuid string | Unique within the form. Stays the same across versions for the same question. |
+| `key` | uuid string | Unique within the form. Stays the same across versions for the same question: the builder mints a key only when a question is added (`newField`, a Preset's `build()`) and every save sends the whole list with its keys unchanged. A question deleted and added again gets a new key, so it drops out of a job's `highlighted_question_keys` (§3.5). |
 | `type` | string | One of the field types below. |
 | `label` | string | Trimmed, 1–200 characters. |
 | `helpText` | string or null | Trimmed, at most 500 characters. |
