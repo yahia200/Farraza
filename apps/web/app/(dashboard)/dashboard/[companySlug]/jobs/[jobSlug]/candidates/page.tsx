@@ -10,7 +10,13 @@ import type { CandidateRow } from '@/components/dashboard/candidates/data-table-
 import { PipelineBoard } from '@/components/dashboard/candidates/pipeline-board';
 import { JobPage, type LoadedJob } from '@/components/dashboard/jobs/job-page';
 import { Skeleton } from '@/components/ui/skeleton';
-import { flattenBoard, getPipelineBoard, type MyCompany, type PipelineColumn } from '@/lib/dal';
+import {
+  flattenBoard,
+  getPipelineBoard,
+  type HighlightedQuestion,
+  type MyCompany,
+  type PipelineColumn,
+} from '@/lib/dal';
 
 export const metadata: Metadata = { title: 'Candidates · Farraza' };
 
@@ -42,7 +48,7 @@ async function Candidates({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   // One fetch of the board feeds both views.
-  const [{ columns }, { application, view: viewParam }] = await Promise.all([
+  const [{ columns, highlightedQuestions }, { application, view: viewParam }] = await Promise.all([
     getPipelineBoard(company.slug, job.slug),
     searchParams,
   ]);
@@ -56,13 +62,19 @@ async function Candidates({
       {view === 'board' ? (
         <PipelineBoard
           columns={columns}
+          highlightedQuestions={highlightedQuestions}
           basePath={basePath}
           companySlug={company.slug}
           jobSlug={job.slug}
           canMove={canMoveApplications(company.role)}
         />
       ) : (
-        <TableView columns={columns} stages={job.stages} basePath={basePath} />
+        <TableView
+          columns={columns}
+          highlightedQuestions={highlightedQuestions}
+          stages={job.stages}
+          basePath={basePath}
+        />
       )}
       <CandidateSheet open={selected !== undefined} closeHref={candidatesHref(basePath, { view })}>
         {selected && (
@@ -84,14 +96,23 @@ async function Candidates({
 
 function TableView({
   columns,
+  highlightedQuestions,
   stages,
   basePath,
 }: {
   columns: PipelineColumn[];
+  highlightedQuestions: HighlightedQuestion[];
   stages: LoadedJob['stages'];
   basePath: string;
 }) {
   // `appliedLabel` was formatted on the server by the DAL (lib/format.ts), so it can't differ from the browser's.
   const rows: CandidateRow[] = flattenBoard(columns);
-  return <CandidatesTable data={rows} stages={stages} meta={{ basePath }} />;
+  return (
+    <CandidatesTable
+      data={rows}
+      stages={stages}
+      highlightedQuestions={highlightedQuestions}
+      meta={{ basePath }}
+    />
+  );
 }
