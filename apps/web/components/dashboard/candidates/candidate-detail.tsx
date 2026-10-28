@@ -5,19 +5,20 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getApplication, getApplicationFiles } from '@/lib/dal';
+import { getApplication, getApplicationFiles, getCurrentUser } from '@/lib/dal';
 import { formatDate } from '@/lib/format';
 import { toActivityItems } from './activity-items';
 import { CandidateAnswer } from './candidate-answer';
 import { CandidateActivity } from './candidate-activity';
 import { CandidateFile } from './candidate-file';
 import { CandidateMove } from './candidate-move';
+import { CandidateRatings } from './candidate-ratings';
 import { CandidateStageBadges } from './candidate-stage-badges';
 import { formatAnswer } from './format-answer';
 
 /**
  * One candidate's application: contact details, stage, the answers to the
- * form version they saw, and the activity timeline with a note composer. A
+ * form version they saw, the Ratings, and the activity timeline with a note composer. A
  * Server Component, rendered inside the sheet when the URL has ?application=<id>.
  */
 export async function CandidateDetail({
@@ -26,6 +27,7 @@ export async function CandidateDetail({
   applicationId,
   stages,
   canMove,
+  ratingCriteria,
 }: {
   companySlug: string;
   jobSlug: string;
@@ -34,15 +36,18 @@ export async function CandidateDetail({
   stages: { id: string; name: string; kind: StageKind }[];
   /** canMoveApplications(role): interviewers get no move control. */
   canMove: boolean;
+  /** The Job's rating Criteria now (catalog keys): the detail doesn't carry them, and the control scores only these. */
+  ratingCriteria: string[];
 }) {
   // Together, as they don't depend on each other. If the files can't be loaded, `files` is null
   // and the sheet says so instead of claiming the candidate sent none.
-  const [application, files] = await Promise.all([
+  const [application, files, currentUser] = await Promise.all([
     getApplication(companySlug, jobSlug, applicationId),
     getApplicationFiles(companySlug, jobSlug, applicationId).catch((error: unknown) => {
       unstable_rethrow(error); // a redirect to sign-in must not be swallowed
       return null;
     }),
+    getCurrentUser(), // to find the viewer's own Rating; this renders inside the page's <Suspense>
   ]);
 
   if (!application) {
@@ -178,11 +183,21 @@ export async function CandidateDetail({
           )}
         </section>
 
+        <CandidateRatings
+          companySlug={companySlug}
+          jobSlug={jobSlug}
+          applicationId={application.id}
+          currentUserId={currentUser.id}
+          jobCriteria={ratingCriteria}
+          ratings={application.ratings}
+          summary={application.ratingSummary}
+        />
+
         <CandidateActivity
           companySlug={companySlug}
           jobSlug={jobSlug}
           applicationId={application.id}
-          items={toActivityItems(application.events, application.notes)}
+          items={toActivityItems(application.events, application.notes, application.ratings)}
         />
       </div>
     </>
@@ -202,6 +217,7 @@ export function CandidateDetailSkeleton() {
         <Skeleton className="h-16 w-full" />
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-32 w-full" />
       </div>
     </>
   );
