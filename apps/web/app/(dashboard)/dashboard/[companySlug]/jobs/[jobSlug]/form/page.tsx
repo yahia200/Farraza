@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { canManageJobs, DEFAULT_CV_MODE } from '@repo/shared';
 import { FormBuilder } from '@/components/dashboard/jobs/form-builder/form-builder';
+import { JobPageTransition } from '@/components/dashboard/jobs/job-page-transition';
 import { JobPage } from '@/components/dashboard/jobs/job-page';
 import { getJobForm } from '@/lib/dal';
 
@@ -12,9 +13,13 @@ export const metadata: Metadata = { title: 'Application form · Farraza' };
  */
 export default function JobFormPage({ params }: PageProps<'/dashboard/[companySlug]/jobs/[jobSlug]/form'>) {
   return (
-    <JobPage params={params}>
-      {(company, job) => <Builder companySlug={company.slug} jobSlug={job.slug} canEdit={canManageJobs(company.role)} />}
-    </JobPage>
+    <JobPageTransition>
+      <JobPage params={params}>
+        {(company, job) => (
+          <Builder companySlug={company.slug} jobSlug={job.slug} canEdit={canManageJobs(company.role)} />
+        )}
+      </JobPage>
+    </JobPageTransition>
   );
 }
 

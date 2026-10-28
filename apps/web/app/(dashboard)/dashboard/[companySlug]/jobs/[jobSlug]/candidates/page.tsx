@@ -10,6 +10,7 @@ import type { CandidateRow } from '@/components/dashboard/candidates/data-table-
 import { HighlightedQuestionsPicker } from '@/components/dashboard/candidates/highlighted-questions-picker';
 import { PipelineBoard } from '@/components/dashboard/candidates/pipeline-board';
 import { RatingCriteriaPicker } from '@/components/dashboard/candidates/rating-criteria-picker';
+import { JobPageTransition } from '@/components/dashboard/jobs/job-page-transition';
 import { JobPage, type LoadedJob } from '@/components/dashboard/jobs/job-page';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -39,9 +40,11 @@ export default function JobCandidatesPage({
   searchParams,
 }: PageProps<'/dashboard/[companySlug]/jobs/[jobSlug]/candidates'>) {
   return (
-    <JobPage params={params} fallback={<Skeleton className="h-64 w-full rounded-2xl" />}>
-      {(company, job) => <Candidates company={company} job={job} searchParams={searchParams} />}
-    </JobPage>
+    <JobPageTransition>
+      <JobPage params={params} fallback={<Skeleton className="h-64 w-full rounded-2xl" />}>
+        {(company, job) => <Candidates company={company} job={job} searchParams={searchParams} />}
+      </JobPage>
+    </JobPageTransition>
   );
 }
 

@@ -240,3 +240,39 @@
     @apply scrollbar-none;
   }
 }
+
+/* Job pages (Overview, Application form, Candidates) fade and blur in and out
+   like the tab panels do. The values are Animate UI's panel tokens
+   (node_modules/@animate-ui/react/dist/utils/motion/index.js: panelOut 150ms
+   "leave", panelIn 300ms "enter", blur.panel 5px). The wrapper is
+   <ViewTransition> in each page (components/dashboard/jobs/job-page-transition.tsx).
+   The new page waits for the old one to leave, as in
+   02-guides/view-transitions.md, Step 2. */
+::view-transition-old(.job-page-out) {
+  animation: 150ms cubic-bezier(0, 0, 0.58, 1) both job-page-fade reverse;
+}
+::view-transition-new(.job-page-in) {
+  animation: 300ms cubic-bezier(0.25, 0.1, 0.35, 1) 150ms both job-page-fade;
+}
+@keyframes job-page-fade {
+  from {
+    filter: blur(5px);
+    opacity: 0;
+  }
+  to {
+    filter: blur(0);
+    opacity: 1;
+  }
+}
+/* Don't swallow clicks while a transition runs (view-transitions.md, "Keeping the page interactive"). */
+::view-transition {
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
