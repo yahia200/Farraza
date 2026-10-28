@@ -1,4 +1,4 @@
-Status: needs-triage
+Status: resolved
 
 # Highlighted questions on the candidate list
 

@@ -6,14 +6,14 @@ Walk the whole flow on a Job with a published form that has at least one questio
 
 **Blocked by:** 04, 05.
 
-**Status:** needs-triage
+**Status:** resolved
 
-- [ ] Every browser check above is done, with what was seen recorded in the Answer
-- [ ] The stale key disappears from both views after the new version is published, and the old Application keeps its applicant's option labels
-- [ ] `docs/db-schema.md`, `.claude/rules/api.md` and `.claude/rules/web.md` describe the column, route, payload, picker, columns and card as built (no leftover "proposed" or ticket-only wording)
-- [ ] `GLOSSARY.md` still matches the UI wording (Highlighted question; no "column" for a Stage)
-- [ ] The spec's Further Notes assumption (Question keys persist across versions) is confirmed in `form-builder.tsx` and noted
-- [ ] `pnpm lint`, `pnpm check-types`, `pnpm --filter @repo/shared test` and `pnpm --filter api test` pass
+- [x] Every browser check above is done, with what was seen recorded in the Answer
+- [x] The stale key disappears from both views after the new version is published, and the old Application keeps its applicant's option labels
+- [x] `docs/db-schema.md`, `.claude/rules/api.md` and `.claude/rules/web.md` describe the column, route, payload, picker, columns and card as built (no leftover "proposed" or ticket-only wording)
+- [x] `GLOSSARY.md` still matches the UI wording (Highlighted question; no "column" for a Stage)
+- [x] The spec's Further Notes assumption (Question keys persist across versions) is confirmed in `form-builder.tsx` and noted
+- [x] `pnpm lint`, `pnpm check-types`, `pnpm --filter @repo/shared test` and `pnpm --filter api test` pass
 
 ## Comments
 
