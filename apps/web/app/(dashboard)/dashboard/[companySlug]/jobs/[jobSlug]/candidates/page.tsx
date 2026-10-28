@@ -12,7 +12,7 @@ import { PipelineBoard } from '@/components/dashboard/candidates/pipeline-board'
 import { RatingCriteriaPicker } from '@/components/dashboard/candidates/rating-criteria-picker';
 import { JobPageTransition } from '@/components/dashboard/jobs/job-page-transition';
 import { JobPage, type LoadedJob } from '@/components/dashboard/jobs/job-page';
-import { Skeleton } from '@/components/ui/skeleton';
+import { CandidatesSkeleton } from '@/components/dashboard/skeletons';
 import {
   flattenBoard,
   getJobForm,
@@ -41,7 +41,7 @@ export default function JobCandidatesPage({
 }: PageProps<'/dashboard/[companySlug]/jobs/[jobSlug]/candidates'>) {
   return (
     <JobPageTransition>
-      <JobPage params={params} fallback={<Skeleton className="h-64 w-full rounded-2xl" />}>
+      <JobPage params={params} fallback={<CandidatesSkeleton />}>
         {(company, job) => <Candidates company={company} job={job} searchParams={searchParams} />}
       </JobPage>
     </JobPageTransition>

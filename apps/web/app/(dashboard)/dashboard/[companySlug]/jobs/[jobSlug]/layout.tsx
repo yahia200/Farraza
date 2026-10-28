@@ -6,7 +6,7 @@ import { JobPage } from '@/components/dashboard/jobs/job-page';
 import { JobStatusActions } from '@/components/dashboard/jobs/job-status-actions';
 import { JobStatusBadge } from '@/components/dashboard/jobs/job-status-badge';
 import { JobTabs } from '@/components/dashboard/jobs/job-tabs';
-import { Skeleton } from '@/components/ui/skeleton';
+import { JobHeaderSkeleton } from '@/components/dashboard/skeletons';
 import { hasPublishedForm } from '@/lib/dal';
 
 /**
@@ -17,7 +17,7 @@ import { hasPublishedForm } from '@/lib/dal';
 export default function JobLayout({ children, params }: LayoutProps<'/dashboard/[companySlug]/jobs/[jobSlug]'>) {
   return (
     <div className="flex flex-col gap-4">
-      <JobPage params={params} fallback={<Skeleton className="h-12 w-80" />}>
+      <JobPage params={params} fallback={<JobHeaderSkeleton />}>
         {(company, job) => (
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-1">

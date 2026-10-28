@@ -4,13 +4,26 @@ import { CompanyPage, PageTitle } from '@/components/dashboard/company-page';
 import { AddMemberDialog } from '@/components/dashboard/members/add-member-dialog';
 import type { MemberRow } from '@/components/dashboard/members/data-table-features';
 import { MembersTable } from '@/components/dashboard/members/members-table';
+import { PageHeaderSkeleton, SkeletonGroup, TableSkeleton } from '@/components/dashboard/skeletons';
 import { getCurrentUser, getMembers, type MyCompany } from '@/lib/dal';
 import { formatDate } from '@/lib/format';
 
 export const metadata: Metadata = { title: 'Members · Farraza' };
 
 export default function MembersPage({ params }: PageProps<'/dashboard/[companySlug]/members'>) {
-  return <CompanyPage params={params}>{(company) => <Members company={company} />}</CompanyPage>;
+  return (
+    <CompanyPage
+      params={params}
+      fallback={
+        <SkeletonGroup label="Loading members" className="flex flex-col gap-4">
+          <PageHeaderSkeleton />
+          <TableSkeleton columns={4} rows={4} />
+        </SkeletonGroup>
+      }
+    >
+      {(company) => <Members company={company} />}
+    </CompanyPage>
+  );
 }
 
 async function Members({ company }: { company: MyCompany }) {

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { CompanyPage, PageTitle } from '@/components/dashboard/company-page';
+import { CardGridSkeleton, PageTitleSkeleton, SkeletonGroup } from '@/components/dashboard/skeletons';
 import { NAV_ITEMS } from '@/components/dashboard/nav-items';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -14,7 +15,15 @@ const DESCRIPTIONS: Record<string, string> = {
 
 export default function OverviewPage({ params }: PageProps<'/dashboard/[companySlug]'>) {
   return (
-    <CompanyPage params={params}>
+    <CompanyPage
+      params={params}
+      fallback={
+        <SkeletonGroup label="Loading overview" className="flex flex-col gap-4">
+          <PageTitleSkeleton />
+          <CardGridSkeleton />
+        </SkeletonGroup>
+      }
+    >
       {(company) => (
         <>
           <PageTitle title={company.name} description={`You're signed in as ${company.role}.`} />

@@ -3,6 +3,7 @@ import { canManageJobs } from '@repo/shared';
 import { JobDetailsForm } from '@/components/dashboard/jobs/job-details-form';
 import { JobPageTransition } from '@/components/dashboard/jobs/job-page-transition';
 import { JobPage } from '@/components/dashboard/jobs/job-page';
+import { JobOverviewSkeleton } from '@/components/dashboard/skeletons';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/format';
 
@@ -12,7 +13,7 @@ export const metadata: Metadata = { title: 'Job · Farraza' };
 export default function JobOverviewPage({ params }: PageProps<'/dashboard/[companySlug]/jobs/[jobSlug]'>) {
   return (
     <JobPageTransition>
-      <JobPage params={params}>
+      <JobPage params={params} fallback={<JobOverviewSkeleton />}>
         {(company, job) => (
           <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_16rem]">
             {/* key: fresh default values if the job changes underneath. */}

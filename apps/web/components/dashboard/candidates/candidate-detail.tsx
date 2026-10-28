@@ -213,11 +213,19 @@ export function CandidateDetailSkeleton() {
         <Skeleton className="h-6 w-48" />
         <Skeleton className="h-4 w-32" />
       </SheetHeader>
-      <div className="flex flex-col gap-4 p-4">
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-24 w-full" />
-        <Skeleton className="h-24 w-full" />
-        <Skeleton className="h-32 w-full" />
+      <div className="flex flex-col gap-6 p-4" aria-busy="true" aria-hidden="true">
+        {/* Contact, Answers and Ratings: a heading, then label/value pairs. */}
+        {[2, 3, 2].map((rows, section) => (
+          <div key={section} className="flex flex-col gap-3">
+            <Skeleton className="h-4 w-24" />
+            {Array.from({ length: rows }, (_, row) => (
+              <div key={row} className="flex flex-col gap-1.5">
+                <Skeleton className="h-3.5 w-32" />
+                <Skeleton className="h-4 w-56 max-w-full" />
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
     </>
   );

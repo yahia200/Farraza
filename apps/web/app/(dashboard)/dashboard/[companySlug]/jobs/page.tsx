@@ -4,13 +4,26 @@ import { CompanyPage, PageTitle } from '@/components/dashboard/company-page';
 import type { JobRow } from '@/components/dashboard/jobs/data-table-features';
 import { JobsTable } from '@/components/dashboard/jobs/jobs-table';
 import { NewJobDialog } from '@/components/dashboard/jobs/new-job-dialog';
+import { PageHeaderSkeleton, SkeletonGroup, TableSkeleton } from '@/components/dashboard/skeletons';
 import { getJobs, type MyCompany } from '@/lib/dal';
 import { formatDate } from '@/lib/format';
 
 export const metadata: Metadata = { title: 'Jobs · Farraza' };
 
 export default function JobsPage({ params }: PageProps<'/dashboard/[companySlug]/jobs'>) {
-  return <CompanyPage params={params}>{(company) => <Jobs company={company} />}</CompanyPage>;
+  return (
+    <CompanyPage
+      params={params}
+      fallback={
+        <SkeletonGroup label="Loading jobs" className="flex flex-col gap-4">
+          <PageHeaderSkeleton />
+          <TableSkeleton columns={4} />
+        </SkeletonGroup>
+      }
+    >
+      {(company) => <Jobs company={company} />}
+    </CompanyPage>
+  );
 }
 
 async function Jobs({ company }: { company: MyCompany }) {

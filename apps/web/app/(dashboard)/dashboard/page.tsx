@@ -1,12 +1,12 @@
 import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
-import { Spinner } from '@/components/ui/spinner';
 import { getMyCompanies } from '@/lib/dal';
 
 /** /dashboard has no page of its own: it sends you to your first company, or to onboarding. */
 export default function DashboardIndexPage() {
   return (
-    <Suspense fallback={<Spinner className="m-auto size-6" />}>
+    // Nothing to draw: this page only redirects (web.md, "Loading states").
+    <Suspense fallback={null}>
       <ToFirstCompany />
     </Suspense>
   );

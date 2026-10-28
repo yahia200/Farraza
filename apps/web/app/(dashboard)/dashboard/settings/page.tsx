@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { PageTitle } from '@/components/dashboard/company-page';
+import { SkeletonGroup } from '@/components/dashboard/skeletons';
 import { SettingsView } from '@/components/settings/settings-view';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,12 +21,34 @@ export default function SettingsPage() {
       <PageTitle title="Settings" description="Manage your account and how Farraza looks." />
       <SettingsView
         account={
-          <Suspense fallback={<Skeleton className="h-40 w-full max-w-xl" />}>
+          <Suspense fallback={<AccountSkeleton />}>
             <AccountCard />
           </Suspense>
         }
       />
     </>
+  );
+}
+
+/** The Account card's shape: title and description, then Name and Email rows. */
+function AccountSkeleton() {
+  return (
+    <SkeletonGroup label="Loading account" className="max-w-xl">
+      <Card ghost aria-hidden="true">
+        <CardHeader className="gap-2">
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-3.5 w-48" />
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          {[0, 1].map((i) => (
+            <div key={i} className="grid gap-1.5">
+              <Skeleton className="h-4 w-12" />
+              <Skeleton className="h-4 w-44" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </SkeletonGroup>
   );
 }
 

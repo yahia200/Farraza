@@ -1,5 +1,5 @@
 import { Suspense, type ReactNode } from 'react';
-import { Spinner } from '@/components/ui/spinner';
+import { PageTitleSkeleton, SkeletonGroup } from '@/components/dashboard/skeletons';
 import { getCompany, type MyCompany } from '@/lib/dal';
 
 /**
@@ -11,12 +11,19 @@ import { getCompany, type MyCompany } from '@/lib/dal';
 export function CompanyPage({
   params,
   children,
+  fallback = (
+    <SkeletonGroup label="Loading">
+      <PageTitleSkeleton />
+    </SkeletonGroup>
+  ),
 }: {
   params: Promise<{ companySlug: string }>;
   children: (company: MyCompany) => ReactNode;
+  /** A skeleton shaped like this page's content (web.md, "Loading states"). */
+  fallback?: ReactNode;
 }) {
   return (
-    <Suspense fallback={<Spinner className="m-auto size-6" />}>
+    <Suspense fallback={fallback}>
       <WithCompany params={params}>{children}</WithCompany>
     </Suspense>
   );

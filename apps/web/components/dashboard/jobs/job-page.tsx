@@ -1,5 +1,5 @@
 import { Suspense, type ReactNode } from 'react';
-import { Spinner } from '@/components/ui/spinner';
+import { FormSkeleton, SkeletonGroup } from '@/components/dashboard/skeletons';
 import { getCompany, getJob, type CompanyJob, type JobStage, type MyCompany } from '@/lib/dal';
 
 type JobParams = Promise<{ companySlug: string; jobSlug: string }>;
@@ -14,7 +14,11 @@ export type LoadedJob = CompanyJob & { stages: JobStage[] };
 export function JobPage({
   params,
   children,
-  fallback = <Spinner className="m-auto size-6" />,
+  fallback = (
+    <SkeletonGroup label="Loading job">
+      <FormSkeleton />
+    </SkeletonGroup>
+  ),
 }: {
   params: JobParams;
   children: (company: MyCompany, job: LoadedJob) => ReactNode;
