@@ -36,13 +36,8 @@ const steps: Step[] = [
       "bg-primary-500/65 backdrop-blur-md text-primary-foreground",
   },
   {
-<<<<<<< Updated upstream
-    title: 'Share the link',
-    text: 'Every job gets its own public page. Applicants answer one question at a time, on any phone, and attach their CV as they go.',
-=======
     title: "Share one link",
     text: "Every job gets its own public page. Applicants answer one question at a time, on any phone, and attach their CV as they go.",
->>>>>>> Stashed changes
     image: {
       src: "/landing/apply-on-phone.webp",
       alt: 'Apply page on a phone asking "How long have you worked with React?" with three choices',
