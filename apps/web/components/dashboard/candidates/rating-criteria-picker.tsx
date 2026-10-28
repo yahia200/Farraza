@@ -1,10 +1,10 @@
 'use client';
 
 import { RATING_CRITERIA, RATING_CRITERIA_LIMIT } from '@repo/shared';
-import { StarIcon } from 'lucide-react';
 import { startTransition, useId, useOptimistic, useState } from 'react';
 import { saveRatingCriteria, type SaveRatingCriteriaResult } from '@/app/actions/jobs';
 import { Button } from '@/components/ui/button';
+import { RatingStarIcon } from './rating-star-icon';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import {
@@ -93,7 +93,7 @@ export function RatingCriteriaPicker({
         render={<Button variant="ghost" size="icon-sm" aria-label="Choose rating criteria" />}
         className="text-muted-foreground"
       >
-        <StarIcon />
+        <RatingStarIcon className="size-4 fill-none text-muted-foreground" />
       </PopoverTrigger>
       <PopoverContent align="start" collisionPadding={16} className="w-80 max-w-[calc(100vw-2rem)]">
         <PopoverHeader>
@@ -118,7 +118,7 @@ export function RatingCriteriaPicker({
                   disabled={!checked && atLimit}
                   onCheckedChange={(next) => toggle(criterion.key, next)}
                 />
-                <span className="min-w-0 break-words">{criterion.label}</span>
+                <span className="min-w-0 wrap-break-words">{criterion.label}</span>
               </Label>
             );
           })}
