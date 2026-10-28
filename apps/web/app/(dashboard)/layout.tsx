@@ -41,7 +41,9 @@ export default function DashboardLayout({ children }: LayoutProps<'/'>) {
             </Suspense>
           }
         />
-        <SidebarInset>
+        {/* `min-w-0`: SidebarInset is a flex item beside the sidebar, and a flex item can't shrink below
+            its content's width unless this is set, so a wide table would stretch the whole page. */}
+        <SidebarInset className="min-w-0">
           <DashboardHeader />
           <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
             {/* Reads the session, so it streams in after the static shell. */}
