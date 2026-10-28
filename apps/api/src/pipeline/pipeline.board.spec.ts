@@ -353,7 +353,7 @@ describe('the pipeline board', () => {
   });
 
   describe('with Highlighted questions', () => {
-    it('gives each card only the Highlighted answers, as display text, or null when unanswered', async () => {
+    it('gives each card only the Highlighted answers, raw and tagged by type, or null when unanswered', async () => {
       publish(
         'version-1',
         formOf([city, level({ junior: 'Junior', senior: 'Senior' }), onSite]),
@@ -372,7 +372,7 @@ describe('the pipeline board', () => {
       expect(
         (await cardsOf()).map((card) => [card.id, card.highlights]),
       ).toEqual([
-        ['mona', { [Q.level]: 'Senior', [Q.onSite]: 'No' }],
+        ['mona', { [Q.level]: { type: 'select', labels: ['Senior'] }, [Q.onSite]: { type: 'yes_no', value: false } }],
         ['omar', { [Q.level]: null, [Q.onSite]: null }],
       ]);
     });
@@ -402,8 +402,8 @@ describe('the pipeline board', () => {
       expect(
         (await cardsOf()).map((card) => [card.id, card.highlights[Q.level]]),
       ).toEqual([
-        ['new', 'Experienced'],
-        ['old', 'Senior'],
+        ['new', { type: 'select', labels: ['Experienced'] }],
+        ['old', { type: 'select', labels: ['Senior'] }],
       ]);
     });
 
@@ -473,13 +473,13 @@ describe('the pipeline board', () => {
       );
 
       expect(board.highlightedQuestions).toEqual([
-        { key: Q.city, label: 'City' },
+        { key: Q.city, label: 'City', kind: 'text' },
       ]);
       expect(
         board.columns
           .flatMap((c) => c.applications)
           .map((card) => card.highlights),
-      ).toEqual([{ [Q.city]: 'Cairo' }]);
+      ).toEqual([{ [Q.city]: { type: 'text', value: 'Cairo' } }]);
     });
 
     it('leaves out a stored key that the latest published form has on a Question that cannot be highlighted', async () => {
@@ -502,7 +502,7 @@ describe('the pipeline board', () => {
         board.columns
           .flatMap((c) => c.applications)
           .map((card) => card.highlights),
-      ).toEqual([{ [Q.city]: 'Cairo' }]);
+      ).toEqual([{ [Q.city]: { type: 'text', value: 'Cairo' } }]);
     });
 
     it('does not read answers when every stored key is stale', async () => {
@@ -548,9 +548,9 @@ describe('the pipeline board', () => {
       );
 
       expect(board.highlightedQuestions).toEqual([
-        { key: Q.onSite, label: 'On site?' },
-        { key: Q.city, label: 'City' },
-        { key: Q.level, label: 'Seniority' },
+        { key: Q.onSite, label: 'On site?', kind: 'yes_no' },
+        { key: Q.city, label: 'City', kind: 'text' },
+        { key: Q.level, label: 'Seniority', kind: 'select' },
       ]);
     });
 
@@ -585,6 +585,36 @@ describe('the pipeline board', () => {
       ]);
     });
 
+    it("keeps an Application's answer in the type its own version had, while the column takes the latest form's kind", async () => {
+      repository.seedVersion('version-1', formOf([city]));
+      publish(
+        'version-2',
+        formOf([{ ...city, type: 'number', config: { min: null, max: null, integerOnly: false } }]),
+      );
+      highlight(Q.city);
+      repository.seedApplication({
+        id: 'old',
+        formVersionId: 'version-1',
+        answers: { [Q.city]: 'Cairo' },
+      });
+      repository.seedApplication({
+        id: 'new',
+        formVersionId: 'version-2',
+        submittedAt: new Date('2026-04-01T00:00:00Z'),
+        answers: { [Q.city]: 7 },
+      });
+
+      const board = await service.board(member('company-1', 'recruiter'), 'engineer');
+
+      expect(board.highlightedQuestions).toEqual([{ key: Q.city, label: 'City', kind: 'number' }]);
+      expect(
+        board.columns.flatMap((c) => c.applications).map((card) => [card.id, card.highlights[Q.city]]),
+      ).toEqual([
+        ['new', { type: 'number', value: 7 }],
+        ['old', { type: 'text', value: 'Cairo' }],
+      ]);
+    });
+
     it('cuts long text at 200 characters', async () => {
       publish('version-1', formOf([cover]));
       highlight(Q.cover);
@@ -595,7 +625,7 @@ describe('the pipeline board', () => {
 
       const [card] = await cardsOf();
 
-      expect(card!.highlights[Q.cover]).toBe(`${'a'.repeat(200)}…`);
+      expect(card!.highlights[Q.cover]).toEqual({ type: 'text', value: `${'a'.repeat(200)}…` });
     });
   });
 
@@ -672,7 +702,7 @@ describe('the pipeline board', () => {
       const [card] = await cardsOf();
 
       expect(card?.rating).toEqual({ average: 5, count: 1 });
-      expect(card?.highlights).toEqual({ [Q.city]: 'Cairo' });
+      expect(card?.highlights).toEqual({ [Q.city]: { type: 'text', value: 'Cairo' } });
       expect(repository.ratingRequests).toHaveLength(1);
     });
 
@@ -734,7 +764,7 @@ describe('the pipeline board', () => {
 
       expect(
         (await cardsOf('interviewer')).map((card) => card.highlights),
-      ).toEqual([{ [Q.city]: 'Cairo' }]);
+      ).toEqual([{ [Q.city]: { type: 'text', value: 'Cairo' } }]);
     });
   });
 });

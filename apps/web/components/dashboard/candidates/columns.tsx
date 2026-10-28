@@ -1,11 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import { compareHighlightSort, highlightSortValue, type HighlightSortValue } from '@repo/shared';
 import { createColumnHelper } from '@tanstack/react-table';
 import { DataTableSortButton } from '@/components/data-table/data-table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { HighlightedQuestion } from '@/lib/dal';
-import { ApplicationStatusBadge } from './application-status-badge';
 import { AverageRatingLabel } from './average-rating-label';
 import { ContactActions } from './contact-actions';
 import type { CandidateRow, CandidatesTableFeatures } from './data-table-features';
@@ -70,13 +70,6 @@ const stageColumn =columnHelper.accessor((row) => row.stage.position, {
   meta: { className: 'w-px whitespace-nowrap' },
 });
 
-const statusColumn = columnHelper.accessor('status', {
-  header: 'Status',
-  enableSorting: false,
-  cell: ({ row }) => <ApplicationStatusBadge status={row.original.status} />,
-  meta: { className: 'w-px whitespace-nowrap' },
-});
-
 const appliedColumn = columnHelper.accessor('submittedAt', {
   header: ({ column }) => <DataTableSortButton column={column}>Applied</DataTableSortButton>,
   // ISO dates sort correctly as text.
@@ -89,35 +82,39 @@ const appliedColumn = columnHelper.accessor('submittedAt', {
 const HIGHLIGHT_WIDTH = 'max-w-48';
 
 /**
- * One display-only column for a Highlighted question: the Question's latest
- * text as the header (cut to one line, the full text in a tooltip and in the
- * DOM), and each Application's answer cut to one line, "—" when there is none.
- * The full answer is in the sheet. Not sortable and not filterable (spec, Out
- * of Scope).
+ * One column for a Highlighted question: the Question's latest text as the
+ * header (cut to one line, the full text in a tooltip and in the DOM), and each
+ * Application's answer cut to one line, "—" when there is none. The full answer
+ * is in the sheet. Sortable, not filterable. The cell shows the raw answer
+ * through `formatHighlight`; the sort reads `highlightSortValue`, which is
+ * `undefined` for no answer or an answer of another kind than the column holds
+ * (the Question's type changed between form versions), so those rows stay last
+ * in both directions, like the Rating column.
  */
-function highlightColumn({ key, label }: HighlightedQuestion) {
-  return columnHelper.accessor((row) => row.highlights[key] ?? null, {
+function highlightColumn({ key, label, kind }: HighlightedQuestion) {
+  return columnHelper.accessor((row) => highlightSortValue(row.highlights[key] ?? null, kind), {
     // Question keys are UUIDs, so this can't clash with the built-in ids.
     id: `highlight-${key}`,
-    enableSorting: false,
     enableColumnFilter: false,
-    header: () => (
-      <Tooltip>
-        {/*
-          A span, not Base UI's default <button>: the header does nothing when
-          pressed. tabIndex={0} lets keyboard users focus it, which opens the
-          tooltip (Base UI opens it on focus as well as hover), so a cut-off
-          Question can be read in full. Base UI disables tooltips on touch;
-          screen readers read the full text from the span.
-        */}
-        <TooltipTrigger
-          render={<span tabIndex={0} />}
-          className={`block ${HIGHLIGHT_WIDTH} truncate rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30`}
-        >
-          {label}
-        </TooltipTrigger>
-        <TooltipContent>{label}</TooltipContent>
-      </Tooltip>
+    sortUndefined: 'last',
+    sortFn: (rowA, rowB, columnId) =>
+      compareHighlightSort(rowA.getValue<HighlightSortValue>(columnId), rowB.getValue<HighlightSortValue>(columnId)),
+    header: ({ column }) => (
+      <DataTableSortButton column={column}>
+        <Tooltip>
+          {/*
+            A span, not Base UI's default <button>: the sort button around it is the
+            button, and a button can't contain one. The tooltip opens on hover only
+            (a span in a button takes no focus of its own); keyboard and screen
+            reader users get the full text from the span, which is only visually
+            cut. Base UI disables tooltips on touch.
+          */}
+          <TooltipTrigger render={<span />} className={`block ${HIGHLIGHT_WIDTH} truncate`}>
+            {label}
+          </TooltipTrigger>
+          <TooltipContent>{label}</TooltipContent>
+        </Tooltip>
+      </DataTableSortButton>
     ),
     cell: ({ row }) => (
       <HighlightAnswer
@@ -129,8 +126,8 @@ function highlightColumn({ key, label }: HighlightedQuestion) {
 }
 
 /**
- * The table's columns: Candidate, Rating, then one per Highlighted question (in form
- * order, as the API sends them), then Stage, Status, Applied and the Contact actions. The set
+ * The table's columns: Candidate, then one per Highlighted question (in form
+ * order, as the API sends them), then Rating, Stage, Applied and the Contact actions. The set
  * varies per Job, so it is built from `highlightedQuestions`; the caller
  * memoizes it, because TanStack Table expects `columns` to stay the same
  * array between renders (table-core 9.2.8 `skills/core/SKILL.md`, "Essential
@@ -139,10 +136,9 @@ function highlightColumn({ key, label }: HighlightedQuestion) {
 export function candidateColumns(highlightedQuestions: HighlightedQuestion[]) {
   return columnHelper.columns([
     candidateColumn,
-    ratingColumn,
     ...highlightedQuestions.map(highlightColumn),
+    ratingColumn,
     stageColumn,
-    statusColumn,
     appliedColumn,
     contactColumn,
   ]);
