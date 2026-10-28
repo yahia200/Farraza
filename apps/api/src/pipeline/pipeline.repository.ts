@@ -143,9 +143,15 @@ export class PipelineRepository {
         average: aggregate.avg('overall'),
       }));
 
-    // `avg` is nullable in the types because an empty group has none; a group here has a row.
+    // `avg` is nullable in the types because an empty group has none, but a group exists only because it
+    // has a row. Throw if that ever fails, rather than turn it into a 0 that reads as a real score.
     return new Map(
-      rows.map((row) => [row.applicationId, { count: row.count, average: row.average ?? 0 }]),
+      rows.map((row) => {
+        if (row.average === null) {
+          throw new Error(`Rating group for application ${row.applicationId} has no average.`);
+        }
+        return [row.applicationId, { count: row.count, average: row.average }];
+      }),
     );
   }
 
