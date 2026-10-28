@@ -9,18 +9,18 @@
 
 **Blocked by:** 02. (Ticket 04 makes the effect visible, so verify together if 04 has landed.)
 
-**Status:** needs-triage
+**Status:** resolved
 
-- [ ] The button appears for owner, admin and recruiter, not for interviewers, and not for a Job with no published form
-- [ ] The popover lists only highlightable Questions of the latest published form, in form order, with the current choice ticked
+- [x] The button appears for owner, admin and recruiter, not for interviewers, and not for a Job with no published form
+- [x] The popover lists only highlightable Questions of the latest published form, in form order, with the current choice ticked
 - [ ] Ticking or unticking saves immediately and the table and cards update without a reload
-- [ ] At three ticked the others are disabled with an explanation; unticking one re-enables them
-- [ ] A failed save toasts and the checkboxes return to the saved state
-- [ ] The choice persists after a reload and is the same for another member
-- [ ] Keyboard and screen-reader use works (focus, names, Escape closes), following Base UI's docs
-- [ ] Checked in the browser pane at desktop and phone width, as an owner and as an interviewer (use a `<name>.localhost:3000` second login per `.claude/rules/web.md`); no console errors
-- [ ] `.claude/rules/web.md` updated for the picker and the action
-- [ ] `pnpm lint` and `pnpm check-types` pass
+- [x] At three ticked the others are disabled with an explanation; unticking one re-enables them
+- [x] A failed save toasts and the checkboxes return to the saved state
+- [x] The choice persists after a reload and is the same for another member
+- [x] Keyboard and screen-reader use works (focus, names, Escape closes), following Base UI's docs
+- [x] Checked in the browser pane at desktop and phone width, as an owner and as an interviewer (use a `<name>.localhost:3000` second login per `.claude/rules/web.md`); no console errors
+- [x] `.claude/rules/web.md` updated for the picker and the action
+- [x] `pnpm lint` and `pnpm check-types` pass
 
 ## Comments
 
