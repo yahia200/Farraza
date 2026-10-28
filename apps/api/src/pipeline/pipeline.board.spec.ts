@@ -58,7 +58,7 @@ class InMemoryPipelineRepository implements Pick<
       stageId: 'stage-applied',
       status: 'active',
       submittedAt: new Date('2026-03-01T00:00:00Z'),
-      candidate: { name: row.id, email: `${row.id}@example.com` },
+      candidate: { name: row.id, email: `${row.id}@example.com`, phone: '+201000000000' },
       formVersionId: 'version-1',
       answers: {},
       ...row,

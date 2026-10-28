@@ -8,7 +8,7 @@ export interface ApplicationCard {
   stageId: string;
   status: ApplicationStatus;
   submittedAt: Date;
-  candidate: { name: string; email: string };
+  candidate: { name: string; email: string; phone: string };
   /**
    * The answer to each of the Job's Highlighted questions, keyed by Question key: display text
    * (`formatHighlightText`), or null when unanswered or when this Application's form version has

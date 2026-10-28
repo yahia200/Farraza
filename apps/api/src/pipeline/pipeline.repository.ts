@@ -39,6 +39,7 @@ function toCardRow(row: {
   status: ApplicationStatus;
   submittedAt: Date;
   email: string;
+  phone: string;
   candidate: { name: string };
 }): CardRow {
   return {
@@ -46,8 +47,8 @@ function toCardRow(row: {
     stageId: row.stageId,
     status: row.status,
     submittedAt: row.submittedAt,
-    // The email this application was sent with (the candidate row keeps the latest).
-    candidate: { name: row.candidate.name, email: row.email },
+    // The email and phone this application was sent with (the candidate row keeps the latest).
+    candidate: { name: row.candidate.name, email: row.email, phone: row.phone },
   };
 }
 
@@ -78,7 +79,7 @@ export class PipelineRepository {
    */
   async findCards(companyId: string, jobId: string): Promise<CardRow[]> {
     const rows = await this.applications
-      .select('id', 'stageId', 'status', 'submittedAt', 'email')
+      .select('id', 'stageId', 'status', 'submittedAt', 'email', 'phone')
       .where({ companyId, jobId })
       .include('candidate')
       .orderBy((application) => application.submittedAt.desc())
@@ -94,7 +95,7 @@ export class PipelineRepository {
    */
   async findCardsWithAnswers(companyId: string, jobId: string): Promise<CardRowWithAnswers[]> {
     const rows = await this.applications
-      .select('id', 'stageId', 'status', 'submittedAt', 'email', 'formVersionId', 'answers')
+      .select('id', 'stageId', 'status', 'submittedAt', 'email', 'phone', 'formVersionId', 'answers')
       .where({ companyId, jobId })
       .include('candidate')
       .orderBy((application) => application.submittedAt.desc())

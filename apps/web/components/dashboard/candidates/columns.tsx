@@ -6,6 +6,7 @@ import { DataTableSortButton } from '@/components/data-table/data-table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { HighlightedQuestion } from '@/lib/dal';
 import { ApplicationStatusBadge } from './application-status-badge';
+import { ContactActions } from './contact-actions';
 import type { CandidateRow, CandidatesTableFeatures } from './data-table-features';
 import { HighlightAnswer } from './highlight-answer';
 
@@ -30,7 +31,20 @@ const candidateColumn = columnHelper.accessor((row) => row.candidate.name, {
   ),
 });
 
-const stageColumn = columnHelper.accessor((row) => row.stage.position, {
+const contactColumn = columnHelper.display({
+  id: 'contact',
+  header: 'Contact',
+  cell: ({ row }) => (
+    <ContactActions
+      name={row.original.candidate.name}
+      email={row.original.candidate.email}
+      phone={row.original.candidate.phone}
+    />
+  ),
+  meta: { className: 'w-px' },
+});
+
+const stageColumn =columnHelper.accessor((row) => row.stage.position, {
   id: 'stage',
   header: ({ column }) => <DataTableSortButton column={column}>Stage</DataTableSortButton>,
   // Sorted and filtered by pipeline position, shown by name.
@@ -100,7 +114,7 @@ function highlightColumn({ key, label }: HighlightedQuestion) {
 
 /**
  * The table's columns: Candidate, then one per Highlighted question (in form
- * order, as the API sends them), then Stage, Status and Applied. The set
+ * order, as the API sends them), then Stage, Status, Applied and the Contact actions. The set
  * varies per Job, so it is built from `highlightedQuestions`; the caller
  * memoizes it, because TanStack Table expects `columns` to stay the same
  * array between renders (table-core 9.2.8 `skills/core/SKILL.md`, "Essential
@@ -113,5 +127,6 @@ export function candidateColumns(highlightedQuestions: HighlightedQuestion[]) {
     stageColumn,
     statusColumn,
     appliedColumn,
+    contactColumn,
   ]);
 }

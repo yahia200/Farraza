@@ -284,7 +284,7 @@ export interface ApplicationSummary {
   id: string;
   status: ApplicationStatus;
   submittedAt: string;
-  candidate: { name: string; email: string };
+  candidate: { name: string; email: string; phone: string };
   stage: JobStage;
   /**
    * The answer to each of the Job's Highlighted questions, keyed by Question key:
@@ -358,7 +358,7 @@ export async function getPipelineBoard(companySlug: string, jobSlug: string): Pr
         status,
         submittedAt,
         appliedLabel: formatDate(submittedAt),
-        candidate: { name: candidate.name, email: candidate.email },
+        candidate: { name: candidate.name, email: candidate.email, phone: candidate.phone },
         highlights,
       })),
     }))
