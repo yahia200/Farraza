@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Answers, FilePurpose, FormFields } from '@repo/shared';
+import type { Answers, FilePurpose, FormFields, RatingValues } from '@repo/shared';
 import type { StageKind } from '../jobs/job.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
@@ -10,7 +10,6 @@ import type {
   ApplicationStatus,
   DownloadableFile,
   NoteView,
-  RatingValues,
   SavedRating,
 } from './pipeline.js';
 import { EVENT_FOR_STAGE, STATUS_FOR_STAGE } from './pipeline.js';
@@ -143,9 +142,15 @@ export class PipelineRepository {
         average: aggregate.avg('overall'),
       }));
 
-    // `avg` is nullable in the types because an empty group has none; a group here has a row.
+    // `avg` is nullable in the types because an empty group has none, but a group exists only because it
+    // has a row. Throw if that ever fails, rather than turn it into a 0 that reads as a real score.
     return new Map(
-      rows.map((row) => [row.applicationId, { count: row.count, average: row.average ?? 0 }]),
+      rows.map((row) => {
+        if (row.average === null) {
+          throw new Error(`Rating group for application ${row.applicationId} has no average.`);
+        }
+        return [row.applicationId, { count: row.count, average: row.average }];
+      }),
     );
   }
 
@@ -329,8 +334,11 @@ export class PipelineRepository {
     resolve: (previous: RatingValues | null) => RatingValues;
   }): Promise<SavedRating> {
     return this.prisma.db.transaction(async (tx) => {
+      // Scoped by company like every read here. The upsert below cannot be: its `conflictOn` names the
+      // UNIQUE (application_id, user_id) key only, which is global (an Application id belongs to one
+      // company, and the service has already checked that this one is the caller's).
       const existing = await tx.orm.public.Rating
-        .where({ applicationId: input.applicationId, userId: input.userId })
+        .where({ companyId: input.companyId, applicationId: input.applicationId, userId: input.userId })
         .first();
       const previous = existing ? toRatingValues(existing) : null;
       const current = input.resolve(previous);

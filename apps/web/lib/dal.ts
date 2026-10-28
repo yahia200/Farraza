@@ -9,6 +9,7 @@ import type {
   FilePurpose,
   FormFields,
   RatingSummary,
+  RatingValues,
 } from '@repo/shared';
 import { apiFetch } from './api';
 import { formatDate } from './format';
@@ -388,22 +389,20 @@ export function flattenBoard(columns: PipelineColumn[]): (ApplicationSummary & {
   return columns.flatMap(({ applications, ...stage }) => applications.map((card) => ({ ...card, stage })));
 }
 
-/** Mirrors ApplicationDetail in apps/api/src/pipeline/pipeline.ts (dates as ISO strings). */
 /**
  * One Member's Rating on an Application, as the detail returns it (RatingView in
- * apps/api/src/pipeline/pipeline.ts). `userId` is null when the author has left the company
- * (`name` is then "Former member"): that Rating is never the viewer's own. `criteria` holds the
+ * apps/api/src/pipeline/pipeline.ts). `userId` is null when the author's user is gone
+ * (`name` is then `FORMER_MEMBER_NAME`): that Rating is never the viewer's own. `criteria` holds the
  * scores as stored, so it can include Criteria the Job no longer uses.
  */
-export interface RatingView {
+export interface RatingView extends RatingValues {
   userId: string | null;
   name: string;
-  overall: number;
-  criteria: Record<string, number>;
   /** ISO timestamp. */
   updatedAt: string;
 }
 
+/** Mirrors ApplicationDetail in apps/api/src/pipeline/pipeline.ts (dates as ISO strings). */
 export interface ApplicationDetailView {
   id: string;
   status: ApplicationStatus;

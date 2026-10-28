@@ -1,6 +1,6 @@
 'use client';
 
-import { RATING_MAX, RATING_MIN } from '@repo/shared';
+import { RATING_MAX, RATING_MIN, type RatingValues } from '@repo/shared';
 import { startTransition, useId, useMemo, useOptimistic, useState } from 'react';
 import { saveRating, type SaveRatingResult } from '@/app/actions/applications';
 import { toast } from '@/components/ui/toast';
@@ -9,7 +9,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 const SCORES = Array.from({ length: RATING_MAX - RATING_MIN + 1 }, (_, index) => RATING_MIN + index);
 
 /** The viewer's own Rating as the sheet shows it. A Criterion with no entry is not scored. */
-type OwnRating = { overall: number | null; criteria: Record<string, number> };
+type OwnRating = { overall: number | null } & Pick<RatingValues, 'criteria'>;
 
 /** What one click changes: the overall, or one Criterion (`null` clears it). */
 type Change = { overall: number } | { criterion: string; score: number | null };
@@ -55,7 +55,7 @@ export function RatingControl({
   /** The Criteria the Job uses now, in catalog order. */
   criteria: { key: string; label: string }[];
   /** The viewer's saved Rating, or null if they have not rated yet. */
-  saved: { overall: number; criteria: Record<string, number> } | null;
+  saved: RatingValues | null;
 }) {
   const base = useMemo<OwnRating>(
     () => ({ overall: saved?.overall ?? null, criteria: saved?.criteria ?? {} }),
@@ -63,7 +63,6 @@ export function RatingControl({
   );
   const [own, setOwn] = useOptimistic(base, apply);
   const [announcement, setAnnouncement] = useState('');
-  const overallLabelId = useId();
   const hintId = useId();
 
   function save(change: Change, saidAs: string) {
@@ -96,7 +95,6 @@ export function RatingControl({
     <div className="flex flex-col gap-3 rounded-2xl border p-3">
       <p className="font-medium">Your rating</p>
       <ScoreRow
-        labelId={overallLabelId}
         label="Overall"
         hiddenLabel=" rating, 1 to 5"
         score={own.overall ?? undefined}
@@ -113,9 +111,10 @@ export function RatingControl({
               : 'Score the criteria you can judge. Press a chosen score again to clear it.'}
           </p>
           {criteria.map((criterion) => (
-            <CriterionRow
+            <ScoreRow
               key={criterion.key}
-              criterion={criterion}
+              label={criterion.label}
+              hiddenLabel=" score, 1 to 5"
               score={own.criteria[criterion.key]}
               disabled={own.overall === null}
               describedBy={hintId}
@@ -136,33 +135,6 @@ export function RatingControl({
   );
 }
 
-function CriterionRow({
-  criterion,
-  score,
-  disabled,
-  describedBy,
-  onChange,
-}: {
-  criterion: { key: string; label: string };
-  score: number | undefined;
-  disabled: boolean;
-  describedBy: string;
-  onChange: (score: number | null) => void;
-}) {
-  const labelId = useId();
-  return (
-    <ScoreRow
-      labelId={labelId}
-      label={criterion.label}
-      hiddenLabel=" score, 1 to 5"
-      score={score}
-      disabled={disabled}
-      describedBy={describedBy}
-      onChange={onChange}
-    />
-  );
-}
-
 /**
  * A label and five buttons, 1 to 5. A Base UI ToggleGroup (docs/react/components/toggle-group.md):
  * `value` is an array even when one button is pressed, and pressing the pressed button gives `[]`,
@@ -170,7 +142,6 @@ function CriterionRow({
  * between the buttons; each is a `<button aria-pressed>`.
  */
 function ScoreRow({
-  labelId,
   label,
   hiddenLabel,
   score,
@@ -178,7 +149,6 @@ function ScoreRow({
   describedBy,
   onChange,
 }: {
-  labelId: string;
   label: string;
   /** Said by a screen reader after the visible label (the group's name). */
   hiddenLabel: string;
@@ -187,6 +157,7 @@ function ScoreRow({
   describedBy?: string;
   onChange: (score: number | null) => void;
 }) {
+  const labelId = useId();
   return (
     <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
       <span id={labelId} className="min-w-0 break-words">

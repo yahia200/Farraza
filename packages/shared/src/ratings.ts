@@ -59,6 +59,21 @@ export function checkRatingCriteria(
   return errors.length > 0 ? { ok: false, errors } : { ok: true, criteria: { ...criteria } };
 }
 
+/**
+ * What the detail and the `rated` event call the author of a Rating (and the sheet the author of a
+ * Note) once their user is gone: the API gives a Rating this name with `userId: null`, and the web
+ * uses it for a history line or a Note whose author it cannot find.
+ */
+export const FORMER_MEMBER_NAME = 'Former member';
+
+/**
+ * A Rating's scores as stored and as the detail returns them: the overall and a score per Criterion
+ * key, never `null` (a cleared score is removed). A `type`, not an `interface`, on purpose: an
+ * interface has no implicit index signature, so `RatingScores` is not assignable to the JSON value
+ * the `rated` event's `data` and the `criteria` column take, and this is.
+ */
+export type RatingValues = { overall: number; criteria: Record<string, number> };
+
 /** What `summariseRatings` reads of a Rating: the overall score and the Criteria scores. */
 export interface RatingScores {
   overall: number;

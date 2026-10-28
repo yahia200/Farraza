@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { AuthorizationService } from '@nestjs/authorization';
 import {
+  FORMER_MEMBER_NAME,
   checkRatingCriteria,
   formatHighlightText,
   highlightableQuestions,
@@ -10,6 +11,7 @@ import {
 } from '@repo/shared';
 import { isUniqueViolation } from '../common/db-errors.js';
 import type { Membership } from '../companies/company.js';
+import type { JobWithStages } from '../jobs/job.js';
 import { JobsService } from '../jobs/jobs.service.js';
 import type { User } from '../users/user.js';
 import { ApplicationPolicy } from './application.policy.js';
@@ -36,9 +38,6 @@ function mergeCriteria(existing: Record<string, number>, requested: RatingCriter
   }
   return merged;
 }
-
-/** What the detail calls a Rating's author once their user is gone (`ratings.user_id` is null). */
-const FORMER_MEMBER_NAME = 'Former member';
 
 @Injectable()
 export class PipelineService {
@@ -218,6 +217,17 @@ export class PipelineService {
     return { url, expiresInSeconds: DOWNLOAD_URL_TTL_SECONDS };
   }
 
+  /**
+   * The Stage this Application is in now, from the Job's own stages. 404 if the Application isn't in
+   * this company's Job (or, which cannot happen, sits in a Stage the Job doesn't have).
+   */
+  private async currentStageOf(membership: Membership, job: JobWithStages, applicationId: string) {
+    const stageId = await this.pipeline.findStageOf(membership.company.id, job.id, applicationId);
+    const stage = stageId ? job.stages.find((candidate) => candidate.id === stageId) : undefined;
+    if (!stage) throw new NotFoundException();
+    return stage;
+  }
+
   async move(
     user: User,
     membership: Membership,
@@ -231,12 +241,8 @@ export class PipelineService {
     const to = job.stages.find((stage) => stage.id === dto.stageId);
     if (!to) throw new BadRequestException('That stage is not part of this job.');
 
-    const currentStageId = await this.pipeline.findStageOf(membership.company.id, job.id, applicationId);
-    if (!currentStageId) throw new NotFoundException();
-    if (currentStageId === to.id) throw new ConflictException('The candidate is already in that stage.');
-
-    const from = job.stages.find((stage) => stage.id === currentStageId);
-    if (!from) throw new NotFoundException();
+    const from = await this.currentStageOf(membership, job, applicationId);
+    if (from.id === to.id) throw new ConflictException('The candidate is already in that stage.');
 
     const moved = await this.pipeline.move({
       companyId: membership.company.id,
@@ -287,10 +293,7 @@ export class PipelineService {
     await this.authorization.authorize(ApplicationPolicy, 'rate', user, membership);
 
     const job = await this.jobs.get(membership, jobSlug);
-    const stageId = await this.pipeline.findStageOf(membership.company.id, job.id, applicationId);
-    if (!stageId) throw new NotFoundException();
-    const stage = job.stages.find((candidate) => candidate.id === stageId);
-    if (!stage) throw new NotFoundException();
+    const stage = await this.currentStageOf(membership, job, applicationId);
 
     const requested = dto.criteria ?? {};
     const checked = checkRatingCriteria(requested, job.ratingCriteria);

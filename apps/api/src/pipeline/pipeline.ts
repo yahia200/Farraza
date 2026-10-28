@@ -1,4 +1,4 @@
-import type { Answers, CvMode, FilePurpose, FormFields, RatingSummary } from '@repo/shared';
+import type { Answers, CvMode, FilePurpose, FormFields, RatingSummary, RatingValues } from '@repo/shared';
 import type { StageKind } from '../jobs/job.js';
 
 export type ApplicationStatus = 'active' | 'rejected' | 'hired' | 'withdrawn';
@@ -91,20 +91,16 @@ export interface ApplicationDetail {
  * and `name` is "Former member" when the author's user is gone (the Rating stays and still counts).
  * `criteria` is as stored, so it can hold scores for Criteria the Job no longer uses.
  */
-export interface RatingView {
+export interface RatingView extends RatingValues {
   userId: string | null;
   name: string;
-  overall: number;
-  criteria: Record<string, number>;
   updatedAt: Date;
 }
 
 /** A Rating as `PipelineRepository` reads it: the author's name is null when the author's user is gone. */
-export interface RatingRow {
+export interface RatingRow extends RatingValues {
   userId: string | null;
   userName: string | null;
-  overall: number;
-  criteria: Record<string, number>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -113,13 +109,6 @@ export interface RatingRow {
 export type ApplicationDetailRow = Omit<ApplicationDetail, 'ratings' | 'ratingSummary'> & {
   ratings: RatingRow[];
 };
-
-/**
- * A Rating's scores as stored: the overall and a score per Criterion key, never `null` (a cleared score
- * is removed). A `type`, not an `interface`, so it is assignable to the JSON value the `rated` event
- * and the `criteria` column take (an interface has no implicit index signature).
- */
-export type RatingValues = { overall: number; criteria: Record<string, number> };
 
 /** A Rating as the API answers after a save: the Member's own scores and when they were saved. */
 export type SavedRating = RatingValues & { updatedAt: Date };
