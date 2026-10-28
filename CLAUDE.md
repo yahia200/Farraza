@@ -29,8 +29,8 @@ Use the local docs first: they match the installed version. Paths are relative t
 | Tool | Version | Local (version-matched) | Online |
 |---|---|---|---|
 | Turborepo | 2.11.7 | `node_modules/turbo/docs/` (start at `README.md`). Read before changing `turbo.json`; see root `AGENTS.md`. | https://turborepo.dev/docs |
-| pnpm | 11.25.0 | — | https://pnpm.io |
-| Next.js | 16.4.0 | `apps/web/node_modules/next/dist/docs/` (`01-app/` for the App Router). Read before writing web code; see `apps/web/AGENTS.md`. | https://nextjs.org/docs |
+| pnpm | 12.15.0 (the `packageManager` in the root `package.json`) | `pnpm help` and `pnpm <command> --help` (authoritative) | https://pnpm.io |
+| Next.js | 16.4.2 | `apps/web/node_modules/next/dist/docs/` (`01-app/` for the App Router). Read before writing web code; see `apps/web/AGENTS.md`. | https://nextjs.org/docs |
 | NestJS (core, common, config, testing, CLI) | 12.1 | READMEs only, so use the `.d.ts` files in `apps/api/node_modules/@nestjs/*` | https://docs.nestjs.com |
 | `@nestjs/authentication`, `@nestjs/authorization` | 0.0.1 | Each `README.md` (quick start) plus its `.d.ts` files. These are new packages. | https://docs.nestjs.com/security/authentication, https://docs.nestjs.com/security/authorization |
 | `@nestjs/mail` | 0.0.1 | `apps/api/node_modules/@nestjs/mail/README.md` (overview only), so use the `.d.ts` files in `apps/api/node_modules/@nestjs/mail/dist/` (module options: `interfaces/mail-module-options.interface.d.ts`); worked examples in `docs/nestjs/auth.md` ("Verify email addresses"). A new package. | https://docs.nestjs.com/application/mail |
@@ -40,13 +40,14 @@ Use the local docs first: they match the installed version. Paths are relative t
 | Nest Standard Schema validation | 12.1 | `apps/api/node_modules/@nestjs/common/pipes/standard-schema-validation.pipe.d.ts` | https://docs.nestjs.com/application/validation |
 | React Hook Form, `@hookform/resolvers` | 7.90 / 5.9 | `.d.ts` in `apps/web/node_modules/react-hook-form` | https://react-hook-form.com, https://ui.shadcn.com/docs/forms/react-hook-form |
 | Zod | 4.4.3 | `packages/shared/node_modules/zod/README.md`, or `apps/api/node_modules/zod/` (also a direct `apps/api` dependency, for the env schema and API-only query schemas); types in `v4/classic/schemas.d.ts` | https://zod.dev |
-| TypeScript | 6.0.3 (`packages/shared`, `apps/api`); 5.9.3 (`apps/web`) | `lib.esnext.temporal.d.ts` and the other libs in `apps/api/node_modules/typescript/lib/` (6.x only; web's 5.9 has no Temporal lib) | https://www.typescriptlang.org/docs/ |
+| TypeScript | 6.0.3 (`packages/shared`, `apps/api`); 5.9.3 (`apps/web`); 7.0.2 (root `package.json` devDependency only) | `lib.esnext.temporal.d.ts` and the other libs in `apps/api/node_modules/typescript/lib/` (6.x only; web's 5.9 has no Temporal lib) | https://www.typescriptlang.org/docs/ |
 | `temporal-polyfill` (web only) | 1.0.6 | `apps/web/node_modules/temporal-polyfill/README.md`; loaded in `apps/web/instrumentation-client.ts` (decision: question-types ticket 01, Owner decisions) | https://github.com/fullcalendar/temporal-polyfill |
 | Vitest | 4.1.11 | `.d.ts` in `apps/api/node_modules/vitest` | https://vitest.dev |
 | oxlint | 1.87.0 | `apps/api/node_modules/oxlint/README.md` | https://oxc.rs/docs/guide/usage/linter |
 | ESLint | 9.39.5 | — | https://eslint.org |
 | Tailwind CSS | 4.3.3 | — | https://tailwindcss.com/docs |
 | Base UI (`@base-ui/react`) | 1.8.0 | `apps/web/node_modules/@base-ui/react/docs/` | https://base-ui.com |
+| Animate UI (`@animate-ui/react`: the `components/ui/` files, `Tilt`, the copy button) | 2.3.0 | `apps/web/node_modules/@animate-ui/react/README.md`; each primitive's props in `dist/primitives/**/index.d.ts` and its behaviour in the sibling `index.js` (the copy button: `dist/primitives/buttons/copy/`) | https://animate-ui.com/docs |
 | `react-day-picker` (behind shadcn `calendar`, used by `components/date-picker.tsx`) | 10.0.2 | `apps/web/node_modules/react-day-picker/README.md`; props in `dist/esm/types/props.d.ts` | https://daypicker.dev, https://ui.shadcn.com/docs/components/base/date-picker |
 | docx-preview | 0.4.1 | `apps/web/node_modules/docx-preview/README.md` (API and options), `dist/docx-preview.d.ts`, readable source `dist/docx-preview.mjs` | https://github.com/VolodymyrBaydalka/docxjs |
 | shadcn | 4.21.3 | `apps/web/node_modules/shadcn/README.md` | https://ui.shadcn.com/docs |
@@ -60,7 +61,7 @@ Prisma 8 differs most from older knowledge: there is no `PrismaClient`, no `pris
 
 ## Commands
 
-Run from the repo root unless noted. Node >= 26, pnpm 11.
+Run from the repo root unless noted. Node >= 26, pnpm 12.
 
 ```bash
 docker compose up -d                 # Postgres 17 on :5432 (user/pass/db: hiring) + RustFS S3 on :9000 with the dev bucket and its CORS rules (docker/rustfs-cors.json); re-apply CORS with `docker compose up createbuckets`
@@ -116,6 +117,7 @@ If you're reasoning about cross-cutting work before touching files, open the rel
   - One logical change per commit; keep the subject in the imperative and under ~72 chars.
 - **Worktrees per session.** Each parallel desktop session runs in its own git worktree under `.claude/worktrees/` on its own branch, so sessions don't collide. A worktree is a fresh checkout: `.worktreeinclude` copies the `.env` files in automatically, but you must run `pnpm install` in a new worktree before `pnpm dev` works. Two sessions can't both bind ports 3000/3001, so only run dev servers in one at a time.
 - `AGENTS.md` (root) and `apps/web/AGENTS.md` contain blocks managed by `turbo` and `next dev` that get re-added automatically. Leave them in place.
+- **Agent skills from dependencies.** `pnpm-workspace.yaml` has a `permissions` block that grants `skills: true` to `@prisma/orm-postgres`, `@tanstack/react-table` and `prisma`. `pnpm install` then links the skills those packages ship into `.claude/skills/` as `pnpm-*` symlinks to `node_modules`; the `.gitignore` pnpm writes there keeps the symlinks out of git, so only that file is committed (list the decisions with `pnpm permissions list`; `pnpm permissions --help`). `apps/api/.claude/skills/prisma-8` is a committed copy of the Prisma 8 skill, written by the Prisma skills install.
 
 ## Agent skills
 
