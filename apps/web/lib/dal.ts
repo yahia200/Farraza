@@ -298,6 +298,15 @@ export interface HighlightedQuestion {
 }
 
 /**
+ * Only a Question's key and label: for the board's Highlighted questions, and for
+ * the published form's Questions that the page hands to the client-side picker
+ * (so a Question's config, auto-reject rules included, never reaches the browser).
+ */
+export function toHighlightedQuestion({ key, label }: HighlightedQuestion): HighlightedQuestion {
+  return { key, label };
+}
+
+/**
  * One card on the pipeline board: an application without its stage (the column
  * is the stage), plus the applied date already formatted on the server
  * (lib/format.ts). The card is a client component, so it renders this string
@@ -352,7 +361,7 @@ export async function getPipelineBoard(companySlug: string, jobSlug: string): Pr
       })),
     }))
     .sort((a, b) => a.position - b.position);
-  const highlightedQuestions = board.highlightedQuestions.map(({ key, label }) => ({ key, label }));
+  const highlightedQuestions = board.highlightedQuestions.map(toHighlightedQuestion);
   return { columns, highlightedQuestions };
 }
 

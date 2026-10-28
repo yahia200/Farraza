@@ -16,12 +16,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { toast } from '@/components/ui/toast';
-
-/** A highlightable Question of the latest published form, as the picker lists it. */
-export interface PickerQuestion {
-  key: string;
-  label: string;
-}
+import type { HighlightedQuestion } from '@/lib/dal';
 
 /**
  * Lets a person who can manage jobs choose the Job's Highlighted questions:
@@ -49,7 +44,8 @@ export function HighlightedQuestionsPicker({
 }: {
   companySlug: string;
   jobSlug: string;
-  questions: PickerQuestion[];
+  /** The latest published form's highlightable Questions, key and label only. */
+  questions: HighlightedQuestion[];
   savedKeys: string[];
 }) {
   const saved = questions.filter((question) => savedKeys.includes(question.key)).map((question) => question.key);

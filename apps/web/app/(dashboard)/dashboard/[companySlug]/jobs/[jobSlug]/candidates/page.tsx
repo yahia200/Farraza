@@ -18,6 +18,7 @@ import {
   type HighlightedQuestion,
   type MyCompany,
   type PipelineColumn,
+  toHighlightedQuestion,
 } from '@/lib/dal';
 
 export const metadata: Metadata = { title: 'Candidates · Farraza' };
@@ -64,7 +65,7 @@ async function Candidates({
   const selected = typeof application === 'string' ? application : undefined;
   // The latest published form's Questions, never the draft's: the list shows what applicants are asked now.
   const pickerQuestions = form?.published
-    ? highlightableQuestions(form.published.fields).map(({ key, label }) => ({ key, label }))
+    ? highlightableQuestions(form.published.fields).map(toHighlightedQuestion)
     : null;
 
   return (
