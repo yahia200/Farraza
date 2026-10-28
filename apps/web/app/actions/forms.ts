@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { cvModeSchema, parseFormFields, type CvMode, type FieldError, type FormFields } from '@repo/shared';
+import { GENERIC_FAILURE_MESSAGE } from '@/lib/action-failure';
 import { apiFetch, readApiError } from '@/lib/api';
 import { expirePublicJob } from '@/lib/public-jobs';
 
@@ -98,6 +99,6 @@ async function toFailure(response: Response): Promise<FormActionResult> {
     case 409: // "This draft was just published", "Someone else just started a draft", ...
       return { formError: message };
     default:
-      return { formError: 'Something went wrong. Please try again.' };
+      return { formError: GENERIC_FAILURE_MESSAGE };
   }
 }

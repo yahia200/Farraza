@@ -1,5 +1,8 @@
 import type { FieldError } from '@repo/shared';
 
+/** The fallback when a failed request has nothing more specific to tell the user. */
+export const GENERIC_FAILURE_MESSAGE = 'Something went wrong. Please try again.';
+
 /**
  * What a failed Server Action hands back to its form; success redirects
  * instead. `F` is the form's field names. Safe to import from Client Components.

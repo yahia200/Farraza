@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { verifyEmailSchema, type VerifyEmailInput } from '@repo/shared';
+import { GENERIC_FAILURE_MESSAGE } from '@/lib/action-failure';
 import { apiFetch, failureFromResponse } from '@/lib/api';
 
 /**
@@ -69,5 +70,5 @@ async function messageFor(response: Response): Promise<string> {
   const failure = await failureFromResponse(response, [], {
     400: (message) => ({ formError: message || 'This link is invalid or has expired.' }),
   });
-  return failure.formError ?? 'Something went wrong. Please try again.';
+  return failure.formError ?? GENERIC_FAILURE_MESSAGE;
 }

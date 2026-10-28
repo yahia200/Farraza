@@ -9,7 +9,7 @@ import {
   type ForgotPasswordInput,
   type ResetPasswordInput,
 } from '@repo/shared';
-import type { ActionFailure } from '@/lib/action-failure';
+import { GENERIC_FAILURE_MESSAGE, type ActionFailure } from '@/lib/action-failure';
 import { apiFetch, failureFromResponse, relaySessionCookie } from '@/lib/api';
 
 /**
@@ -59,7 +59,7 @@ export async function resetPassword(input: ResetPasswordInput): Promise<ResetPas
     const { fieldErrors } = z.flattenError(parsed.error);
     return fieldErrors.password
       ? { fieldErrors: { password: fieldErrors.password } }
-      : { formError: fieldErrors.token?.[0] ?? 'Something went wrong. Please try again.' };
+      : { formError: fieldErrors.token?.[0] ?? GENERIC_FAILURE_MESSAGE };
   }
 
   const response = await apiFetch('/api/auth/password/reset', {

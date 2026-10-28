@@ -9,7 +9,7 @@ import {
   type CompanySettingsFormInput,
   type CreateCompanyInput,
 } from '@repo/shared';
-import type { ActionFailure } from '@/lib/action-failure';
+import { GENERIC_FAILURE_MESSAGE, type ActionFailure } from '@/lib/action-failure';
 import { apiFetch, failureFromResponse } from '@/lib/api';
 import { expirePublicJob } from '@/lib/public-jobs';
 
@@ -68,7 +68,7 @@ export async function checkMembership(): Promise<{ message: string }> {
     redirect('/sign-in');
   }
   if (!response.ok) {
-    return { message: 'Something went wrong. Please try again.' };
+    return { message: GENERIC_FAILURE_MESSAGE };
   }
 
   const companies = (await response.json()) as unknown[];

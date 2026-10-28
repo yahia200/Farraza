@@ -1,7 +1,7 @@
 import 'server-only';
 import { cookies, headers } from 'next/headers';
 import type { FieldError } from '@repo/shared';
-import { fromValidationErrors, type ActionFailure } from './action-failure';
+import { fromValidationErrors, GENERIC_FAILURE_MESSAGE, type ActionFailure } from './action-failure';
 
 /**
  * Talks to the NestJS API from the Next.js server (the "backend for frontend").
@@ -104,7 +104,7 @@ export async function failureFromResponse<F extends string>(
     case 429: // ThrottlerGuard
       return { formError: 'Too many attempts. Wait a minute and try again.' };
     default:
-      return { formError: 'Something went wrong. Please try again.' };
+      return { formError: GENERIC_FAILURE_MESSAGE };
   }
 }
 

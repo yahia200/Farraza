@@ -12,6 +12,7 @@ import { createUpload } from '@/app/actions/applications';
 import { FileDropzone } from '@/components/file-upload/file-dropzone';
 import { FileUploadItem } from '@/components/file-upload/file-upload-item';
 import { QuestionnaireChoices, QuestionnaireInput } from '@/components/ui/questionnaire';
+import { GENERIC_FAILURE_MESSAGE } from '@/lib/action-failure';
 import { compressImageForUpload } from '@/lib/compress-image';
 import { formatFileSize } from '@/lib/format';
 import { readMediaDuration } from '@/lib/media-duration';
@@ -158,7 +159,7 @@ export function UploadControl({
       });
       if (controller.signal.aborted) return;
       if (!created.upload) {
-        throw new Error(created.formError ?? 'Something went wrong. Please try again.');
+        throw new Error(created.formError ?? GENERIC_FAILURE_MESSAGE);
       }
       await putFile({
         url: created.upload.url,

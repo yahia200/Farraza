@@ -12,7 +12,7 @@ import {
   type FieldError,
   type SubmitApplicationInput,
 } from '@repo/shared';
-import type { ActionFailure } from '@/lib/action-failure';
+import { GENERIC_FAILURE_MESSAGE, type ActionFailure } from '@/lib/action-failure';
 import { apiFetch, failureFromResponse, readApiError } from '@/lib/api';
 
 /**
@@ -69,7 +69,7 @@ export async function submitApplication(
     case 429: // ThrottlerGuard: 5 applications per 10 minutes per visitor.
       return { formError: 'Too many attempts. Wait a few minutes and try again.' };
     default:
-      return { formError: 'Something went wrong. Please try again.' };
+      return { formError: GENERIC_FAILURE_MESSAGE };
   }
 }
 
@@ -116,7 +116,7 @@ export async function createUpload(
     case 429: // ThrottlerGuard: 20 uploads per 10 minutes per visitor.
       return { formError: 'Too many uploads. Wait a few minutes and try again.' };
     default:
-      return { formError: 'Something went wrong. Please try again.' };
+      return { formError: GENERIC_FAILURE_MESSAGE };
   }
 }
 
