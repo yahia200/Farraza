@@ -160,6 +160,8 @@ export interface CompanyJob {
   createdAt: string;
   /** Keys of the Job's Highlighted questions as last saved; may include keys the latest published form no longer has. */
   highlightedQuestionKeys: string[];
+  /** Keys of the rating Criteria raters may score on this Job (catalog keys from `@repo/shared`, at most five). */
+  ratingCriteria: string[];
 }
 
 /** Mirrors Stage in apps/api/src/jobs/job.ts. */
@@ -268,8 +270,9 @@ function toCompanyJob({
   closedAt,
   createdAt,
   highlightedQuestionKeys,
+  ratingCriteria,
 }: CompanyJob): CompanyJob {
-  return { id, title, slug, description, status, openedAt, closedAt, createdAt, highlightedQuestionKeys };
+  return { id, title, slug, description, status, openedAt, closedAt, createdAt, highlightedQuestionKeys, ratingCriteria };
 }
 
 /** Expose only what the UI needs. */

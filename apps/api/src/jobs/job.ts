@@ -25,6 +25,11 @@ export interface Job {
    * be stale (the latest published form no longer has it); readers filter against that form.
    */
   highlightedQuestionKeys: string[];
+  /**
+   * Keys of the rating Criteria raters may score on this Job (catalog keys from `@repo/shared`, at
+   * most `RATING_CRITERIA_LIMIT`), as last saved. Empty means the Job is rated on the overall alone.
+   */
+  ratingCriteria: string[];
 }
 
 export interface JobWithStages extends Job {
