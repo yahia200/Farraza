@@ -329,8 +329,11 @@ export class PipelineRepository {
     resolve: (previous: RatingValues | null) => RatingValues;
   }): Promise<SavedRating> {
     return this.prisma.db.transaction(async (tx) => {
+      // Scoped by company like every read here. The upsert below cannot be: its `conflictOn` names the
+      // UNIQUE (application_id, user_id) key only, which is global (an Application id belongs to one
+      // company, and the service has already checked that this one is the caller's).
       const existing = await tx.orm.public.Rating
-        .where({ applicationId: input.applicationId, userId: input.userId })
+        .where({ companyId: input.companyId, applicationId: input.applicationId, userId: input.userId })
         .first();
       const previous = existing ? toRatingValues(existing) : null;
       const current = input.resolve(previous);
