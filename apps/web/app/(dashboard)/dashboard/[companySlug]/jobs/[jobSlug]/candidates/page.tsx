@@ -1,4 +1,4 @@
-import { canMoveApplications } from '@repo/shared';
+import { canManageJobs, canMoveApplications, highlightableQuestions } from '@repo/shared';
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { CandidateDetail, CandidateDetailSkeleton } from '@/components/dashboard/candidates/candidate-detail';
@@ -7,11 +7,13 @@ import { candidatesHref, parseView } from '@/components/dashboard/candidates/can
 import { CandidatesTable } from '@/components/dashboard/candidates/candidates-table';
 import { CandidatesViewToggle } from '@/components/dashboard/candidates/candidates-view-toggle';
 import type { CandidateRow } from '@/components/dashboard/candidates/data-table-features';
+import { HighlightedQuestionsPicker } from '@/components/dashboard/candidates/highlighted-questions-picker';
 import { PipelineBoard } from '@/components/dashboard/candidates/pipeline-board';
 import { JobPage, type LoadedJob } from '@/components/dashboard/jobs/job-page';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   flattenBoard,
+  getJobForm,
   getPipelineBoard,
   type HighlightedQuestion,
   type MyCompany,
@@ -25,7 +27,9 @@ export const metadata: Metadata = { title: 'Candidates · Farraza' };
  * too; those who can move candidates (canMoveApplications) can also do so
  * from the board (drag, or the card's Select) and from the detail sheet.
  * ?view=table|board picks the view (table by default); ?application=<id>
- * opens one candidate in a side sheet, in either view.
+ * opens one candidate in a side sheet, in either view. Those who can manage
+ * jobs (canManageJobs) also get the Highlighted questions picker beside the
+ * view toggle, once the job has a published form.
  */
 export default function JobCandidatesPage({
   params,
@@ -47,18 +51,35 @@ async function Candidates({
   job: LoadedJob;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  // One fetch of the board feeds both views.
-  const [{ columns, highlightedQuestions }, { application, view: viewParam }] = await Promise.all([
+  const canPickHighlights = canManageJobs(company.role);
+  // One fetch of the board feeds both views. The form is read only for the
+  // Highlighted questions picker, which interviewers don't get.
+  const [{ columns, highlightedQuestions }, { application, view: viewParam }, form] = await Promise.all([
     getPipelineBoard(company.slug, job.slug),
     searchParams,
+    canPickHighlights ? getJobForm(company.slug, job.slug) : null,
   ]);
   const view = parseView(viewParam);
   const basePath = `/dashboard/${company.slug}/jobs/${job.slug}/candidates`;
   const selected = typeof application === 'string' ? application : undefined;
+  // The latest published form's Questions, never the draft's: the list shows what applicants are asked now.
+  const pickerQuestions = form?.published
+    ? highlightableQuestions(form.published.fields).map(({ key, label }) => ({ key, label }))
+    : null;
 
   return (
     <div className="flex flex-col gap-4">
-      <CandidatesViewToggle basePath={basePath} view={view} application={selected} />
+      <div className="flex items-center gap-2">
+        <CandidatesViewToggle basePath={basePath} view={view} application={selected} />
+        {pickerQuestions && (
+          <HighlightedQuestionsPicker
+            companySlug={company.slug}
+            jobSlug={job.slug}
+            questions={pickerQuestions}
+            savedKeys={job.highlightedQuestionKeys}
+          />
+        )}
+      </div>
       {view === 'board' ? (
         <PipelineBoard
           columns={columns}
