@@ -30,7 +30,7 @@ export class PipelineService {
   async board(membership: Membership, jobSlug: string) {
     const job = await this.jobs.get(membership, jobSlug);
     const highlightedQuestions = await this.highlightedQuestionsOf(job.id, job.highlightedQuestionKeys);
-    const cards = await this.cardsOf(job.id, highlightedQuestions);
+    const cards = await this.cardsOf(membership.company.id, job.id, highlightedQuestions);
 
     const columns: BoardColumn[] = job.stages.map((stage) => ({
       id: stage.id,
@@ -68,7 +68,11 @@ export class PipelineService {
    * Question of the same key in the Application's own form version (so an older Application shows
    * the option labels its applicant saw). With no Highlighted question, answers are not read.
    */
-  private async cardsOf(jobId: string, highlighted: HighlightedQuestion[]): Promise<ApplicationCard[]> {
+  private async cardsOf(
+    companyId: string,
+    jobId: string,
+    highlighted: HighlightedQuestion[],
+  ): Promise<ApplicationCard[]> {
     if (highlighted.length === 0) {
       const rows = await this.pipeline.findCards(jobId);
       return rows.map((row) => ({ ...row, highlights: {} }));
@@ -76,7 +80,7 @@ export class PipelineService {
 
     const rows = await this.pipeline.findCardsWithAnswers(jobId);
     const versionIds = [...new Set(rows.map((row) => row.formVersionId))];
-    const versions = await this.pipeline.findFormFields(versionIds);
+    const versions = await this.pipeline.findFormFields(companyId, jobId, versionIds);
     // Per version, its highlightable Questions by key: a key the version lacks, or has on a
     // Question that can't be highlighted there, reads as null.
     const questionsByVersion = new Map(

@@ -67,6 +67,10 @@ export class PipelineRepository {
     return this.prisma.db.orm.public.Note;
   }
 
+  private get formVersions() {
+    return this.prisma.db.orm.public.FormVersion;
+  }
+
   /**
    * A job's cards, newest first. Only the card's own columns are read (`select`), never `answers`:
    * the board reads those through `findCardsWithAnswers`, and only when the Job has Highlighted
@@ -103,11 +107,19 @@ export class PipelineRepository {
     }));
   }
 
-  /** The `fields` of each of these form versions, by version id. Unknown ids are left out. */
-  async findFormFields(versionIds: readonly string[]): Promise<Map<string, FormFields>> {
+  /**
+   * The `fields` of each of these form versions of this company's job, by version id. Unknown ids,
+   * and ids of another job's or company's versions, are left out.
+   */
+  async findFormFields(
+    companyId: string,
+    jobId: string,
+    versionIds: readonly string[],
+  ): Promise<Map<string, FormFields>> {
     if (versionIds.length === 0) return new Map();
-    const rows = await this.prisma.db.orm.public.FormVersion
+    const rows = await this.formVersions
       .select('id', 'fields')
+      .where({ companyId, jobId })
       .where((version) => version.id.in(versionIds))
       .all();
     return new Map(rows.map((row) => [row.id, row.fields as FormFields]));

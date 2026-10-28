@@ -15,8 +15,9 @@ import { PipelineService } from './pipeline.service.js';
 // The board (`PipelineService.board`) and its Highlighted answers, through the service. The real
 // PipelineService runs against hand-written in-memory fakes (the pattern of pipeline.files.spec.ts).
 // The fake repository mirrors the SQL rules that matter here: cards are a job's Applications, newest
-// first, and form versions are looked up by id. It also counts what was read, so a spec can say
-// that answers were not read at all. Those rules are checked against the real database by hand.
+// first, and form versions are looked up by id within the job's company and job. It also counts
+// what was read, so a spec can say that answers were not read at all. Those rules are checked
+// against the real database by hand.
 
 type PublicApi<T> = { [K in keyof T]: T[K] };
 
@@ -29,14 +30,24 @@ class InMemoryPipelineRepository implements Pick<
   'findCards' | 'findCardsWithAnswers' | 'findFormFields'
 > {
   private readonly applications: StoredApplication[] = [];
-  private readonly versions = new Map<string, FormFields>();
+  private readonly versions = new Map<
+    string,
+    { companyId: string; jobId: string; fields: FormFields }
+  >();
   /** How many times the Applications' answers were read. */
   answerReads = 0;
   /** The ids asked for, per call of `findFormFields`. */
   readonly versionRequests: string[][] = [];
 
-  seedVersion(id: string, fields: FormFields): void {
-    this.versions.set(id, fields);
+  seedVersion(
+    id: string,
+    fields: FormFields,
+    owner: { companyId: string; jobId: string } = {
+      companyId: 'company-1',
+      jobId: 'job-1',
+    },
+  ): void {
+    this.versions.set(id, { ...owner, fields });
   }
 
   seedApplication(row: Partial<StoredApplication> & { id: string }): void {
@@ -94,13 +105,16 @@ class InMemoryPipelineRepository implements Pick<
   }
 
   async findFormFields(
+    companyId: string,
+    jobId: string,
     versionIds: readonly string[],
   ): Promise<Map<string, FormFields>> {
     this.versionRequests.push([...versionIds]);
     const found = new Map<string, FormFields>();
     for (const id of versionIds) {
-      const fields = this.versions.get(id);
-      if (fields) found.set(id, fields);
+      const version = this.versions.get(id);
+      if (version?.companyId === companyId && version.jobId === jobId)
+        found.set(id, version.fields);
     }
     return found;
   }
@@ -503,6 +517,37 @@ describe('the pipeline board', () => {
         { key: Q.onSite, label: 'On site?' },
         { key: Q.city, label: 'City' },
         { key: Q.level, label: 'Seniority' },
+      ]);
+    });
+
+    it('does not read a form version of another job or company, so the answer reads as null', async () => {
+      publish('version-1', formOf([city]));
+      repository.seedVersion('other-job-version', formOf([city]), {
+        companyId: 'company-1',
+        jobId: 'job-2',
+      });
+      repository.seedVersion('other-company-version', formOf([city]), {
+        companyId: 'company-2',
+        jobId: 'job-1',
+      });
+      highlight(Q.city);
+      repository.seedApplication({
+        id: 'other-job',
+        formVersionId: 'other-job-version',
+        answers: { [Q.city]: 'Cairo' },
+      });
+      repository.seedApplication({
+        id: 'other-company',
+        formVersionId: 'other-company-version',
+        submittedAt: new Date('2026-02-01T00:00:00Z'),
+        answers: { [Q.city]: 'Giza' },
+      });
+
+      expect(
+        (await cardsOf()).map((card) => [card.id, card.highlights]),
+      ).toEqual([
+        ['other-job', { [Q.city]: null }],
+        ['other-company', { [Q.city]: null }],
       ]);
     });
 
