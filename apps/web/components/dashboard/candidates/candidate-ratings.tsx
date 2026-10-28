@@ -1,4 +1,4 @@
-import { RATING_CRITERIA, type RatingSummary } from '@repo/shared';
+import { RATING_CRITERIA, RATING_MAX, type RatingSummary } from '@repo/shared';
 import { StarIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { RatingView } from '@/lib/dal';
@@ -151,7 +151,7 @@ function RatingRow({
         <span aria-hidden="true">
           {rating.overall} <span className="text-muted-foreground">overall</span>
         </span>
-        <span className="sr-only">Overall rating {rating.overall} out of 5</span>
+        <span className="sr-only">Overall rating {rating.overall} out of {RATING_MAX}</span>
       </p>
       {scored.length > 0 && (
         <dl className="flex flex-wrap gap-x-4 gap-y-1">
@@ -160,7 +160,7 @@ function RatingRow({
               <dt className="text-muted-foreground">{label}</dt>
               <dd className="font-medium">
                 {score}
-                <span className="sr-only"> out of 5</span>
+                <span className="sr-only"> out of {RATING_MAX}</span>
               </dd>
               {!used && <Badge variant="outline">no longer used</Badge>}
             </div>

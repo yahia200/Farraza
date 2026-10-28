@@ -1,6 +1,6 @@
 'use client';
 
-import { RATING_MAX, RATING_MIN } from '@repo/shared';
+import { RATING_MAX, RATING_MIN, type RatingValues } from '@repo/shared';
 import { startTransition, useId, useMemo, useOptimistic, useState } from 'react';
 import { saveRating, type SaveRatingResult } from '@/app/actions/applications';
 import { toast } from '@/components/ui/toast';
@@ -9,7 +9,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 const SCORES = Array.from({ length: RATING_MAX - RATING_MIN + 1 }, (_, index) => RATING_MIN + index);
 
 /** The viewer's own Rating as the sheet shows it. A Criterion with no entry is not scored. */
-type OwnRating = { overall: number | null; criteria: Record<string, number> };
+type OwnRating = { overall: number | null } & Pick<RatingValues, 'criteria'>;
 
 /** What one click changes: the overall, or one Criterion (`null` clears it). */
 type Change = { overall: number } | { criterion: string; score: number | null };
@@ -55,7 +55,7 @@ export function RatingControl({
   /** The Criteria the Job uses now, in catalog order. */
   criteria: { key: string; label: string }[];
   /** The viewer's saved Rating, or null if they have not rated yet. */
-  saved: { overall: number; criteria: Record<string, number> } | null;
+  saved: RatingValues | null;
 }) {
   const base = useMemo<OwnRating>(
     () => ({ overall: saved?.overall ?? null, criteria: saved?.criteria ?? {} }),

@@ -9,6 +9,7 @@ import {
   AuthorizationService,
 } from '@nestjs/authorization';
 import { Test } from '@nestjs/testing';
+import type { RatingValues } from '@repo/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { toValidationException } from '../common/validation-errors.js';
 import type { MemberRole, Membership } from '../companies/company.js';
@@ -19,7 +20,6 @@ import type { StorageService } from '../storage/storage.service.js';
 import type { User } from '../users/user.js';
 import { ApplicationPolicy } from './application.policy.js';
 import { saveRatingSchema } from './dto/save-rating.dto.js';
-import type { RatingValues } from './pipeline.js';
 import type { PipelineRepository } from './pipeline.repository.js';
 import { PipelineService } from './pipeline.service.js';
 

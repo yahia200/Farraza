@@ -1,4 +1,13 @@
-import { RATING_CRITERIA, buildActivityTimeline, type ActivityEntry, type ActivityEvent, type ActivityNote } from '@repo/shared';
+import {
+  FORMER_MEMBER_NAME,
+  RATING_CRITERIA,
+  RATING_MAX,
+  buildActivityTimeline,
+  type ActivityEntry,
+  type ActivityEvent,
+  type ActivityNote,
+  type RatingValues,
+} from '@repo/shared';
 import { formatDateTime } from '@/lib/format';
 
 /**
@@ -33,7 +42,7 @@ export function toActivityItems(
     }
     // The event is there but its note is not: say so rather than drop the line.
     return entry.note
-      ? { kind: 'note', id: entry.id, body: entry.note.body, author: entry.note.authorName ?? 'Former member', at }
+      ? { kind: 'note', id: entry.id, body: entry.note.body, author: entry.note.authorName ?? FORMER_MEMBER_NAME, at }
       : { kind: 'event', id: entry.id, text: 'A note was added', at };
   });
 }
@@ -90,7 +99,7 @@ function fromStage(data: unknown): string {
  * A line that can't be read says only who rated.
  */
 function describeRating(data: unknown, rater: Rater | undefined): string {
-  const who = rater?.name ?? 'Former member';
+  const who = rater?.name ?? FORMER_MEMBER_NAME;
   const current = scoresOf(data, 'current');
   if (!current) {
     return `${who} rated`;
@@ -99,7 +108,7 @@ function describeRating(data: unknown, rater: Rater | undefined): string {
   const stage = stringField(data, 'stage');
   const inStage = stage ? ` (in ${stage})` : '';
   if (!previous) {
-    return `${who} rated ${current.overall} out of 5${inStage}`;
+    return `${who} rated ${current.overall} out of ${RATING_MAX}${inStage}`;
   }
   if (previous.overall !== current.overall) {
     return `${who} changed their rating from ${previous.overall} to ${current.overall}${inStage}`;
@@ -110,10 +119,8 @@ function describeRating(data: unknown, rater: Rater | undefined): string {
     : `${who} kept their rating at ${current.overall}${inStage}`;
 }
 
-type Scores = { overall: number; criteria: Record<string, number> };
-
 /** `data[key]` as `{ overall, criteria }`, or null if it isn't one. `data` is JSONB, so it is not trusted. */
-function scoresOf(data: unknown, key: string): Scores | null {
+function scoresOf(data: unknown, key: string): RatingValues | null {
   if (typeof data !== 'object' || data === null || !(key in data)) {
     return null;
   }

@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { AuthorizationService } from '@nestjs/authorization';
 import {
+  FORMER_MEMBER_NAME,
   checkRatingCriteria,
   formatHighlightText,
   highlightableQuestions,
@@ -37,9 +38,6 @@ function mergeCriteria(existing: Record<string, number>, requested: RatingCriter
   }
   return merged;
 }
-
-/** What the detail calls a Rating's author once their user is gone (`ratings.user_id` is null). */
-const FORMER_MEMBER_NAME = 'Former member';
 
 @Injectable()
 export class PipelineService {
