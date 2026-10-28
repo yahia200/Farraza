@@ -388,7 +388,6 @@ export function flattenBoard(columns: PipelineColumn[]): (ApplicationSummary & {
   return columns.flatMap(({ applications, ...stage }) => applications.map((card) => ({ ...card, stage })));
 }
 
-/** Mirrors ApplicationDetail in apps/api/src/pipeline/pipeline.ts (dates as ISO strings). */
 /**
  * One Member's Rating on an Application, as the detail returns it (RatingView in
  * apps/api/src/pipeline/pipeline.ts). `userId` is null when the author has left the company
@@ -404,6 +403,7 @@ export interface RatingView {
   updatedAt: string;
 }
 
+/** Mirrors ApplicationDetail in apps/api/src/pipeline/pipeline.ts (dates as ISO strings). */
 export interface ApplicationDetailView {
   id: string;
   status: ApplicationStatus;
