@@ -96,7 +96,7 @@ export function HighlightedQuestionsPicker({
       >
         <Settings2Icon />
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 max-w-[calc(100vw-2rem)]">
+      <PopoverContent align="start" collisionPadding={16} className="w-80 max-w-[calc(100vw-2rem)]">
         <PopoverHeader>
           <PopoverTitle>Questions shown in the list</PopoverTitle>
           <PopoverDescription>
