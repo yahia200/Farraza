@@ -164,6 +164,7 @@ enum ApplicationEventType {
   Hired        = "hired"
   Withdrawn    = "withdrawn"
   NoteAdded    = "note_added"
+  Rated        = "rated"
 }
 
 model Candidate {
@@ -250,6 +251,26 @@ model Note {
   @@index([applicationId, createdAt])
   @@check(expression: "length(trim(body)) > 0", name: "notes_body_not_blank")
   @@map("notes")
+}
+
+model Rating {
+  id            Uuid                       @id @default(sql`gen_random_uuid()`)
+  companyId     Uuid                       @map("company_id")
+  applicationId Uuid                       @map("application_id")
+  userId        Uuid?                      @map("user_id")
+  overall       SmallInt
+  criteria      Jsonb                      @default(json`{}`)
+  createdAt     TimestamptzJsDate          @default(now()) @map("created_at")
+  updatedAt     temporal.updatedAtJsDate() @map("updated_at")
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // One Rating per Member per Application; also the index for the board's grouped read by application_id.
+  @@unique([applicationId, userId])
+  @@check(expression: "overall BETWEEN 1 AND 5", name: "ratings_overall_range")
+  @@check(expression: "jsonb_typeof(criteria) = 'object'", name: "ratings_criteria_object")
+  @@map("ratings")
 }
 
 enum FilePurpose {

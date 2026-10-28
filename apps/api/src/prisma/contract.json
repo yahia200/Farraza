@@ -52,6 +52,10 @@
       "model": "OidcState",
       "namespace": "public"
     },
+    "ratings": {
+      "model": "Rating",
+      "namespace": "public"
+    },
     "sessions": {
       "model": "Session",
       "namespace": "public"
@@ -99,6 +103,10 @@
               {
                 "name": "NoteAdded",
                 "value": "note_added"
+              },
+              {
+                "name": "Rated",
+                "value": "rated"
               }
             ]
           },
@@ -1902,6 +1910,130 @@
               "table": "oidc_states"
             }
           },
+          "Rating": {
+            "fields": {
+              "applicationId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "companyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              },
+              "criteria": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/jsonb@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "overall": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int2@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "application": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "applicationId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Application",
+                  "namespace": "public"
+                }
+              },
+              "user": {
+                "cardinality": "N:1",
+                "nullable": true,
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "applicationId": {
+                  "column": "application_id"
+                },
+                "companyId": {
+                  "column": "company_id"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "criteria": {
+                  "column": "criteria"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "overall": {
+                  "column": "overall"
+                },
+                "updatedAt": {
+                  "column": "updated_at"
+                },
+                "userId": {
+                  "column": "user_id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "ratings"
+            }
+          },
           "Session": {
             "fields": {
               "createdAt": {
@@ -2261,8 +2393,8 @@
             "application_events": {
               "checks": [
                 {
-                  "expression": "\"type\" IN ('applied', 'auto_rejected', 'stage_changed', 'rejected', 'hired', 'withdrawn', 'note_added')",
-                  "name": "application_events_type_check_390670b3",
+                  "expression": "\"type\" IN ('applied', 'auto_rejected', 'stage_changed', 'rejected', 'hired', 'withdrawn', 'note_added', 'rated')",
+                  "name": "application_events_type_check_f13f5dd1",
                   "prefix": "application_events_type_check"
                 }
               ],
@@ -3928,6 +4060,141 @@
               },
               "uniques": []
             },
+            "ratings": {
+              "checks": [
+                {
+                  "expression": "jsonb_typeof(criteria) = 'object'",
+                  "name": "ratings_criteria_object_1f6d185c",
+                  "prefix": "ratings_criteria_object"
+                },
+                {
+                  "expression": "overall BETWEEN 1 AND 5",
+                  "name": "ratings_overall_range_8711ed2f",
+                  "prefix": "ratings_overall_range"
+                }
+              ],
+              "columns": {
+                "application_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "company_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "created_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "criteria": {
+                  "codecId": "pg/jsonb@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": {}
+                  },
+                  "nativeType": "jsonb",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "default": {
+                    "expression": "gen_random_uuid()",
+                    "kind": "function"
+                  },
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "overall": {
+                  "codecId": "pg/int2@1",
+                  "nativeType": "int2",
+                  "nullable": false
+                },
+                "updated_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "user_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": true
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "application_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "ratings"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "applications"
+                  }
+                },
+                {
+                  "onDelete": "setNull",
+                  "source": {
+                    "columns": [
+                      "user_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "ratings"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "users"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "application_id"
+                  ],
+                  "name": "ratings_application_id_idx_e32e1f6e",
+                  "prefix": "ratings_application_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "user_id"
+                  ],
+                  "name": "ratings_user_id_idx_6c952402",
+                  "prefix": "ratings_user_id_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "application_id",
+                    "user_id"
+                  ]
+                }
+              ]
+            },
             "sessions": {
               "checks": [
                 {
@@ -4268,7 +4535,8 @@
                 "rejected",
                 "hired",
                 "withdrawn",
-                "note_added"
+                "note_added",
+                "rated"
               ]
             },
             "ApplicationStatus": {
@@ -4357,10 +4625,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "fed4d280821d06638e9aed882f9cbb02b9d6f851ecdce868b9c2e177bdf05786"
+    "storageHash": "cbaa55ed9222e9ef75abb65ab91a0cc62a7b6e0a11c690ff19bd38f85be624a6"
   },
   "execution": {
-    "executionHash": "c19b53563967fe1cdc97d45552456039c34d42f7b292484a823348d6f653f142",
+    "executionHash": "6c72d2e21cac19476b009440c451b74d3f8aaae32e374ce19a06cc2a66cb6742",
     "mutations": {
       "defaults": [
         {
@@ -4449,6 +4717,21 @@
           },
           "ref": {
             "entry": "notes",
+            "field": "updated_at",
+            "namespace": "public"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "timestampNow",
+            "kind": "generator"
+          },
+          "onUpdate": {
+            "id": "timestampNow",
+            "kind": "generator"
+          },
+          "ref": {
+            "entry": "ratings",
             "field": "updated_at",
             "namespace": "public"
           }

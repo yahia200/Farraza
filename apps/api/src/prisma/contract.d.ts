@@ -34,9 +34,9 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'fed4d280821d06638e9aed882f9cbb02b9d6f851ecdce868b9c2e177bdf05786'>;
+  StorageHashBase<'cbaa55ed9222e9ef75abb65ab91a0cc62a7b6e0a11c690ff19bd38f85be624a6'>;
 export type ExecutionHash =
-  ExecutionHashBase<'c19b53563967fe1cdc97d45552456039c34d42f7b292484a823348d6f653f142'>;
+  ExecutionHashBase<'6c72d2e21cac19476b009440c451b74d3f8aaae32e374ce19a06cc2a66cb6742'>;
 export type ProfileHash =
   ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
@@ -282,7 +282,8 @@ export type FieldOutputTypes = {
         | 'rejected'
         | 'hired'
         | 'withdrawn'
-        | 'note_added';
+        | 'note_added'
+        | 'rated';
     };
     readonly Candidate: {
       readonly companyId: CodecTypes['pg/uuid@1']['output'];
@@ -388,6 +389,16 @@ export type FieldOutputTypes = {
       readonly redirectTo: CodecTypes['pg/text@1']['output'] | null;
       readonly state: CodecTypes['pg/text@1']['output'];
     };
+    readonly Rating: {
+      readonly applicationId: CodecTypes['pg/uuid@1']['output'];
+      readonly companyId: CodecTypes['pg/uuid@1']['output'];
+      readonly createdAt: CodecTypes['pg/timestamptz-date@1']['output'];
+      readonly criteria: CodecTypes['pg/jsonb@1']['output'];
+      readonly id: CodecTypes['pg/uuid@1']['output'];
+      readonly overall: CodecTypes['pg/int2@1']['output'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-date@1']['output'];
+      readonly userId: CodecTypes['pg/uuid@1']['output'] | null;
+    };
     readonly Session: {
       readonly createdAt: CodecTypes['pg/timestamptz-date@1']['output'];
       readonly expiresAt: CodecTypes['pg/timestamptz-date@1']['output'];
@@ -453,7 +464,8 @@ export type FieldInputTypes = {
         | 'rejected'
         | 'hired'
         | 'withdrawn'
-        | 'note_added';
+        | 'note_added'
+        | 'rated';
     };
     readonly Candidate: {
       readonly companyId: CodecTypes['pg/uuid@1']['input'];
@@ -559,6 +571,16 @@ export type FieldInputTypes = {
       readonly redirectTo: CodecTypes['pg/text@1']['input'] | null;
       readonly state: CodecTypes['pg/text@1']['input'];
     };
+    readonly Rating: {
+      readonly applicationId: CodecTypes['pg/uuid@1']['input'];
+      readonly companyId: CodecTypes['pg/uuid@1']['input'];
+      readonly createdAt: CodecTypes['pg/timestamptz-date@1']['input'];
+      readonly criteria: CodecTypes['pg/jsonb@1']['input'];
+      readonly id: CodecTypes['pg/uuid@1']['input'];
+      readonly overall: CodecTypes['pg/int2@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-date@1']['input'];
+      readonly userId: CodecTypes['pg/uuid@1']['input'] | null;
+    };
     readonly Session: {
       readonly createdAt: CodecTypes['pg/timestamptz-date@1']['input'];
       readonly expiresAt: CodecTypes['pg/timestamptz-date@1']['input'];
@@ -608,7 +630,8 @@ export type StorageColumnTypes = {
         | 'rejected'
         | 'hired'
         | 'withdrawn'
-        | 'note_added';
+        | 'note_added'
+        | 'rated';
     };
     readonly applications: {
       readonly answers: CodecTypes['pg/jsonb@1']['output'];
@@ -730,6 +753,16 @@ export type StorageColumnTypes = {
       readonly redirect_to: CodecTypes['pg/text@1']['output'] | null;
       readonly state: CodecTypes['pg/text@1']['output'];
     };
+    readonly ratings: {
+      readonly application_id: CodecTypes['pg/uuid@1']['output'];
+      readonly company_id: CodecTypes['pg/uuid@1']['output'];
+      readonly created_at: CodecTypes['pg/timestamptz-date@1']['output'];
+      readonly criteria: CodecTypes['pg/jsonb@1']['output'];
+      readonly id: CodecTypes['pg/uuid@1']['output'];
+      readonly overall: CodecTypes['pg/int2@1']['output'];
+      readonly updated_at: CodecTypes['pg/timestamptz-date@1']['output'];
+      readonly user_id: CodecTypes['pg/uuid@1']['output'] | null;
+    };
     readonly sessions: {
       readonly created_at: CodecTypes['pg/timestamptz-date@1']['output'];
       readonly expires_at: CodecTypes['pg/timestamptz-date@1']['output'];
@@ -779,7 +812,8 @@ export type StorageColumnInputTypes = {
         | 'rejected'
         | 'hired'
         | 'withdrawn'
-        | 'note_added';
+        | 'note_added'
+        | 'rated';
     };
     readonly applications: {
       readonly answers: CodecTypes['pg/jsonb@1']['input'];
@@ -901,6 +935,16 @@ export type StorageColumnInputTypes = {
       readonly redirect_to: CodecTypes['pg/text@1']['input'] | null;
       readonly state: CodecTypes['pg/text@1']['input'];
     };
+    readonly ratings: {
+      readonly application_id: CodecTypes['pg/uuid@1']['input'];
+      readonly company_id: CodecTypes['pg/uuid@1']['input'];
+      readonly created_at: CodecTypes['pg/timestamptz-date@1']['input'];
+      readonly criteria: CodecTypes['pg/jsonb@1']['input'];
+      readonly id: CodecTypes['pg/uuid@1']['input'];
+      readonly overall: CodecTypes['pg/int2@1']['input'];
+      readonly updated_at: CodecTypes['pg/timestamptz-date@1']['input'];
+      readonly user_id: CodecTypes['pg/uuid@1']['input'] | null;
+    };
     readonly sessions: {
       readonly created_at: CodecTypes['pg/timestamptz-date@1']['input'];
       readonly expires_at: CodecTypes['pg/timestamptz-date@1']['input'];
@@ -972,7 +1016,8 @@ export namespace Models {
       | 'rejected'
       | 'hired'
       | 'withdrawn'
-      | 'note_added';
+      | 'note_added'
+      | 'rated';
     application: public_Application;
     readonly [RelationKeys]?: 'application';
   };
@@ -1107,6 +1152,19 @@ export namespace Models {
     linkUser: public_User | null;
     readonly [RelationKeys]?: 'linkUser';
   };
+  export type public_Rating = {
+    applicationId: CodecTypes['pg/uuid@1']['output'];
+    companyId: CodecTypes['pg/uuid@1']['output'];
+    createdAt: CodecTypes['pg/timestamptz-date@1']['output'];
+    criteria: CodecTypes['pg/jsonb@1']['output'];
+    id: CodecTypes['pg/uuid@1']['output'];
+    overall: CodecTypes['pg/int2@1']['output'];
+    updatedAt: CodecTypes['pg/timestamptz-date@1']['output'];
+    userId: CodecTypes['pg/uuid@1']['output'] | null;
+    application: public_Application;
+    user: public_User | null;
+    readonly [RelationKeys]?: 'application' | 'user';
+  };
   export type public_Session = {
     createdAt: CodecTypes['pg/timestamptz-date@1']['output'];
     expiresAt: CodecTypes['pg/timestamptz-date@1']['output'];
@@ -1159,6 +1217,7 @@ export declare const models: {
     Membership: Models.public_Membership;
     Note: Models.public_Note;
     OidcState: Models.public_OidcState;
+    Rating: Models.public_Rating;
     Session: Models.public_Session;
     Stage: Models.public_Stage;
     User: Models.public_User;
@@ -2360,6 +2419,101 @@ type ContractBase = Omit<
                 },
               ];
             };
+            readonly ratings: {
+              columns: {
+                readonly application_id: {
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
+                  readonly nullable: false;
+                };
+                readonly company_id: {
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
+                  readonly nullable: false;
+                };
+                readonly created_at: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+                readonly criteria: {
+                  readonly nativeType: 'jsonb';
+                  readonly codecId: 'pg/jsonb@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/jsonb@1', {}>;
+                  };
+                };
+                readonly id: {
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'function';
+                    readonly expression: 'gen_random_uuid()';
+                  };
+                };
+                readonly overall: {
+                  readonly nativeType: 'int2';
+                  readonly codecId: 'pg/int2@1';
+                  readonly nullable: false;
+                };
+                readonly updated_at: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly nullable: false;
+                };
+                readonly user_id: {
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
+                  readonly nullable: true;
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [{ readonly columns: readonly ['application_id', 'user_id'] }];
+              indexes: readonly [
+                {
+                  readonly name: 'ratings_application_id_idx_e32e1f6e';
+                  readonly prefix: 'ratings_application_id_idx';
+                  readonly columns: readonly ['application_id'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'ratings_user_id_idx_6c952402';
+                  readonly prefix: 'ratings_user_id_idx';
+                  readonly columns: readonly ['user_id'];
+                  readonly unique: false;
+                },
+              ];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'ratings';
+                    readonly columns: readonly ['application_id'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'applications';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'ratings';
+                    readonly columns: readonly ['user_id'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'users';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
+            };
             readonly sessions: {
               columns: {
                 readonly created_at: {
@@ -2600,6 +2754,7 @@ type ContractBase = Omit<
                 'hired',
                 'withdrawn',
                 'note_added',
+                'rated',
               ];
             };
             readonly ApplicationStatus: {
@@ -2686,6 +2841,7 @@ type ContractBase = Omit<
       readonly namespace: 'public' & NamespaceId;
       readonly model: 'OidcState';
     };
+    readonly ratings: { readonly namespace: 'public' & NamespaceId; readonly model: 'Rating' };
     readonly sessions: { readonly namespace: 'public' & NamespaceId; readonly model: 'Session' };
     readonly stages: { readonly namespace: 'public' & NamespaceId; readonly model: 'Stage' };
     readonly users: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
@@ -3695,6 +3851,85 @@ type ContractBase = Omit<
               };
             };
           };
+          readonly Rating: {
+            readonly fields: {
+              readonly applicationId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
+              };
+              readonly companyId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                };
+              };
+              readonly criteria: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
+              };
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
+              };
+              readonly overall: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int2@1' };
+              };
+              readonly updatedAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                };
+              };
+              readonly userId: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
+              };
+            };
+            readonly relations: {
+              readonly application: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Application';
+                };
+                readonly cardinality: 'N:1';
+                readonly nullable: false;
+                readonly on: {
+                  readonly localFields: readonly ['applicationId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+              readonly user: {
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'User' };
+                readonly cardinality: 'N:1';
+                readonly nullable: true;
+                readonly on: {
+                  readonly localFields: readonly ['userId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'ratings';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly applicationId: { readonly column: 'application_id' };
+                readonly companyId: { readonly column: 'company_id' };
+                readonly createdAt: { readonly column: 'created_at' };
+                readonly criteria: { readonly column: 'criteria' };
+                readonly id: { readonly column: 'id' };
+                readonly overall: { readonly column: 'overall' };
+                readonly updatedAt: { readonly column: 'updated_at' };
+                readonly userId: { readonly column: 'user_id' };
+              };
+            };
+          };
           readonly Session: {
             readonly fields: {
               readonly createdAt: {
@@ -3920,6 +4155,7 @@ type ContractBase = Omit<
               { readonly name: 'Hired'; readonly value: 'hired' },
               { readonly name: 'Withdrawn'; readonly value: 'withdrawn' },
               { readonly name: 'NoteAdded'; readonly value: 'note_added' },
+              { readonly name: 'Rated'; readonly value: 'rated' },
             ];
           };
           readonly ApplicationStatus: {
@@ -4081,6 +4317,15 @@ type ContractBase = Omit<
           readonly onUpdate: { readonly id: 'timestampNow'; readonly kind: 'generator' };
           readonly ref: {
             readonly entry: 'notes';
+            readonly field: 'updated_at';
+            readonly namespace: 'public';
+          };
+        },
+        {
+          readonly onCreate: { readonly id: 'timestampNow'; readonly kind: 'generator' };
+          readonly onUpdate: { readonly id: 'timestampNow'; readonly kind: 'generator' };
+          readonly ref: {
+            readonly entry: 'ratings';
             readonly field: 'updated_at';
             readonly namespace: 'public';
           };
