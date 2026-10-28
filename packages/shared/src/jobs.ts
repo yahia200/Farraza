@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { cvModeSchema } from './cv-mode.js';
 import { MAX_FIELDS } from './form-fields.js';
 import { highlightedQuestionKeysSchema } from './highlights.js';
+import { ratingCriteriaKeysSchema } from './rating-criteria.js';
 
 /** Request bodies for the API's /companies/:companySlug/jobs endpoints. */
 
@@ -41,6 +42,13 @@ export type SaveFormInput = z.infer<typeof saveFormSchema>;
  */
 export const saveHighlightedQuestionsSchema = z.strictObject({ keys: highlightedQuestionKeysSchema });
 export type SaveHighlightedQuestionsInput = z.infer<typeof saveHighlightedQuestionsSchema>;
+
+/**
+ * Saving a Job's rating Criteria (PUT .../jobs/:jobSlug/rating-criteria): the whole new list of
+ * catalog keys. The catalog is fixed, so the schema is the whole check (no form to compare with).
+ */
+export const saveRatingCriteriaSchema = z.strictObject({ keys: ratingCriteriaKeysSchema });
+export type SaveRatingCriteriaInput = z.infer<typeof saveRatingCriteriaSchema>;
 
 /**
  * Response for the public company listing (GET /api/public/:companySlug): a
