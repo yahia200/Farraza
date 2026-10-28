@@ -14,7 +14,7 @@ Sections 1–7 describe what is built. Section 8 lists designed tables and const
 - **Enums are text plus a CHECK.** Contract `enum`s become `text` columns with a `CHECK (col IN (...))` constraint, not Postgres enum types. The contract uses PascalCase member names (for example `Draft = "draft"`), but only the lowercase string values are stored.
 - **Emails:** plain `text`, not `citext`. The application normalizes them before writing (trim, Unicode NFC, lowercase), and `CHECK (email = lower(email))` backs this up, which makes uniqueness case-insensitive.
 - **Slugs:** plain `text` with a regex CHECK that only allows lowercase letters, digits, and hyphens.
-- **Tenant column:** every company-owned table has `company_id`. The application copies it from the parent row on insert and filters by it on every query. It is not always a foreign key: see `application_events` and `notes`.
+- **Tenant column:** every company-owned table has `company_id`. The application copies it from the parent row on insert and filters by it on every query. It is not always a foreign key: see `application_events`, `notes` and `ratings`.
 - **Blocking deletes:** `applications` references `jobs`, `form_versions`, and `stages` with `ON DELETE NO ACTION`, which is `onDelete: NoAction` in the contract and the Postgres default. `NO ACTION` is checked at the end of the statement, so deleting a whole company still cascades cleanly. `RESTRICT` would be checked immediately and could make that cascade fail.
 - **Constraint and index names:** Prisma appends a hash to the names it generates (for example `form_versions_one_draft_5c11b249`). This document uses the names without the hash.
 
@@ -27,7 +27,7 @@ Sections 1–7 describe what is built. Section 8 lists designed tables and const
 | `StageKind` | `stages.kind` | `normal`, `hired`, `rejected` |
 | `PublicLabel` | `stages.public_label` | `received`, `in_review`, `interview`, `offer`, `closed` |
 | `ApplicationStatus` | `applications.status` | `active`, `rejected`, `hired`, `withdrawn` |
-| `ApplicationEventType` | `application_events.type` | `applied`, `auto_rejected`, `stage_changed`, `rejected`, `hired`, `withdrawn`, `note_added` |
+| `ApplicationEventType` | `application_events.type` | `applied`, `auto_rejected`, `stage_changed`, `rejected`, `hired`, `withdrawn`, `note_added`, `rated` |
 | `CvMode` | `form_versions.cv_mode` | `off`, `optional`, `required` |
 | `FilePurpose` | `files.purpose` | `cv`, `answer` |
 | `FileStatus` | `files.status` | `pending`, `uploaded` |
@@ -334,6 +334,24 @@ OIDC logins in progress, persisted by the auth library's `OidcStateStore` and co
 - CHECK `oidc_states_link_complete`: `(link_user_id IS NULL) = (link_session_id IS NULL)`: a link flow has both, a sign-in has neither. The store maps the pair to the library's `link: { userId, sessionId }`.
 - INDEX (`expires_at`) for pruning expired logins on save; INDEX (`link_user_id`) (Prisma adds one for every FK)
 
+### 3.16 `ratings` (model `Rating`)
+A Member's own Rating of an Application (`GLOSSARY.md`, "Rating"): one overall score and optional scores for the Job's Criteria. This is the **current** row; the history of changes is in `application_events` (`rated`, §4.3).
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK |
+| `company_id` | `companyId` | `uuid` | NOT NULL, **no FK** (copied from the Application) |
+| `application_id` | `applicationId` | `uuid` | NOT NULL, FK → `applications.id` ON DELETE CASCADE |
+| `user_id` | `userId` | `uuid` | NULL, FK → `users.id` ON DELETE SET NULL (a Rating outlives its author; the detail payload then shows "Former member") |
+| `overall` | `overall` | `smallint` (`SmallInt`) | NOT NULL, CHECK 1 to 5 |
+| `criteria` | `criteria` | `jsonb` | NOT NULL, DEFAULT `'{}'`, CHECK it is an object (shape in §4.4) |
+| `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+| `updated_at` | `updatedAt` | `timestamptz` | NOT NULL, set by the ORM (also on the update branch of the upsert) |
+
+- UNIQUE (`application_id`, `user_id`): one Rating per Member per Application, and the conflict target of the upsert. Postgres treats NULLs as distinct, so Ratings whose author is gone (`user_id` NULL) never clash. INDEX (`application_id`) and INDEX (`user_id`) (Prisma adds one for every FK; the first also serves the board's grouped read).
+- CHECK `ratings_overall_range`: `overall BETWEEN 1 AND 5` (shown as `overall >= 1 AND overall <= 5` by Postgres). CHECK `ratings_criteria_object`: `jsonb_typeof(criteria) = 'object'`.
+- A save (`PUT .../applications/:applicationId/rating`) upserts this row and writes a `rated` event in the same transaction (`PipelineRepository.saveRating`). Ratings cannot be removed through the API.
+
 ## 4. JSONB shapes
 
 The database does not validate these. The application does, using the Zod schemas and parsers in `packages/shared` (`@repo/shared`).
@@ -449,19 +467,26 @@ An object keyed by field key, checked with `parseAnswers()` in `answers.ts` agai
 | `hired` | Moved to the `hired` stage | `{ "fromStageName": "...", "toStageName": "..." }` | from → to | user |
 | `rejected` | Moved to the `rejected` stage | `{ "fromStageName": "...", "toStageName": "..." }` | from → to | user |
 | `note_added` | A note is added | `{ "noteId": "uuid" }` | `NULL` | note author |
+| `rated` | A Member gives or changes their Rating | `{ "previous": { "overall": 3, "criteria": {} } \| null, "current": { "overall": 4, "criteria": { "communication": 5 } }, "stage": "Interview" }` | `NULL` | the rater |
 | `withdrawn` | Not written yet | | | |
 
 A knocked-out application is created directly in the Rejected stage with `status = 'rejected'`. It gets both an `applied` and an `auto_rejected` event.
+
+A `rated` event is written on every save of a Rating, even one that changes nothing. `previous` is the Member's Rating as read inside the same transaction (`null` for a first rating), `current` is what was stored (including scores carried over for Criteria the Job no longer uses), and `stage` is the name of the Application's stage when it was rated.
+
+### 4.4 `ratings.criteria`
+
+An object from a Criterion key (the catalog `RATING_CRITERIA` in `packages/shared/src/rating-criteria.ts`) to a whole score 1 to 5: `{ "communication": 5, "culture_fit": 3 }`. A Criterion the Member did not score is absent; a value is never `null` (the request's `null` removes the key). It may hold keys the Job no longer uses: a save carries those over untouched (§7). The database checks only that it is an object; the keys and the range are checked by `saveRatingSchema` and `checkRatingCriteria`.
 
 ## 5. Relationships
 
 These are the relations declared in `contract.prisma`. Columns marked "no FK" above are not relations.
 
 - A `company` has many `memberships`, `jobs`, `stages`, `form_versions`, `candidates`, `applications`, and `files`.
-- A `user` has many `memberships`, `sessions`, `identities` and `email_tokens`, and is referenced by `jobs.created_by`, `notes.author_id` and `oidc_states.link_user_id`.
+- A `user` has many `memberships`, `sessions`, `identities` and `email_tokens`, and is referenced by `jobs.created_by`, `notes.author_id`, `ratings.user_id` and `oidc_states.link_user_id`.
 - A `job` has many `form_versions`, `stages`, `applications`, and `files`.
 - A `candidate` has many `applications`.
-- An `application` belongs to one `job`, one `candidate`, one `form_version`, and one `stage`, and has many `application_events`, `notes`, and `files`.
+- An `application` belongs to one `job`, one `candidate`, one `form_version`, and one `stage`, and has many `application_events`, `notes`, `ratings`, and `files`.
 
 ## 6. Changing the schema
 
@@ -479,8 +504,9 @@ Prisma works out table creation order and constraint names from the contract. Co
 The database cannot check these, so the services must:
 
 - `company_id` on a child row equals the `company_id` of its parent. It is copied from the parent on insert, and every read filters by it.
-- Columns without an FK (`application_events.company_id`/`from_stage_id`/`to_stage_id`/`actor_id`, `notes.company_id`, `form_versions.created_by`, `oidc_states.link_session_id`, `jobs.highlighted_question_keys`, `jobs.rating_criteria`) hold valid ids at the time of writing. `jobs.highlighted_question_keys` holds Question keys inside a JSONB array (so Postgres could not enforce an FK anyway), checked when they are written, not afterwards: see the next rule. `jobs.rating_criteria` holds catalog keys (strings, not ids of any table) inside a JSONB array: they are checked when written (`saveRatingCriteriaSchema`: only keys in `RATING_CRITERIA`, at most five, no repeats), and because the catalog is append-only they stay valid forever.
+- Columns without an FK (`application_events.company_id`/`from_stage_id`/`to_stage_id`/`actor_id`, `notes.company_id`, `ratings.company_id`, `form_versions.created_by`, `oidc_states.link_session_id`, `jobs.highlighted_question_keys`, `jobs.rating_criteria`) hold valid ids at the time of writing. `jobs.highlighted_question_keys` holds Question keys inside a JSONB array (so Postgres could not enforce an FK anyway), checked when they are written, not afterwards: see the next rule. `jobs.rating_criteria` holds catalog keys (strings, not ids of any table) inside a JSONB array: they are checked when written (`saveRatingCriteriaSchema`: only keys in `RATING_CRITERIA`, at most five, no repeats), and because the catalog is append-only they stay valid forever.
 - `jobs.rating_criteria` is replaced in one unconditional `UPDATE` (`JobsRepository.replaceRatingCriteria`), the same deliberate exception to conditional writes as the Highlighted questions: it is a preference, so last-write-wins loses no data. Saving it never changes or deletes a Rating; a Criterion the Job dropped keeps its old scores on the Ratings that have them.
+- A Rating (`ratings`) is written only by `PipelineService.rate` for the **caller's own** row (the user comes from the session, never the body), on an Application of the caller's company and the URL's Job (else 404), in any status, and only with Criteria scores that are in the Job's current `rating_criteria` (else 400, paths `criteria.<key>`). The new `criteria` is the Member's existing object, minus each key sent as `null`, plus each number sent; every other key is kept, so a score for a Criterion the Job dropped survives a re-rate. The read of the old row, the upsert and the `rated` event are one transaction. The write is deliberately last-write-wins, an exception to the conditional-write rule: it is the Member's own preference-like data, and the worst case of two tabs saving at once is a slightly wrong `previous` in the event. Ratings are never removed through the API, and never appear on a public route.
 - `jobs.highlighted_question_keys` is saved only after `checkHighlightKeys` (`@repo/shared`) accepts every key against the job's **latest published** form version: each must be a top-level Question of a single-answer type (not a file, a Repeating group or a group's sub-question). A job with no published version can't save any (409). A key can go stale later, when a newer published version drops the Question; stale keys are **not** removed at publish. Anything that reads the list filters it against the latest published form, and the next save replaces the whole list. That save is one unconditional `UPDATE`, a deliberate exception to the conditional writes used everywhere else (`.claude/rules/api.md`, "Concurrency and error conventions"): the list is a display preference, so two people saving at once is last-write-wins and loses no data.
 - `applications.stage_id` belongs to the same job as the application. A move is rejected unless the target is one of the job's stages.
 - `applications.form_version_id` is the job's latest published version at submit time, and `applications.answers` is valid against its fields.
@@ -528,7 +554,7 @@ It also adds `candidates.account_id uuid NULL` (FK → `candidate_accounts.id` O
 | `used_at` | `timestamptz` | NULL |
 | `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` |
 
-**`scores`**: a reviewer's rating of an application overall, or of one answer. Adds `score_added` (`{ "scoreId": "uuid", "value": 4 }`) to `ApplicationEventType`.
+**`scores`**: a reviewer's rating of an application overall, or of one answer. Adds `score_added` (`{ "scoreId": "uuid", "value": 4 }`) to `ApplicationEventType`. *The overall part is built as `ratings` (§3.16) with a `rated` event; only the per-answer score (`field_key`) and the comment are still planned.*
 
 | Column | Type | Constraints |
 |---|---|---|
