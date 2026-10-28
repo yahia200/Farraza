@@ -6,6 +6,7 @@ import { DataTableSortButton } from '@/components/data-table/data-table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { HighlightedQuestion } from '@/lib/dal';
 import { ApplicationStatusBadge } from './application-status-badge';
+import { AverageRatingLabel } from './average-rating-label';
 import { ContactActions } from './contact-actions';
 import type { CandidateRow, CandidatesTableFeatures } from './data-table-features';
 import { HighlightAnswer } from './highlight-answer';
@@ -30,6 +31,21 @@ const candidateColumn = columnHelper.accessor((row) => row.candidate.name, {
     </div>
   ),
 });
+
+const ratingColumn = columnHelper.accessor(
+  // `undefined`, not `null`, for "no ratings": `sortUndefined` only looks for `undefined`
+  // (table-core 9.2.8, createSortedRowModel.js), so these rows stay last in both directions.
+  (row) => row.rating.average ?? undefined,
+  {
+    id: 'rating',
+    header: ({ column }) => <DataTableSortButton column={column}>Rating</DataTableSortButton>,
+    sortFn: 'basic',
+    sortUndefined: 'last',
+    enableColumnFilter: false,
+    cell: ({ row }) => <AverageRatingLabel rating={row.original.rating} />,
+    meta: { className: 'w-px whitespace-nowrap' },
+  },
+);
 
 const contactColumn = columnHelper.display({
   id: 'contact',
@@ -113,7 +129,7 @@ function highlightColumn({ key, label }: HighlightedQuestion) {
 }
 
 /**
- * The table's columns: Candidate, then one per Highlighted question (in form
+ * The table's columns: Candidate, Rating, then one per Highlighted question (in form
  * order, as the API sends them), then Stage, Status, Applied and the Contact actions. The set
  * varies per Job, so it is built from `highlightedQuestions`; the caller
  * memoizes it, because TanStack Table expects `columns` to stay the same
@@ -123,6 +139,7 @@ function highlightColumn({ key, label }: HighlightedQuestion) {
 export function candidateColumns(highlightedQuestions: HighlightedQuestion[]) {
   return columnHelper.columns([
     candidateColumn,
+    ratingColumn,
     ...highlightedQuestions.map(highlightColumn),
     stageColumn,
     statusColumn,
