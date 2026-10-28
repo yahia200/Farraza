@@ -8,6 +8,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import type { HighlightedQuestion, PipelineCard } from "@/lib/dal";
 import { cn } from "@/lib/utils";
 import { ApplicationStatusBadge } from "./application-status-badge";
+import { AverageRatingLabel } from "./average-rating-label";
 import { candidatesHref } from "./candidates-href";
 import { ContactActions } from "./contact-actions";
 import { HighlightAnswer } from "./highlight-answer";
@@ -126,6 +127,9 @@ export function CandidateCard({
         <span id={nameId} className="truncate pr-14 font-medium">
           {card.candidate.name}
         </span>
+
+        {/* A card nobody has rated shows nothing here; the table says "No ratings". */}
+        {card.rating.count > 0 && <AverageRatingLabel rating={card.rating} className="text-xs" />}
 
         {highlightedQuestions.length > 0 && (
           <dl className="mt-1 flex flex-col gap-2">

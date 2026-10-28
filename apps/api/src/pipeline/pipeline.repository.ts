@@ -1,15 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import type { Answers, FilePurpose, FormFields } from '@repo/shared';
+import type { Answers, FilePurpose, FormFields, RatingValues } from '@repo/shared';
 import type { StageKind } from '../jobs/job.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
-  ApplicationDetail,
+  ApplicationDetailRow,
   CardRow,
   CardRowWithAnswers,
   ApplicationFile,
   ApplicationStatus,
   DownloadableFile,
   NoteView,
+  SavedRating,
 } from './pipeline.js';
 import { EVENT_FOR_STAGE, STATUS_FOR_STAGE } from './pipeline.js';
 
@@ -31,6 +32,15 @@ function toApplicationFile(row: {
     sizeBytes: row.sizeBytes,
     durationSeconds: row.durationSeconds,
   };
+}
+
+/**
+ * `criteria` is CHECKed to be an object and written only from the service's merge of a parsed
+ * `saveRatingSchema` body (catalog keys to 1-5, never `null`), so the cast is as safe as the one for
+ * `highlightedQuestionKeys`.
+ */
+function toRatingValues(row: { overall: number; criteria: unknown }): RatingValues {
+  return { overall: row.overall, criteria: row.criteria as RatingValues['criteria'] };
 }
 
 function toCardRow(row: {
@@ -66,6 +76,10 @@ export class PipelineRepository {
 
   private get notes() {
     return this.prisma.db.orm.public.Note;
+  }
+
+  private get ratings() {
+    return this.prisma.db.orm.public.Rating;
   }
 
   private get formVersions() {
@@ -109,6 +123,38 @@ export class PipelineRepository {
   }
 
   /**
+   * The Average rating of each of these Applications of one company, by Application id, in one
+   * grouped query (`GROUP BY application_id`). An Application with no Rating has no entry. `count`
+   * is the number of Ratings (a Rating whose author left still counts, as in `summariseRatings`),
+   * and `average` the plain mean of `overall`, never rounded.
+   */
+  async findRatingSummaries(
+    companyId: string,
+    applicationIds: readonly string[],
+  ): Promise<Map<string, { count: number; average: number }>> {
+    if (applicationIds.length === 0) return new Map();
+    const rows = await this.ratings
+      .where({ companyId })
+      .where((rating) => rating.applicationId.in(applicationIds))
+      .groupBy('applicationId')
+      .aggregate((aggregate) => ({
+        count: aggregate.count(),
+        average: aggregate.avg('overall'),
+      }));
+
+    // `avg` is nullable in the types because an empty group has none, but a group exists only because it
+    // has a row. Throw if that ever fails, rather than turn it into a 0 that reads as a real score.
+    return new Map(
+      rows.map((row) => {
+        if (row.average === null) {
+          throw new Error(`Rating group for application ${row.applicationId} has no average.`);
+        }
+        return [row.applicationId, { count: row.count, average: row.average }];
+      }),
+    );
+  }
+
+  /**
    * The `fields` of each of these form versions of this company's job, by version id. Unknown ids,
    * and ids of another job's or company's versions, are left out.
    */
@@ -136,7 +182,7 @@ export class PipelineRepository {
     companyId: string,
     jobId: string,
     applicationId: string,
-  ): Promise<ApplicationDetail | null> {
+  ): Promise<ApplicationDetailRow | null> {
     const row = await this.applications
       .where({ id: applicationId, companyId, jobId })
       .include('candidate')
@@ -145,7 +191,7 @@ export class PipelineRepository {
       .first();
     if (!row) return null;
 
-    const [eventRows, noteRows] = await Promise.all([
+    const [eventRows, noteRows, ratingRows] = await Promise.all([
       this.events
         .where({ applicationId })
         .orderBy((event) => event.createdAt.asc())
@@ -154,6 +200,13 @@ export class PipelineRepository {
         .where({ applicationId })
         .include('author')
         .orderBy((note) => note.createdAt.asc())
+        .all(),
+      // One query for every Member's Rating with the author's name (the `user` relation is null once the
+      // user is gone: `user_id` is SET NULL). The Application above is already this company's and Job's.
+      this.ratings
+        .where({ companyId, applicationId })
+        .include('user')
+        .orderBy((rating) => rating.createdAt.asc())
         .all(),
     ]);
 
@@ -188,6 +241,13 @@ export class PipelineRepository {
         authorId: note.authorId,
         authorName: note.author?.name ?? null,
         createdAt: note.createdAt,
+      })),
+      ratings: ratingRows.map((rating) => ({
+        userId: rating.userId,
+        userName: rating.user?.name ?? null,
+        ...toRatingValues(rating),
+        createdAt: rating.createdAt,
+        updatedAt: rating.updatedAt,
       })),
     };
   }
@@ -255,6 +315,57 @@ export class PipelineRepository {
       });
 
       return { status };
+    });
+  }
+
+  /**
+   * Gives or replaces one Member's Rating and appends the `rated` event, in one transaction.
+   * `resolve` gets the Member's current Rating as read inside the transaction (`null` on a first
+   * rating) and returns the values to store, so the service owns the rules (carrying over dropped
+   * Criteria) while the read and the write cannot be separated by another save. The event's `previous`
+   * is that same read. This is last-write-wins by design (spec, "Confirmed details" 2): no condition
+   * on `updated_at`, so two tabs of one Member saving at once can record a slightly wrong `previous`.
+   */
+  async saveRating(input: {
+    companyId: string;
+    applicationId: string;
+    userId: string;
+    stageName: string;
+    resolve: (previous: RatingValues | null) => RatingValues;
+  }): Promise<SavedRating> {
+    return this.prisma.db.transaction(async (tx) => {
+      // Scoped by company like every read here. The upsert below cannot be: its `conflictOn` names the
+      // UNIQUE (application_id, user_id) key only, which is global (an Application id belongs to one
+      // company, and the service has already checked that this one is the caller's).
+      const existing = await tx.orm.public.Rating
+        .where({ companyId: input.companyId, applicationId: input.applicationId, userId: input.userId })
+        .first();
+      const previous = existing ? toRatingValues(existing) : null;
+      const current = input.resolve(previous);
+
+      // `update` is non-empty, so the ORM also sets `updated_at` on the update branch
+      // (`applyUpdateDefaults` in orm-client.mjs only runs when `update` has values).
+      const saved = await tx.orm.public.Rating.upsert({
+        create: {
+          companyId: input.companyId,
+          applicationId: input.applicationId,
+          userId: input.userId,
+          overall: current.overall,
+          criteria: current.criteria,
+        },
+        update: { overall: current.overall, criteria: current.criteria },
+        conflictOn: { applicationId: input.applicationId, userId: input.userId },
+      });
+
+      await tx.orm.public.ApplicationEvent.create({
+        companyId: input.companyId,
+        applicationId: input.applicationId,
+        type: 'rated',
+        actorId: input.userId,
+        data: { previous, current, stage: input.stageName },
+      });
+
+      return { ...toRatingValues(saved), updatedAt: saved.updatedAt };
     });
   }
 

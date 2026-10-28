@@ -5,6 +5,8 @@ export * from './preset-keys.js';
 export * from './answers.js';
 export * from './answer-text.js';
 export * from './highlights.js';
+export * from './rating-criteria.js';
+export * from './ratings.js';
 export { formatIsoDate } from './dates.js';
 export * from './auth.js';
 export * from './oidc.js';

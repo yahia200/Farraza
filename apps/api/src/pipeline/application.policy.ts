@@ -14,4 +14,9 @@ export class ApplicationPolicy {
   addNote(_user: User, _membership: Membership) {
     return true;
   }
+
+  /** Any member may rate, interviewers included: a Rating is always the caller's own. */
+  rate(_user: User, _membership: Membership) {
+    return true;
+  }
 }

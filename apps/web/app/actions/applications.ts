@@ -7,9 +7,11 @@ import {
   createNoteSchema,
   createUploadSchema,
   moveApplicationSchema,
+  saveRatingSchema,
   submitApplicationSchema,
   type CreateUploadInput,
   type FieldError,
+  type SaveRatingInput,
   type SubmitApplicationInput,
 } from '@repo/shared';
 import { GENERIC_FAILURE_MESSAGE, type ActionFailure } from '@/lib/action-failure';
@@ -278,6 +280,55 @@ export async function moveApplication(
     });
     if (response.status === 404 || response.status === 409) {
       // Refresh what the user sees: the page then shows where the candidate really is.
+      revalidatePath(candidatesPath);
+    }
+    return failure;
+  }
+
+  revalidatePath(candidatesPath);
+  return { ok: true };
+}
+
+export type SaveRatingResult = ActionFailure<never> & { ok?: boolean };
+
+/**
+ * Gives or changes the signed-in Member's own Rating on an application, calling
+ * PUT .../applications/:id/rating (apps/api/src/pipeline). `overall` is always sent (the API
+ * requires it); `criteria` holds only the scores that changed, a number to set one and `null` to
+ * clear it. The Member comes from the session, never from here. Every role may, any status.
+ *
+ * The control calls it on every click, so it returns failures rather than throwing. Success
+ * revalidates the candidates page, which re-reads the sheet (everyone's Ratings and the averages)
+ * and the board and table (the Average rating) in the same response. A 400 (the Job's Criteria
+ * changed under an open sheet) or a 404 revalidates too, so a stale sheet corrects itself.
+ */
+export async function saveRating(
+  companySlug: string,
+  jobSlug: string,
+  applicationId: string,
+  input: SaveRatingInput,
+): Promise<SaveRatingResult> {
+  const parsed = saveRatingSchema.safeParse(input);
+  if (!parsed.success) {
+    return { formError: parsed.error.issues[0]?.message ?? 'Reload the page and try again.' };
+  }
+
+  const candidatesPath = `/dashboard/${companySlug}/jobs/${jobSlug}/candidates`;
+  const response = await apiFetch(`${applicationPath(companySlug, jobSlug, applicationId)}/rating`, {
+    method: 'PUT',
+    body: JSON.stringify(parsed.data),
+  });
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (!response.ok) {
+    const failure = await failureFromResponse(response, [], {
+      // A Criterion the Job no longer uses: the sheet was built from older Criteria.
+      400: () => ({ formError: "This job's rating criteria changed. Reload the page and try again." }),
+      404: () => ({ formError: 'That candidate is no longer part of this job. Reload the page.' }),
+      409: (message) => ({ formError: message }),
+    });
+    if (response.status === 400 || response.status === 404) {
       revalidatePath(candidatesPath);
     }
     return failure;

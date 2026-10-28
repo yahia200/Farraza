@@ -1669,6 +1669,33 @@ describe('ApplicationsService', () => {
     });
   });
 
+  // Ratings are internal (spec: "never leave the signed-in API"). The public routes build their payloads
+  // field by field, so this pins that no key anywhere in what they return mentions a Rating.
+  describe('no Rating reaches the public routes', () => {
+    /** Every object key in a payload, however deep. */
+    const keysOf = (value: unknown): string[] =>
+      Array.isArray(value)
+        ? value.flatMap(keysOf)
+        : value !== null && typeof value === 'object'
+          ? Object.entries(value).flatMap(([key, inner]) => [key, ...keysOf(inner)])
+          : [];
+
+    it('carries no rating field in the apply page, the listing, the branding or the submit answer', async () => {
+      repository.seedJob({ slug: 'backend', cvMode: 'optional' });
+
+      const payloads = [
+        await service.getPublicJob('acme', 'backend'),
+        await service.listCompanyJobs('acme'),
+        await service.getCompanyBranding('acme'),
+        await service.submit('acme', 'backend', applicant()),
+      ];
+
+      for (const payload of payloads) {
+        expect(keysOf(payload).filter((key) => /rating|criteri/i.test(key))).toEqual([]);
+      }
+    });
+  });
+
   // The public listing at /{companySlug}: a company's branding and only its open jobs, projected to
   // the fields applicants may see. The repository query is checked against the real database by hand.
   describe('listCompanyJobs', () => {

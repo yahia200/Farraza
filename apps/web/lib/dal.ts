@@ -8,6 +8,8 @@ import type {
   CvMode,
   FilePurpose,
   FormFields,
+  RatingSummary,
+  RatingValues,
 } from '@repo/shared';
 import { apiFetch } from './api';
 import { formatDate } from './format';
@@ -160,6 +162,8 @@ export interface CompanyJob {
   createdAt: string;
   /** Keys of the Job's Highlighted questions as last saved; may include keys the latest published form no longer has. */
   highlightedQuestionKeys: string[];
+  /** Keys of the rating Criteria raters may score on this Job (catalog keys from `@repo/shared`, at most five). */
+  ratingCriteria: string[];
 }
 
 /** Mirrors Stage in apps/api/src/jobs/job.ts. */
@@ -268,8 +272,9 @@ function toCompanyJob({
   closedAt,
   createdAt,
   highlightedQuestionKeys,
+  ratingCriteria,
 }: CompanyJob): CompanyJob {
-  return { id, title, slug, description, status, openedAt, closedAt, createdAt, highlightedQuestionKeys };
+  return { id, title, slug, description, status, openedAt, closedAt, createdAt, highlightedQuestionKeys, ratingCriteria };
 }
 
 /** Expose only what the UI needs. */
@@ -278,6 +283,16 @@ function toMyCompany({ id, name, slug, logoUrl, brandColor, role }: MyCompany): 
 }
 
 // --- Applications (apps/api/src/pipeline) ------------------------------------
+
+/**
+ * A card's Average rating, mirroring CardRating in apps/api/src/pipeline/pipeline.ts: the plain mean
+ * of the overall Ratings (not rounded; the UI shows one decimal) and how many Members gave one.
+ * `{ average: null, count: 0 }` with none.
+ */
+export interface CardRating {
+  average: number | null;
+  count: number;
+}
 
 /** One application in a job's list, with the stage it's in. */
 export interface ApplicationSummary {
@@ -291,6 +306,7 @@ export interface ApplicationSummary {
    * display text from the API, or null for "—". Empty when the Job has none.
    */
   highlights: Record<string, string | null>;
+  rating: CardRating;
 }
 
 /** Mirrors HighlightedQuestion in apps/api/src/pipeline/pipeline.ts: in form order, with the latest text. */
@@ -353,13 +369,14 @@ export async function getPipelineBoard(companySlug: string, jobSlug: string): Pr
       name,
       position,
       kind,
-      applications: applications.map(({ id: applicationId, status, submittedAt, candidate, highlights }) => ({
+      applications: applications.map(({ id: applicationId, status, submittedAt, candidate, highlights, rating }) => ({
         id: applicationId,
         status,
         submittedAt,
         appliedLabel: formatDate(submittedAt),
         candidate: { name: candidate.name, email: candidate.email, phone: candidate.phone },
         highlights,
+        rating: { average: rating.average, count: rating.count },
       })),
     }))
     .sort((a, b) => a.position - b.position);
@@ -370,6 +387,19 @@ export async function getPipelineBoard(companySlug: string, jobSlug: string): Pr
 /** The board as one row per application, for the table view. */
 export function flattenBoard(columns: PipelineColumn[]): (ApplicationSummary & { appliedLabel: string })[] {
   return columns.flatMap(({ applications, ...stage }) => applications.map((card) => ({ ...card, stage })));
+}
+
+/**
+ * One Member's Rating on an Application, as the detail returns it (RatingView in
+ * apps/api/src/pipeline/pipeline.ts). `userId` is null when the author's user is gone
+ * (`name` is then `FORMER_MEMBER_NAME`): that Rating is never the viewer's own. `criteria` holds the
+ * scores as stored, so it can include Criteria the Job no longer uses.
+ */
+export interface RatingView extends RatingValues {
+  userId: string | null;
+  name: string;
+  /** ISO timestamp. */
+  updatedAt: string;
 }
 
 /** Mirrors ApplicationDetail in apps/api/src/pipeline/pipeline.ts (dates as ISO strings). */
@@ -390,6 +420,10 @@ export interface ApplicationDetailView {
   /** The application's history and its notes, oldest first; `buildActivityTimeline` joins them. */
   events: ActivityEvent[];
   notes: ActivityNote[];
+  /** Every Member's Rating, oldest first (the order they first rated). */
+  ratings: RatingView[];
+  /** The Average rating and the average per Criterion, over `ratings` (unrounded). */
+  ratingSummary: RatingSummary;
 }
 
 /** One application in full, or null if it isn't in this job (the sheet says so). */
@@ -442,6 +476,18 @@ export async function getApplication(
       authorName,
       createdAt,
     })),
+    ratings: detail.ratings.map(({ userId, name, overall, criteria, updatedAt }) => ({
+      userId,
+      name,
+      overall,
+      criteria,
+      updatedAt,
+    })),
+    ratingSummary: {
+      count: detail.ratingSummary.count,
+      average: detail.ratingSummary.average,
+      criteria: detail.ratingSummary.criteria,
+    },
   };
 }
 

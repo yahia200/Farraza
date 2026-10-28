@@ -1,7 +1,13 @@
-import type { Answers, CvMode, FilePurpose, FormFields } from '@repo/shared';
+import type { Answers, CvMode, FilePurpose, FormFields, RatingSummary, RatingValues } from '@repo/shared';
 import type { StageKind } from '../jobs/job.js';
 
 export type ApplicationStatus = 'active' | 'rejected' | 'hired' | 'withdrawn';
+
+/**
+ * A card's Average rating: the same `count` and `average` as `summariseRatings` (the mean of the
+ * `overall` scores, not rounded, `null` with no Ratings), without the per-Criterion part.
+ */
+export type CardRating = Pick<RatingSummary, 'count' | 'average'>;
 
 export interface ApplicationCard {
   id: string;
@@ -15,10 +21,12 @@ export interface ApplicationCard {
    * no such Question. Empty when the Job has none.
    */
   highlights: Record<string, string | null>;
+  /** The Average rating and how many Members gave one; `{ average: null, count: 0 }` with none. */
+  rating: CardRating;
 }
 
-/** A card as `PipelineRepository` reads it, before the service adds the Highlighted answers. */
-export type CardRow = Omit<ApplicationCard, 'highlights'>;
+/** A card as `PipelineRepository` reads it, before the service adds the Highlighted answers and the rating. */
+export type CardRow = Omit<ApplicationCard, 'highlights' | 'rating'>;
 
 /** A card row plus what the service needs to resolve its Highlighted answers. Stays inside the API. */
 export interface CardRowWithAnswers extends CardRow {
@@ -72,7 +80,38 @@ export interface ApplicationDetail {
   answers: Answers;
   events: ApplicationEventView[];
   notes: NoteView[];
+  /** Every Member's Rating of this Application, oldest first. */
+  ratings: RatingView[];
+  /** The count, the average and the per-Criterion averages of `ratings` (`summariseRatings`). */
+  ratingSummary: RatingSummary;
 }
+
+/**
+ * One Member's Rating as the detail shows it. `userId` and `name` describe the author: `userId` is null
+ * and `name` is "Former member" when the author's user is gone (the Rating stays and still counts).
+ * `criteria` is as stored, so it can hold scores for Criteria the Job no longer uses.
+ */
+export interface RatingView extends RatingValues {
+  userId: string | null;
+  name: string;
+  updatedAt: Date;
+}
+
+/** A Rating as `PipelineRepository` reads it: the author's name is null when the author's user is gone. */
+export interface RatingRow extends RatingValues {
+  userId: string | null;
+  userName: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** The detail as `PipelineRepository.findDetail` reads it, before the service resolves names and the summary. */
+export type ApplicationDetailRow = Omit<ApplicationDetail, 'ratings' | 'ratingSummary'> & {
+  ratings: RatingRow[];
+};
+
+/** A Rating as the API answers after a save: the Member's own scores and when they were saved. */
+export type SavedRating = RatingValues & { updatedAt: Date };
 
 /** A file an applicant sent with an Application, as recruiters see it: no storage key. */
 export interface ApplicationFile {

@@ -77,6 +77,17 @@ export class JobsRepository {
     return row ? toJob(row) : null;
   }
 
+  /**
+   * Replaces the job's whole list of rating Criteria in one statement. Returns null if the job is
+   * gone. Deliberately unconditional, like `replaceHighlightedQuestionKeys` and unlike the other
+   * writes here (`.claude/rules/api.md`, "Concurrency"): the list is a preference, so two people
+   * saving at once is last-write-wins and no data is lost (the Ratings already given are untouched).
+   */
+  async replaceRatingCriteria(id: string, keys: string[]): Promise<Job | null> {
+    const row = await this.jobs.where({ id }).update({ ratingCriteria: keys });
+    return row ? toJob(row) : null;
+  }
+
   async hasPublishedForm(jobId: string): Promise<boolean> {
     const row = await this.formVersions
       .where({ jobId })
@@ -116,6 +127,7 @@ function toJob(row: {
   createdAt: Date;
   updatedAt: Date;
   highlightedQuestionKeys: unknown;
+  ratingCriteria: unknown;
 }): Job {
   return {
     id: row.id,
@@ -129,6 +141,8 @@ function toJob(row: {
     updatedAt: row.updatedAt,
     // The column is CHECKed to be a JSON array, and the service writes only checked UUID strings.
     highlightedQuestionKeys: row.highlightedQuestionKeys as string[],
+    // Same reasoning: CHECKed to be a JSON array, and the service writes only catalog keys.
+    ratingCriteria: row.ratingCriteria as string[],
   };
 }
 

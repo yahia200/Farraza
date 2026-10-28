@@ -7,6 +7,7 @@ import {
   createJobSchema,
   RELOAD_MESSAGE,
   saveHighlightedQuestionsSchema,
+  saveRatingCriteriaSchema,
   updateJobSchema,
   type CreateJobInput,
   type UpdateJobInput,
@@ -151,6 +152,51 @@ export async function saveHighlightedQuestions(
     });
     if (response.status === 400 || response.status === 409) {
       // The picker was built from an older form: refresh it so it lists what the form asks now.
+      revalidatePath(candidatesPath);
+    }
+    return failure;
+  }
+
+  const saved = (await response.json()) as { keys: string[] };
+  revalidatePath(candidatesPath);
+  return { keys: saved.keys };
+}
+
+export type SaveRatingCriteriaResult = ActionFailure<never> & { keys?: string[] };
+
+/**
+ * Saves the Job's rating Criteria, calling PUT .../jobs/:jobSlug/rating-criteria
+ * with the whole new list (apps/api/src/jobs). The picker on the candidates
+ * page calls it on every tick, so it returns failures rather than throwing.
+ * It revalidates the candidates page, which re-reads the job (the saved keys),
+ * so the picker and the sheet's Criteria rows follow without a reload.
+ * Applicants never see Criteria, so the public job is left alone.
+ */
+export async function saveRatingCriteria(
+  companySlug: string,
+  jobSlug: string,
+  keys: string[],
+): Promise<SaveRatingCriteriaResult> {
+  const parsed = saveRatingCriteriaSchema.safeParse({ keys });
+  if (!parsed.success) {
+    return { formError: parsed.error.issues[0]?.message ?? RELOAD_MESSAGE };
+  }
+
+  const candidatesPath = `/dashboard/${companySlug}/jobs/${jobSlug}/candidates`;
+  const response = await apiFetch(`${jobsPath(companySlug, jobSlug)}/rating-criteria`, {
+    method: 'PUT',
+    body: JSON.stringify(parsed.data),
+  });
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (!response.ok) {
+    // 400 can only come from a stale page or a hand-made request: the catalog is fixed and checked above.
+    const failure = await failureFromResponse(response, [], {
+      ...NO_PERMISSION,
+      404: () => ({ formError: 'This job no longer exists. Reload the page.' }),
+    });
+    if (response.status === 400) {
       revalidatePath(candidatesPath);
     }
     return failure;

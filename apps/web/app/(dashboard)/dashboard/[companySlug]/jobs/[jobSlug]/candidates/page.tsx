@@ -9,6 +9,7 @@ import { CandidatesViewToggle } from '@/components/dashboard/candidates/candidat
 import type { CandidateRow } from '@/components/dashboard/candidates/data-table-features';
 import { HighlightedQuestionsPicker } from '@/components/dashboard/candidates/highlighted-questions-picker';
 import { PipelineBoard } from '@/components/dashboard/candidates/pipeline-board';
+import { RatingCriteriaPicker } from '@/components/dashboard/candidates/rating-criteria-picker';
 import { JobPage, type LoadedJob } from '@/components/dashboard/jobs/job-page';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -30,7 +31,8 @@ export const metadata: Metadata = { title: 'Candidates · Farraza' };
  * ?view=table|board picks the view (table by default); ?application=<id>
  * opens one candidate in a side sheet, in either view. Those who can manage
  * jobs (canManageJobs) also get the Highlighted questions picker beside the
- * view toggle, once the job has a published form.
+ * view toggle, once the job has a published form, and the rating Criteria
+ * picker, which needs no form (the catalog is fixed).
  */
 export default function JobCandidatesPage({
   params,
@@ -52,13 +54,13 @@ async function Candidates({
   job: LoadedJob;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const canPickHighlights = canManageJobs(company.role);
+  const canManage = canManageJobs(company.role);
   // One fetch of the board feeds both views. The form is read only for the
   // Highlighted questions picker, which interviewers don't get.
   const [{ columns, highlightedQuestions }, { application, view: viewParam }, form] = await Promise.all([
     getPipelineBoard(company.slug, job.slug),
     searchParams,
-    canPickHighlights ? getJobForm(company.slug, job.slug) : null,
+    canManage ? getJobForm(company.slug, job.slug) : null,
   ]);
   const view = parseView(viewParam);
   const basePath = `/dashboard/${company.slug}/jobs/${job.slug}/candidates`;
@@ -79,6 +81,9 @@ async function Candidates({
             questions={pickerQuestions}
             savedKeys={job.highlightedQuestionKeys}
           />
+        )}
+        {canManage && (
+          <RatingCriteriaPicker companySlug={company.slug} jobSlug={job.slug} savedKeys={job.ratingCriteria} />
         )}
       </div>
       {view === 'board' ? (
@@ -108,6 +113,7 @@ async function Candidates({
               applicationId={selected}
               stages={job.stages}
               canMove={canMoveApplications(company.role)}
+              ratingCriteria={job.ratingCriteria}
             />
           </Suspense>
         )}

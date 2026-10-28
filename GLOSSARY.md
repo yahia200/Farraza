@@ -81,7 +81,7 @@ A free-text comment a Member leaves on an Application. Append-only — notes are
 _Avoid_: Comment, remark
 
 **Rating**:
-A Member's overall judgement of an Application, from 1 to 5, shown with who gave it. The overall is always given by the Member, never worked out from Criteria. It can also carry a 1 to 5 score for each Criterion the Job uses. It belongs to the Application, not the Candidate, so the same person can be rated differently for different Jobs. A Member has at most one Rating per Application and can change it at any time, whatever the Application's status, but never remove it; every change is kept in the Application's history. A Rating stays when its Member leaves the company. Every Member who can view the Application sees all its Ratings.
+A Member's overall judgement of an Application, from 1 to 5, shown with who gave it. The overall is always given by the Member, never worked out from Criteria. It can also carry a 1 to 5 score for each Criterion the Job uses. It belongs to the Application, not the Candidate, so the same person can be rated differently for different Jobs. A Member has at most one Rating per Application and can change it at any time, whatever the Application's status, but never remove it; every change is kept in the Application's history. A Rating stays, and still counts, when its Member leaves the company; if the Member's account is deleted it is shown as "Former member". Every Member who can view the Application sees all its Ratings.
 _Avoid_: Score, Review, Vote, Evaluation
 
 **Criterion**:
@@ -89,7 +89,7 @@ One predefined dimension a Rating can score besides the overall, such as technic
 _Avoid_: Category, Skill, Dimension, Question (a Question is on the application form)
 
 **Average rating**:
-The mean of the overall Ratings on an Application, shown with how many Members gave one, on the candidate list and the board.
+The mean of the overall Ratings on an Application, shown with how many Members gave one, on the candidate list and the board (an Application nobody has rated reads "No ratings" in the list, sorts last whichever way the list is sorted, and shows nothing on its board card). Only the overall counts, never the Criteria scores.
 _Avoid_: Score, Overall (the overall is one Member's Rating)
 
 **Application Event**:

@@ -1,17 +1,43 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { AuthorizationService } from '@nestjs/authorization';
-import { formatHighlightText, highlightableQuestions, previewKindOf } from '@repo/shared';
+import {
+  FORMER_MEMBER_NAME,
+  checkRatingCriteria,
+  formatHighlightText,
+  highlightableQuestions,
+  previewKindOf,
+  summariseRatings,
+  type RatingCriteriaScores,
+} from '@repo/shared';
+import { isUniqueViolation } from '../common/db-errors.js';
 import type { Membership } from '../companies/company.js';
+import type { JobWithStages } from '../jobs/job.js';
 import { JobsService } from '../jobs/jobs.service.js';
 import type { User } from '../users/user.js';
 import { ApplicationPolicy } from './application.policy.js';
 import type { CreateNoteDto } from './dto/create-note.dto.js';
 import type { MoveApplicationDto } from './dto/move-application.dto.js';
+import type { SaveRatingDto } from './dto/save-rating.dto.js';
 import { StorageService } from '../storage/storage.service.js';
 import { DOWNLOAD_URL_TTL_SECONDS } from '../storage/storage.js';
 import { FormsRepository } from '../forms/forms.repository.js';
-import type { ApplicationCard, BoardColumn, FileLink, HighlightedQuestion } from './pipeline.js';
+import type { ApplicationCard, ApplicationDetail, BoardColumn, FileLink, HighlightedQuestion, SavedRating } from './pipeline.js';
 import { PipelineRepository } from './pipeline.repository.js';
+
+/**
+ * The Criteria scores to store after a save: start from the Member's existing scores, drop each
+ * Criterion the request sends as `null` (clear), set each number, and leave every other key alone.
+ * That last part is how a score for a Criterion the Job no longer uses survives a re-rate (the
+ * request can only address the Job's current Criteria). Nothing stored is ever `null`.
+ */
+function mergeCriteria(existing: Record<string, number>, requested: RatingCriteriaScores): Record<string, number> {
+  const merged = { ...existing };
+  for (const [key, score] of Object.entries(requested)) {
+    if (score === null || score === undefined) delete merged[key];
+    else merged[key] = score;
+  }
+  return merged;
+}
 
 @Injectable()
 export class PipelineService {
@@ -30,7 +56,8 @@ export class PipelineService {
   async board(membership: Membership, jobSlug: string) {
     const job = await this.jobs.get(membership, jobSlug);
     const highlightedQuestions = await this.highlightedQuestionsOf(job.id, job.highlightedQuestionKeys);
-    const cards = await this.cardsOf(membership.company.id, job.id, highlightedQuestions);
+    const rows = await this.cardsOf(membership.company.id, job.id, highlightedQuestions);
+    const cards = await this.withRatings(membership.company.id, rows);
 
     const columns: BoardColumn[] = job.stages.map((stage) => ({
       id: stage.id,
@@ -72,7 +99,7 @@ export class PipelineService {
     companyId: string,
     jobId: string,
     highlighted: HighlightedQuestion[],
-  ): Promise<ApplicationCard[]> {
+  ): Promise<Omit<ApplicationCard, 'rating'>[]> {
     if (highlighted.length === 0) {
       const rows = await this.pipeline.findCards(companyId, jobId);
       return rows.map((row) => ({ ...row, highlights: {} }));
@@ -101,11 +128,39 @@ export class PipelineService {
     });
   }
 
-  async detail(membership: Membership, jobSlug: string, applicationId: string) {
+  /**
+   * Adds each card's Average rating. One grouped query for the whole board, by the ids of the cards
+   * just read (a Rating has no job id); none at all when the Job has no Applications. A card whose
+   * Application has no Rating gets `{ average: null, count: 0 }`.
+   */
+  private async withRatings(
+    companyId: string,
+    cards: Omit<ApplicationCard, 'rating'>[],
+  ): Promise<ApplicationCard[]> {
+    if (cards.length === 0) return [];
+    const summaries = await this.pipeline.findRatingSummaries(
+      companyId,
+      cards.map((card) => card.id),
+    );
+    return cards.map((card) => ({
+      ...card,
+      rating: summaries.get(card.id) ?? { average: null, count: 0 },
+    }));
+  }
+
+  async detail(membership: Membership, jobSlug: string, applicationId: string): Promise<ApplicationDetail> {
     const job = await this.jobs.get(membership, jobSlug);
     const detail = await this.pipeline.findDetail(membership.company.id, job.id, applicationId);
     if (!detail) throw new NotFoundException();
-    return detail;
+    const { ratings: ratingRows, ...rest } = detail;
+    const ratings = ratingRows.map((rating) => ({
+      userId: rating.userId,
+      name: rating.userName ?? FORMER_MEMBER_NAME,
+      overall: rating.overall,
+      criteria: rating.criteria,
+      updatedAt: rating.updatedAt,
+    }));
+    return { ...rest, ratings, ratingSummary: summariseRatings(ratings) };
   }
 
   /**
@@ -162,6 +217,17 @@ export class PipelineService {
     return { url, expiresInSeconds: DOWNLOAD_URL_TTL_SECONDS };
   }
 
+  /**
+   * The Stage this Application is in now, from the Job's own stages. 404 if the Application isn't in
+   * this company's Job (or, which cannot happen, sits in a Stage the Job doesn't have).
+   */
+  private async currentStageOf(membership: Membership, job: JobWithStages, applicationId: string) {
+    const stageId = await this.pipeline.findStageOf(membership.company.id, job.id, applicationId);
+    const stage = stageId ? job.stages.find((candidate) => candidate.id === stageId) : undefined;
+    if (!stage) throw new NotFoundException();
+    return stage;
+  }
+
   async move(
     user: User,
     membership: Membership,
@@ -175,12 +241,8 @@ export class PipelineService {
     const to = job.stages.find((stage) => stage.id === dto.stageId);
     if (!to) throw new BadRequestException('That stage is not part of this job.');
 
-    const currentStageId = await this.pipeline.findStageOf(membership.company.id, job.id, applicationId);
-    if (!currentStageId) throw new NotFoundException();
-    if (currentStageId === to.id) throw new ConflictException('The candidate is already in that stage.');
-
-    const from = job.stages.find((stage) => stage.id === currentStageId);
-    if (!from) throw new NotFoundException();
+    const from = await this.currentStageOf(membership, job, applicationId);
+    if (from.id === to.id) throw new ConflictException('The candidate is already in that stage.');
 
     const moved = await this.pipeline.move({
       companyId: membership.company.id,
@@ -215,5 +277,53 @@ export class PipelineService {
       author: { id: user.id, name: user.name },
       body: dto.body,
     });
+  }
+
+  /**
+   * Gives or replaces the caller's own Rating on an Application (any status) and records a `rated`
+   * event. The user is the session's, never the body's.
+   */
+  async rate(
+    user: User,
+    membership: Membership,
+    jobSlug: string,
+    applicationId: string,
+    dto: SaveRatingDto,
+  ): Promise<SavedRating> {
+    await this.authorization.authorize(ApplicationPolicy, 'rate', user, membership);
+
+    const job = await this.jobs.get(membership, jobSlug);
+    const stage = await this.currentStageOf(membership, job, applicationId);
+
+    const requested = dto.criteria ?? {};
+    const checked = checkRatingCriteria(requested, job.ratingCriteria);
+    if (!checked.ok) {
+      throw new BadRequestException({
+        message: 'Some criteria are not used for this job.',
+        // The shared check reports the Criterion key; the validation pipe's errors are paths into the
+        // body, so prefix these to give one path shape per route (as saveHighlightedQuestions does).
+        errors: checked.errors.map((error) => ({ ...error, path: `criteria.${error.path}` })),
+      });
+    }
+
+    try {
+      return await this.pipeline.saveRating({
+        companyId: membership.company.id,
+        applicationId,
+        userId: user.id,
+        stageName: stage.name,
+        resolve: (previous) => ({
+          overall: dto.overall,
+          criteria: mergeCriteria(previous?.criteria ?? {}, requested),
+        }),
+      });
+    } catch (error) {
+      // The save is an upsert (`ON CONFLICT`), so the (application, user) key cannot clash with
+      // itself; this guards any other unique constraint the table may gain, in the repo's usual way.
+      if (isUniqueViolation(error)) {
+        throw new ConflictException('Your rating was just saved from somewhere else. Try again.');
+      }
+      throw error;
+    }
   }
 }
