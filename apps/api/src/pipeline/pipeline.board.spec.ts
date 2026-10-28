@@ -28,7 +28,7 @@ interface StoredApplication extends CardRowWithAnswers {
 
 class InMemoryPipelineRepository implements Pick<
   PublicApi<PipelineRepository>,
-  'findCards' | 'findCardsWithAnswers' | 'findFormFields'
+  'findCards' | 'findCardsWithAnswers' | 'findFormFields' | 'findRatingSummaries'
 > {
   private readonly applications: StoredApplication[] = [];
   private readonly versions = new Map<
@@ -39,6 +39,17 @@ class InMemoryPipelineRepository implements Pick<
   answerReads = 0;
   /** The ids asked for, per call of `findFormFields`. */
   readonly versionRequests: string[][] = [];
+  private readonly ratings: { companyId: string; applicationId: string; overall: number }[] = [];
+  /** The application ids asked for, per call of `findRatingSummaries`: its length is the query count. */
+  readonly ratingRequests: string[][] = [];
+
+  seedRating(
+    applicationId: string,
+    overall: number,
+    companyId = 'company-1',
+  ): void {
+    this.ratings.push({ companyId, applicationId, overall });
+  }
 
   seedVersion(
     id: string,
@@ -119,6 +130,26 @@ class InMemoryPipelineRepository implements Pick<
         found.set(id, version.fields);
     }
     return found;
+  }
+
+  /** Mirrors the SQL: one group per application that has a Rating, `avg` of `overall` and the row count. */
+  async findRatingSummaries(
+    companyId: string,
+    applicationIds: readonly string[],
+  ): Promise<Map<string, { count: number; average: number }>> {
+    this.ratingRequests.push([...applicationIds]);
+    const summaries = new Map<string, { count: number; average: number }>();
+    for (const applicationId of applicationIds) {
+      const scores = this.ratings
+        .filter((r) => r.companyId === companyId && r.applicationId === applicationId)
+        .map((r) => r.overall);
+      if (scores.length === 0) continue;
+      summaries.set(applicationId, {
+        count: scores.length,
+        average: scores.reduce((a, b) => a + b, 0) / scores.length,
+      });
+    }
+    return summaries;
   }
 }
 
@@ -565,6 +596,102 @@ describe('the pipeline board', () => {
       const [card] = await cardsOf();
 
       expect(card!.highlights[Q.cover]).toBe(`${'a'.repeat(200)}…`);
+    });
+  });
+
+  describe('the Average rating on each card', () => {
+    it('gives every card the plain mean of its overall Ratings and how many there are, unrounded', async () => {
+      repository.seedApplication({ id: 'mona' });
+      repository.seedApplication({ id: 'omar' });
+      repository.seedRating('mona', 5);
+      repository.seedRating('mona', 4);
+      repository.seedRating('mona', 4);
+      repository.seedRating('omar', 3);
+
+      const cards = await cardsOf();
+
+      expect(cards.find((c) => c.id === 'mona')?.rating).toEqual({
+        average: 13 / 3,
+        count: 3,
+      });
+      expect(cards.find((c) => c.id === 'omar')?.rating).toEqual({
+        average: 3,
+        count: 1,
+      });
+    });
+
+    it('gives a card with no Ratings `{ average: null, count: 0 }`', async () => {
+      repository.seedApplication({ id: 'mona' });
+      repository.seedApplication({ id: 'omar' });
+      repository.seedRating('mona', 2);
+
+      const cards = await cardsOf();
+
+      expect(cards.find((c) => c.id === 'omar')?.rating).toEqual({
+        average: null,
+        count: 0,
+      });
+    });
+
+    it('reads every Rating of the board in one query, however many cards there are', async () => {
+      for (const id of ['a', 'b', 'c', 'd', 'e']) {
+        repository.seedApplication({ id });
+        repository.seedRating(id, 4);
+      }
+
+      await cardsOf();
+
+      expect(repository.ratingRequests).toHaveLength(1);
+      expect([...(repository.ratingRequests[0] ?? [])].sort()).toEqual(['a', 'b', 'c', 'd', 'e']);
+    });
+
+    it('still runs the one query when no card has a Rating, and none when the Job has no Applications', async () => {
+      repository.seedApplication({ id: 'mona' });
+      await cardsOf();
+      expect(repository.ratingRequests).toHaveLength(1);
+
+      repository.ratingRequests.length = 0;
+      const empty = new InMemoryPipelineRepository();
+      const emptyService = new PipelineService(
+        empty as unknown as PipelineRepository,
+        jobs as unknown as JobsService,
+        { authorize: async () => {} } as unknown as AuthorizationService,
+        {} as StorageService,
+        forms as unknown as FormsRepository,
+      );
+      await emptyService.board(member('company-1', 'recruiter'), 'engineer');
+      expect(empty.ratingRequests).toHaveLength(0);
+    });
+
+    it('is the same with Highlighted questions, still one Rating query', async () => {
+      publish('version-1', formOf([city]));
+      highlight(Q.city);
+      repository.seedApplication({ id: 'mona', answers: { [Q.city]: 'Cairo' } });
+      repository.seedRating('mona', 5);
+
+      const [card] = await cardsOf();
+
+      expect(card?.rating).toEqual({ average: 5, count: 1 });
+      expect(card?.highlights).toEqual({ [Q.city]: 'Cairo' });
+      expect(repository.ratingRequests).toHaveLength(1);
+    });
+
+    it("ignores another company's Ratings", async () => {
+      repository.seedApplication({ id: 'mona' });
+      repository.seedRating('mona', 1, 'company-2');
+
+      const [card] = await cardsOf();
+
+      expect(card?.rating).toEqual({ average: null, count: 0 });
+    });
+
+    it('lets an interviewer read the Average rating', async () => {
+      repository.seedApplication({ id: 'mona' });
+      repository.seedRating('mona', 4);
+
+      const [card] = await cardsOf('interviewer');
+
+      expect(card?.rating).toEqual({ average: 4, count: 1 });
     });
   });
 
