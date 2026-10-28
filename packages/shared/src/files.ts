@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { FieldError } from './form-fields.js';
+import { RELOAD_MESSAGE } from './messages.js';
 
 /**
  * Applicant file uploads. The CV's rules are fixed (ADR-0002: a parser depends on them), so they are
@@ -323,7 +324,7 @@ export const createUploadSchema = z.discriminatedUnion(
     z.strictObject({
       purpose: z.literal('answer'),
       /** The file question's key, as in `answers`. Whether it is a file question is the service's call. */
-      fieldKey: z.uuid({ error: 'Something went wrong. Reload the page and try again.' }),
+      fieldKey: z.uuid({ error: RELOAD_MESSAGE }),
       ...uploadFile,
       /** Video and audio only: the length in whole seconds, as the browser read it from the file. */
       durationSeconds: z
@@ -333,6 +334,6 @@ export const createUploadSchema = z.discriminatedUnion(
         .optional(),
     }),
   ],
-  { error: 'Something went wrong. Reload the page and try again.' },
+  { error: RELOAD_MESSAGE },
 );
 export type CreateUploadInput = z.infer<typeof createUploadSchema>;

@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import {
   createJobSchema,
-  HIGHLIGHT_RELOAD_MESSAGE,
+  RELOAD_MESSAGE,
   saveHighlightedQuestionsSchema,
   updateJobSchema,
   type CreateJobInput,
@@ -131,7 +131,7 @@ export async function saveHighlightedQuestions(
 ): Promise<SaveHighlightedQuestionsResult> {
   const parsed = saveHighlightedQuestionsSchema.safeParse({ keys });
   if (!parsed.success) {
-    return { formError: parsed.error.issues[0]?.message ?? HIGHLIGHT_RELOAD_MESSAGE };
+    return { formError: parsed.error.issues[0]?.message ?? RELOAD_MESSAGE };
   }
 
   const candidatesPath = `/dashboard/${companySlug}/jobs/${jobSlug}/candidates`;
