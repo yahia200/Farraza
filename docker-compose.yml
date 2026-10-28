@@ -10,6 +10,17 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  # Browser-based database viewer for development: http://localhost:8080
+  # Log in with System "PostgreSQL", server "db" (pre-filled), user/password/database "hiring".
+  adminer:
+    image: adminer:latest
+    depends_on:
+      - db
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+
   # Local S3-compatible object storage for development.
   # S3 API: http://localhost:9000  |  Console UI: http://localhost:9001
   # Credentials are dev-only, mirroring the hard-coded db creds above.
