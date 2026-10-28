@@ -75,10 +75,6 @@ export class PipelineRepository {
     return this.prisma.db.orm.public.ApplicationEvent;
   }
 
-  private get ratings() {
-    return this.prisma.db.orm.public.Rating;
-  }
-
   private get notes() {
     return this.prisma.db.orm.public.Note;
   }
