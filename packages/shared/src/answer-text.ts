@@ -66,3 +66,60 @@ function truncate(text: string, max: number): string {
 function optionLabel(options: readonly { id: string; label: string }[], id: unknown): string {
   return options.find((option) => option.id === id)?.label ?? 'Unknown option';
 }
+
+/**
+ * A Highlighted question's answer for the candidate list, raw and tagged by type so the reader can
+ * format and sort it: the web app does both (`formatHighlight`, `highlightSortValue`). A select
+ * arrives as labels, not option ids, because only the Application's own form version can name them.
+ */
+export type Highlight =
+  | { type: 'text'; value: string }
+  | { type: 'number'; value: number }
+  | { type: 'date'; value: string }
+  | { type: 'yes_no'; value: boolean }
+  | { type: 'select'; labels: string[] };
+
+/** What kind of answer a Highlighted question's column holds. */
+export type HighlightKind = Highlight['type'];
+
+/** The raw answer to a Highlighted question as a tagged `Highlight`, or `null` for no answer. */
+export function toHighlight(field: LeafFormField, value: AnswerValue | undefined): Highlight | null {
+  switch (field.type) {
+    case 'number':
+      return typeof value === 'number' && Number.isFinite(value) ? { type: 'number', value } : null;
+    case 'yes_no':
+      return typeof value === 'boolean' ? { type: 'yes_no', value } : null;
+    case 'date':
+      return typeof value === 'string' ? { type: 'date', value } : null;
+    case 'single_select':
+    case 'multi_select': {
+      const text = formatAnswerText(field, value);
+      const labels = text === null ? [] : Array.isArray(text) ? text : [text];
+      return labels.length > 0 ? { type: 'select', labels } : null;
+    }
+    case 'short_text':
+    case 'long_text':
+    case 'url': {
+      // The text rules (blank is no answer, a link is trimmed, 200 characters) stay in one place.
+      const text = formatHighlightText(field, value);
+      return text === null ? null : { type: 'text', value: text };
+    }
+  }
+}
+
+/** The kind of Highlight a Question of this type gives: what its Highlighted column holds. */
+export function highlightKindOf(field: LeafFormField): HighlightKind {
+  switch (field.type) {
+    case 'short_text':
+    case 'long_text':
+    case 'url':
+      return 'text';
+    case 'single_select':
+    case 'multi_select':
+      return 'select';
+    case 'yes_no':
+    case 'number':
+    case 'date':
+      return field.type;
+  }
+}

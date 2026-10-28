@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HIGHLIGHT_MAX_CHARACTERS, formatAnswerText, formatHighlightText } from './answer-text.js';
+import { HIGHLIGHT_MAX_CHARACTERS, formatAnswerText, formatHighlightText, highlightKindOf, toHighlight } from './answer-text.js';
 import type { LeafFormField } from './form-fields.js';
 
 /*
@@ -120,5 +120,53 @@ describe('formatHighlightText', () => {
     expect(formatHighlightText(longText, text)).toBe(`${'a'.repeat(199)}😀…`);
     // 200 emoji are 400 UTF-16 units but only 200 characters: nothing is cut.
     expect(formatHighlightText(longText, '😀'.repeat(200))).toBe('😀'.repeat(200));
+  });
+});
+
+describe('toHighlight', () => {
+  it('keeps a number, a yes/no and a date as the raw value, tagged with their type', () => {
+    expect(toHighlight(number, 0)).toEqual({ type: 'number', value: 0 });
+    expect(toHighlight(number, -2.5)).toEqual({ type: 'number', value: -2.5 });
+    expect(toHighlight(yesNo, false)).toEqual({ type: 'yes_no', value: false });
+    expect(toHighlight(yesNo, true)).toEqual({ type: 'yes_no', value: true });
+    expect(toHighlight(date, '2026-02-05')).toEqual({ type: 'date', value: '2026-02-05' });
+  });
+});
+
+describe('toHighlight, text and choices', () => {
+  it('keeps text as written, a link trimmed, and cuts at 200 characters like formatHighlightText', () => {
+    expect(toHighlight(shortText, '  Cairo ')).toEqual({ type: 'text', value: '  Cairo ' });
+    expect(toHighlight(url, '  https://example.com/me ')).toEqual({ type: 'text', value: 'https://example.com/me' });
+    expect(toHighlight(longText, 'a'.repeat(200))).toEqual({ type: 'text', value: 'a'.repeat(200) });
+    expect(toHighlight(longText, 'a'.repeat(201))).toEqual({ type: 'text', value: `${'a'.repeat(200)}…` });
+  });
+
+  it('is null for blank text, like isBlankAnswer', () => {
+    expect(toHighlight(shortText, '   ')).toBeNull();
+    expect(toHighlight(longText, ' \n\t ')).toBeNull();
+    expect(toHighlight(url, '  ')).toBeNull();
+  });
+
+  it('gives a single choice as one label and a multi-select as its labels, unknown ids included', () => {
+    expect(toHighlight(singleSelect, JUNIOR)).toEqual({ type: 'select', labels: ['Junior'] });
+    expect(toHighlight(singleSelect, GONE)).toEqual({ type: 'select', labels: ['Unknown option'] });
+    expect(toHighlight(multiSelect, [SENIOR, GONE])).toEqual({ type: 'select', labels: ['Senior', 'Unknown option'] });
+  });
+
+  it('is null with no answer, an empty multi-select, or a value that does not fit', () => {
+    expect(toHighlight(shortText, undefined)).toBeNull();
+    expect(toHighlight(multiSelect, [])).toBeNull();
+    expect(toHighlight(multiSelect, JUNIOR)).toBeNull();
+    expect(toHighlight(date, 20260205)).toBeNull();
+  });
+});
+
+describe('highlightKindOf', () => {
+  it('is the kind of Highlight a Question of that type gives', () => {
+    expect([shortText, longText, url].map(highlightKindOf)).toEqual(['text', 'text', 'text']);
+    expect([singleSelect, multiSelect].map(highlightKindOf)).toEqual(['select', 'select']);
+    expect(highlightKindOf(yesNo)).toBe('yes_no');
+    expect(highlightKindOf(number)).toBe('number');
+    expect(highlightKindOf(date)).toBe('date');
   });
 });

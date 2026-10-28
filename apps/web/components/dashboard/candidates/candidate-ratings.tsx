@@ -1,10 +1,10 @@
 import { RATING_CRITERIA, RATING_MAX, type RatingSummary } from '@repo/shared';
-import { StarIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { RatingView } from '@/lib/dal';
 import { formatDate } from '@/lib/format';
 import { AverageRatingLabel, formatAverageRating } from './average-rating-label';
 import { RatingControl } from './rating-control';
+import { RatingStarIcon } from './rating-star-icon';
 
 /**
  * The sheet's "Ratings" section: the viewer's own Rating to give or change (`RatingControl`), the
@@ -147,7 +147,7 @@ function RatingRow({
         <span className="text-xs text-muted-foreground">{formatDate(rating.updatedAt)}</span>
       </p>
       <p className="flex items-center gap-1">
-        <StarIcon aria-hidden="true" className="size-3.5 fill-current text-amber-500" />
+        <RatingStarIcon />
         <span aria-hidden="true">
           {rating.overall} <span className="text-muted-foreground">overall</span>
         </span>

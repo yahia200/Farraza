@@ -31,7 +31,7 @@ function DialogOverlay({
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/30 supports-backdrop-filter:backdrop-blur-sm",
+        "fixed inset-0 isolate z-50 supports-backdrop-filter:backdrop-blur-sm",
         className
       )}
       {...props}
@@ -56,6 +56,7 @@ function DialogContent({
           "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-4xl bg-popover p-6 text-sm text-popover-foreground shadow-xl ring-1 ring-foreground/5 outline-none sm:max-w-md dark:ring-foreground/10",
           className
         )}
+        transition={{ type: 'spring', stiffness: 300, damping: 25, opacity: { duration: 0.4, ease: [0.215, 0.61, 0.355, 1] } }}
         {...props}
       >
         {children}

@@ -1,4 +1,13 @@
-import type { Answers, CvMode, FilePurpose, FormFields, RatingSummary, RatingValues } from '@repo/shared';
+import type {
+  Answers,
+  CvMode,
+  FilePurpose,
+  FormFields,
+  Highlight,
+  HighlightKind,
+  RatingSummary,
+  RatingValues,
+} from '@repo/shared';
 import type { StageKind } from '../jobs/job.js';
 
 export type ApplicationStatus = 'active' | 'rejected' | 'hired' | 'withdrawn';
@@ -16,11 +25,12 @@ export interface ApplicationCard {
   submittedAt: Date;
   candidate: { name: string; email: string; phone: string };
   /**
-   * The answer to each of the Job's Highlighted questions, keyed by Question key: display text
-   * (`formatHighlightText`), or null when unanswered or when this Application's form version has
-   * no such Question. Empty when the Job has none.
+   * The answer to each of the Job's Highlighted questions, keyed by Question key: the raw answer
+   * tagged by type (`toHighlight`; a select as its labels from this Application's own form
+   * version), or null when unanswered or when that version has no such Question. The web app
+   * formats and sorts it. Empty when the Job has none.
    */
-  highlights: Record<string, string | null>;
+  highlights: Record<string, Highlight | null>;
   /** The Average rating and how many Members gave one; `{ average: null, count: 0 }` with none. */
   rating: CardRating;
 }
@@ -39,6 +49,8 @@ export interface CardRowWithAnswers extends CardRow {
 export interface HighlightedQuestion {
   key: string;
   label: string;
+  /** What the column holds, from the Question's type in the latest published form. */
+  kind: HighlightKind;
 }
 
 export interface BoardColumn {

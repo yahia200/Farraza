@@ -3,10 +3,12 @@ import { AuthorizationService } from '@nestjs/authorization';
 import {
   FORMER_MEMBER_NAME,
   checkRatingCriteria,
-  formatHighlightText,
   highlightableQuestions,
+  highlightKindOf,
   previewKindOf,
   summariseRatings,
+  toHighlight,
+  type Highlight,
   type RatingCriteriaScores,
 } from '@repo/shared';
 import { isUniqueViolation } from '../common/db-errors.js';
@@ -87,7 +89,7 @@ export class PipelineService {
     if (!latest) return [];
     return highlightableQuestions(latest.fields)
       .filter((question) => keys.includes(question.key))
-      .map((question) => ({ key: question.key, label: question.label }));
+      .map((question) => ({ key: question.key, label: question.label, kind: highlightKindOf(question) }));
   }
 
   /**
@@ -119,10 +121,10 @@ export class PipelineService {
 
     return rows.map(({ formVersionId, answers, ...row }) => {
       const questions = questionsByVersion.get(formVersionId);
-      const highlights: Record<string, string | null> = {};
+      const highlights: Record<string, Highlight | null> = {};
       for (const { key } of highlighted) {
         const question = questions?.get(key);
-        highlights[key] = question ? formatHighlightText(question, answers[key]) : null;
+        highlights[key] = question ? toHighlight(question, answers[key]) : null;
       }
       return { ...row, highlights };
     });

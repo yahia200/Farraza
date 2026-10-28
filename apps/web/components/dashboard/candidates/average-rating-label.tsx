@@ -1,6 +1,6 @@
-import { StarIcon } from 'lucide-react';
 import type { CardRating } from '@/lib/dal';
 import { cn } from '@/lib/utils';
+import { RatingStarIcon } from './rating-star-icon';
 
 /**
  * An Average rating to one decimal. `toFixed` rather than `Intl.NumberFormat`: it never
@@ -23,7 +23,7 @@ export function AverageRatingLabel({ rating, className }: { rating: CardRating; 
   const average = formatAverageRating(rating.average);
   return (
     <span className={cn('inline-flex items-center gap-1 whitespace-nowrap', className)}>
-      <StarIcon aria-hidden="true" className="size-3.5 fill-current text-amber-500" />
+      <RatingStarIcon />
       <span aria-hidden="true">
         {average} <span className="text-muted-foreground">({rating.count})</span>
       </span>

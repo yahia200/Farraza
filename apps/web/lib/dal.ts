@@ -8,9 +8,13 @@ import type {
   CvMode,
   FilePurpose,
   FormFields,
+  Highlight,
+  HighlightKind,
+  LeafFormField,
   RatingSummary,
   RatingValues,
 } from '@repo/shared';
+import { highlightKindOf } from '@repo/shared';
 import { apiFetch } from './api';
 import { formatDate } from './format';
 
@@ -302,10 +306,11 @@ export interface ApplicationSummary {
   candidate: { name: string; email: string; phone: string };
   stage: JobStage;
   /**
-   * The answer to each of the Job's Highlighted questions, keyed by Question key:
-   * display text from the API, or null for "—". Empty when the Job has none.
+   * The answer to each of the Job's Highlighted questions, keyed by Question key: the raw
+   * answer tagged by type (`formatHighlight` shows it, `highlightSortValue` sorts it), or null
+   * for "—". Empty when the Job has none.
    */
-  highlights: Record<string, string | null>;
+  highlights: Record<string, Highlight | null>;
   rating: CardRating;
 }
 
@@ -313,15 +318,19 @@ export interface ApplicationSummary {
 export interface HighlightedQuestion {
   key: string;
   label: string;
+  /** What the Question's column holds, from its type in the latest published form: how it sorts. */
+  kind: HighlightKind;
 }
 
 /**
- * Only a Question's key and label: for the board's Highlighted questions, and for
- * the published form's Questions that the page hands to the client-side picker
- * (so a Question's config, auto-reject rules included, never reaches the browser).
+ * Only a Question's key, label and kind, from a form Question: for the published
+ * form's Questions that the page hands to the client-side picker (so a Question's
+ * config, auto-reject rules included, never reaches the browser). The board's own
+ * Highlighted questions already arrive as `{ key, label, kind }`; `getPipelineBoard`
+ * copies those three fields.
  */
-export function toHighlightedQuestion({ key, label }: HighlightedQuestion): HighlightedQuestion {
-  return { key, label };
+export function toHighlightedQuestion(question: LeafFormField): HighlightedQuestion {
+  return { key: question.key, label: question.label, kind: highlightKindOf(question) };
 }
 
 /**
@@ -380,7 +389,7 @@ export async function getPipelineBoard(companySlug: string, jobSlug: string): Pr
       })),
     }))
     .sort((a, b) => a.position - b.position);
-  const highlightedQuestions = board.highlightedQuestions.map(toHighlightedQuestion);
+  const highlightedQuestions = board.highlightedQuestions.map(({ key, label, kind }) => ({ key, label, kind }));
   return { columns, highlightedQuestions };
 }
 
