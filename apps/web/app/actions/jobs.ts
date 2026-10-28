@@ -3,7 +3,14 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { createJobSchema, updateJobSchema, type CreateJobInput, type UpdateJobInput } from '@repo/shared';
+import {
+  createJobSchema,
+  HIGHLIGHT_RELOAD_MESSAGE,
+  saveHighlightedQuestionsSchema,
+  updateJobSchema,
+  type CreateJobInput,
+  type UpdateJobInput,
+} from '@repo/shared';
 import type { ActionFailure } from '@/lib/action-failure';
 import { apiFetch, failureFromResponse } from '@/lib/api';
 import { expireCompanyJobs, expirePublicJob } from '@/lib/public-jobs';
@@ -104,4 +111,52 @@ async function changeStatus(companySlug: string, jobSlug: string, action: 'open'
   expirePublicJob(companySlug, jobSlug);
   expireCompanyJobs(companySlug);
   return { ok: true };
+}
+
+export type SaveHighlightedQuestionsResult = ActionFailure<never> & { keys?: string[] };
+
+/**
+ * Saves the Job's Highlighted questions, calling
+ * PUT .../jobs/:jobSlug/highlighted-questions with the whole new list
+ * (apps/api/src/jobs). The picker on the candidates page calls it on every
+ * tick, so it returns failures rather than throwing. It revalidates the
+ * candidates page, which re-reads the job (the saved keys) and the board (the
+ * answers shown), so the list updates without a reload. Applicants never see
+ * this choice, so the public job is left alone.
+ */
+export async function saveHighlightedQuestions(
+  companySlug: string,
+  jobSlug: string,
+  keys: string[],
+): Promise<SaveHighlightedQuestionsResult> {
+  const parsed = saveHighlightedQuestionsSchema.safeParse({ keys });
+  if (!parsed.success) {
+    return { formError: parsed.error.issues[0]?.message ?? HIGHLIGHT_RELOAD_MESSAGE };
+  }
+
+  const candidatesPath = `/dashboard/${companySlug}/jobs/${jobSlug}/candidates`;
+  const response = await apiFetch(`${jobsPath(companySlug, jobSlug)}/highlighted-questions`, {
+    method: 'PUT',
+    body: JSON.stringify(parsed.data),
+  });
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (!response.ok) {
+    // 400: a key is no longer on the published form (its message says so); 409: no published form.
+    const failure = await failureFromResponse(response, [], {
+      ...NO_PERMISSION,
+      404: () => ({ formError: 'This job no longer exists. Reload the page.' }),
+      409: (message) => ({ formError: message }),
+    });
+    if (response.status === 400 || response.status === 409) {
+      // The picker was built from an older form: refresh it so it lists what the form asks now.
+      revalidatePath(candidatesPath);
+    }
+    return failure;
+  }
+
+  const saved = (await response.json()) as { keys: string[] };
+  revalidatePath(candidatesPath);
+  return { keys: saved.keys };
 }

@@ -1,10 +1,14 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards, HttpCode } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Put, UseGuards, HttpCode } from '@nestjs/common';
 import { CurrentUser } from '@nestjs/authentication';
 import type { Membership } from '../companies/company.js';
 import { CompanyMemberGuard } from '../companies/company-member.guard.js';
 import { CurrentMembership } from '../companies/current-membership.decorator.js';
 import type { User } from '../users/user.js';
 import { createJobSchema, type CreateJobDto } from './dto/create-job.dto.js';
+import {
+  saveHighlightedQuestionsSchema,
+  type SaveHighlightedQuestionsDto,
+} from './dto/save-highlighted-questions.dto.js';
 import { updateJobSchema, type UpdateJobDto } from './dto/update-job.dto.js';
 import { JobsService } from './jobs.service.js';
 
@@ -40,6 +44,16 @@ export class JobsController {
     @Body({ schema: updateJobSchema }) dto: UpdateJobDto,
   ) {
     return this.jobs.update(user, membership, jobSlug, dto);
+  }
+
+  @Put(':jobSlug/highlighted-questions')
+  saveHighlightedQuestions(
+    @CurrentUser() user: User,
+    @CurrentMembership() membership: Membership,
+    @Param('jobSlug') jobSlug: string,
+    @Body({ schema: saveHighlightedQuestionsSchema }) dto: SaveHighlightedQuestionsDto,
+  ) {
+    return this.jobs.saveHighlightedQuestions(user, membership, jobSlug, dto);
   }
 
   @Post(':jobSlug/open')

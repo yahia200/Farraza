@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { AuthorizationService } from '@nestjs/authorization';
-import { previewKindOf } from '@repo/shared';
+import { formatHighlightText, highlightableQuestions, previewKindOf } from '@repo/shared';
 import type { Membership } from '../companies/company.js';
 import { JobsService } from '../jobs/jobs.service.js';
 import type { User } from '../users/user.js';
@@ -9,7 +9,8 @@ import type { CreateNoteDto } from './dto/create-note.dto.js';
 import type { MoveApplicationDto } from './dto/move-application.dto.js';
 import { StorageService } from '../storage/storage.service.js';
 import { DOWNLOAD_URL_TTL_SECONDS } from '../storage/storage.js';
-import type { BoardColumn, FileLink } from './pipeline.js';
+import { FormsRepository } from '../forms/forms.repository.js';
+import type { ApplicationCard, BoardColumn, FileLink, HighlightedQuestion } from './pipeline.js';
 import { PipelineRepository } from './pipeline.repository.js';
 
 @Injectable()
@@ -19,11 +20,17 @@ export class PipelineService {
     private readonly jobs: JobsService,
     private readonly authorization: AuthorizationService,
     private readonly storage: StorageService,
+    private readonly forms: FormsRepository,
   ) {}
 
+  /**
+   * A job's stages, each with its cards, plus the Job's Highlighted questions. Any member may read
+   * it, interviewers included (the membership guard and the job lookup are the access check).
+   */
   async board(membership: Membership, jobSlug: string) {
     const job = await this.jobs.get(membership, jobSlug);
-    const cards = await this.pipeline.findCards(job.id);
+    const highlightedQuestions = await this.highlightedQuestionsOf(job.id, job.highlightedQuestionKeys);
+    const cards = await this.cardsOf(membership.company.id, job.id, highlightedQuestions);
 
     const columns: BoardColumn[] = job.stages.map((stage) => ({
       id: stage.id,
@@ -33,7 +40,65 @@ export class PipelineService {
       applications: cards.filter((card) => card.stageId === stage.id),
     }));
 
-    return { job: { title: job.title, slug: job.slug, status: job.status }, columns };
+    return {
+      job: { title: job.title, slug: job.slug, status: job.status },
+      columns,
+      highlightedQuestions,
+    };
+  }
+
+  /**
+   * The stored keys that the latest published form still has as highlightable Questions, in that
+   * form's order, with its current text. Stale keys are dropped here on every read, not at publish.
+   */
+  private async highlightedQuestionsOf(
+    jobId: string,
+    keys: readonly string[],
+  ): Promise<HighlightedQuestion[]> {
+    if (keys.length === 0) return [];
+    const latest = await this.forms.findLatestPublished(jobId);
+    if (!latest) return [];
+    return highlightableQuestions(latest.fields)
+      .filter((question) => keys.includes(question.key))
+      .map((question) => ({ key: question.key, label: question.label }));
+  }
+
+  /**
+   * The job's cards, each with its answer to every Highlighted question, resolved against the
+   * Question of the same key in the Application's own form version (so an older Application shows
+   * the option labels its applicant saw). With no Highlighted question, answers are not read.
+   */
+  private async cardsOf(
+    companyId: string,
+    jobId: string,
+    highlighted: HighlightedQuestion[],
+  ): Promise<ApplicationCard[]> {
+    if (highlighted.length === 0) {
+      const rows = await this.pipeline.findCards(jobId);
+      return rows.map((row) => ({ ...row, highlights: {} }));
+    }
+
+    const rows = await this.pipeline.findCardsWithAnswers(jobId);
+    const versionIds = [...new Set(rows.map((row) => row.formVersionId))];
+    const versions = await this.pipeline.findFormFields(companyId, jobId, versionIds);
+    // Per version, its highlightable Questions by key: a key the version lacks, or has on a
+    // Question that can't be highlighted there, reads as null.
+    const questionsByVersion = new Map(
+      [...versions].map(([id, fields]) => [
+        id,
+        new Map(highlightableQuestions(fields).map((question) => [question.key, question])),
+      ]),
+    );
+
+    return rows.map(({ formVersionId, answers, ...row }) => {
+      const questions = questionsByVersion.get(formVersionId);
+      const highlights: Record<string, string | null> = {};
+      for (const { key } of highlighted) {
+        const question = questions?.get(key);
+        highlights[key] = question ? formatHighlightText(question, answers[key]) : null;
+      }
+      return { ...row, highlights };
+    });
   }
 
   async detail(membership: Membership, jobSlug: string, applicationId: string) {

@@ -113,12 +113,15 @@ Links a user to a company with a role.
 | `created_by` | `createdById` | `uuid` | NULL, FK → `users.id` ON DELETE SET NULL |
 | `opened_at` | `openedAt` | `timestamptz` | NULL |
 | `closed_at` | `closedAt` | `timestamptz` | NULL |
+| `highlighted_question_keys` | `highlightedQuestionKeys` | `jsonb` | NOT NULL, DEFAULT `'[]'`, **no FK** (a JSON array of Question keys) |
 | `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
 | `updated_at` | `updatedAt` | `timestamptz` | NOT NULL, set by the ORM |
 
 - UNIQUE (`company_id`, `slug`). The public apply URL is `/{company.slug}/{job.slug}`. Company slugs never take a name in `RESERVED_COMPANY_SLUGS` (`packages/shared/src/companies.ts`), because the web app's own top-level routes (and its fixed segments under `/dashboard`, such as `/dashboard/settings`) would hide those pages.
 - INDEX (`company_id`), INDEX (`company_id`, `status`), INDEX (`created_by`)
 - CHECK `jobs_slug_format`: `slug ~ '^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$'`
+- CHECK `jobs_highlighted_question_keys_array`: `jsonb_typeof(highlighted_question_keys) = 'array'`
+- `highlighted_question_keys` holds the Job's **Highlighted questions** (`GLOSSARY.md`): up to three Question keys (UUIDs, no repeats; `highlightedQuestionKeysSchema` in `packages/shared/src/highlights.ts`) whose answers the candidate list shows. It lives on the job, not on `form_versions`, because published versions are immutable (§3.6). Jobs that existed before the column read as `[]`. It is written only by `PUT /api/companies/:companySlug/jobs/:jobSlug/highlighted-questions`, which replaces the whole list. Stored order carries no meaning: readers show the Questions in form order.
 - There is no pointer to the published form. A job's published form is its `form_versions` row with the highest `version` where `published_at IS NOT NULL`. The application refuses to open a job that has no published version.
 
 ### 3.6 `form_versions` (model `FormVersion`)
@@ -350,7 +353,7 @@ An array of at most 50 field objects (`formFieldsSchema` in `form-fields.ts`, ch
 
 | Property | Type | Rules |
 |---|---|---|
-| `key` | uuid string | Unique within the form. Stays the same across versions for the same question. |
+| `key` | uuid string | Unique within the form. Stays the same across versions for the same question: the builder mints a key only when a question is added (`newField`, a Preset's `build()`) and every save sends the whole list with its keys unchanged. A question deleted and added again gets a new key, so it drops out of a job's `highlighted_question_keys` (§3.5). |
 | `type` | string | One of the field types below. |
 | `label` | string | Trimmed, 1–200 characters. |
 | `helpText` | string or null | Trimmed, at most 500 characters. |
@@ -473,7 +476,8 @@ Prisma works out table creation order and constraint names from the contract. Co
 The database cannot check these, so the services must:
 
 - `company_id` on a child row equals the `company_id` of its parent. It is copied from the parent on insert, and every read filters by it.
-- Columns without an FK (`application_events.company_id`/`from_stage_id`/`to_stage_id`/`actor_id`, `notes.company_id`, `form_versions.created_by`, `oidc_states.link_session_id`) hold valid ids at the time of writing.
+- Columns without an FK (`application_events.company_id`/`from_stage_id`/`to_stage_id`/`actor_id`, `notes.company_id`, `form_versions.created_by`, `oidc_states.link_session_id`, `jobs.highlighted_question_keys`) hold valid ids at the time of writing. `jobs.highlighted_question_keys` holds Question keys inside a JSONB array (so Postgres could not enforce an FK anyway), checked when they are written, not afterwards: see the next rule.
+- `jobs.highlighted_question_keys` is saved only after `checkHighlightKeys` (`@repo/shared`) accepts every key against the job's **latest published** form version: each must be a top-level Question of a single-answer type (not a file, a Repeating group or a group's sub-question). A job with no published version can't save any (409). A key can go stale later, when a newer published version drops the Question; stale keys are **not** removed at publish. Anything that reads the list filters it against the latest published form, and the next save replaces the whole list. That save is one unconditional `UPDATE`, a deliberate exception to the conditional writes used everywhere else (`.claude/rules/api.md`, "Concurrency and error conventions"): the list is a display preference, so two people saving at once is last-write-wins and loses no data.
 - `applications.stage_id` belongs to the same job as the application. A move is rejected unless the target is one of the job's stages.
 - `applications.form_version_id` is the job's latest published version at submit time, and `applications.answers` is valid against its fields.
 - A published `form_versions` row is never modified. Draft updates and publishing are conditional on `published_at IS NULL`.

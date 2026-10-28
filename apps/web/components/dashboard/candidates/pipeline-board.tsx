@@ -13,7 +13,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/components/ui/toast';
 import { useFinePointer } from '@/hooks/use-fine-pointer';
-import type { PipelineColumn } from '@/lib/dal';
+import type { HighlightedQuestion, PipelineColumn } from '@/lib/dal';
 import { CandidateCard } from './candidate-card';
 import { readApplicationDrag, readStageDrop } from './pipeline-drag';
 import { StageColumn } from './stage-column';
@@ -47,12 +47,15 @@ interface Move {
  */
 export function PipelineBoard({
   columns,
+  highlightedQuestions,
   basePath,
   companySlug,
   jobSlug,
   canMove,
 }: {
   columns: PipelineColumn[];
+  /** Shown on every card, under the name; empty leaves the cards as they were. */
+  highlightedQuestions: HighlightedQuestion[];
   basePath: string;
   companySlug: string;
   jobSlug: string;
@@ -137,6 +140,7 @@ export function PipelineBoard({
           <StageColumn key={column.id} column={column} acceptsDrops={canDrag}>
             <StageCards
               column={column}
+              highlightedQuestions={highlightedQuestions}
               stages={stages}
               basePath={basePath}
               canMove={canMove}
@@ -162,6 +166,7 @@ export function PipelineBoard({
             {/* One column at a time, so there is nothing to drop on: no drag here. */}
             <StageCards
               column={column}
+              highlightedQuestions={highlightedQuestions}
               stages={stages}
               basePath={basePath}
               canMove={canMove}
@@ -177,6 +182,7 @@ export function PipelineBoard({
 
 function StageCards({
   column,
+  highlightedQuestions,
   stages,
   basePath,
   canMove,
@@ -184,6 +190,7 @@ function StageCards({
   onMove,
 }: {
   column: PipelineColumn;
+  highlightedQuestions: HighlightedQuestion[];
   stages: { id: string; name: string }[];
   basePath: string;
   canMove: boolean;
@@ -203,6 +210,7 @@ function StageCards({
         <li key={card.id}>
           <CandidateCard
             card={card}
+            highlightedQuestions={highlightedQuestions}
             stageId={column.id}
             stages={stages}
             basePath={basePath}

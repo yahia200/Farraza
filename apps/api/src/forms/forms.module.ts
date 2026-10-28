@@ -9,5 +9,7 @@ import { FormsService } from './forms.service.js';
   imports: [CompaniesModule, JobsModule],
   controllers: [FormsController],
   providers: [FormsService, FormsRepository],
+  // The pipeline board reads the latest published form to resolve a Job's Highlighted questions.
+  exports: [FormsRepository],
 })
 export class FormsModule {}

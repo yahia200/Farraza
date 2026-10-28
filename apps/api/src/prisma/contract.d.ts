@@ -34,7 +34,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'06c9c7f03a37af33a5340d6b9e267de5147655c0acd40b9b9c103705cdcc5502'>;
+  StorageHashBase<'0c8d65e2bb3ae93d467907843f360c84902e8ba011a488362edcd7771d6f3591'>;
 export type ExecutionHash =
   ExecutionHashBase<'c19b53563967fe1cdc97d45552456039c34d42f7b292484a823348d6f653f142'>;
 export type ProfileHash =
@@ -352,6 +352,7 @@ export type FieldOutputTypes = {
       readonly createdAt: CodecTypes['pg/timestamptz-date@1']['output'];
       readonly createdById: CodecTypes['pg/uuid@1']['output'] | null;
       readonly description: CodecTypes['pg/text@1']['output'] | null;
+      readonly highlightedQuestionKeys: CodecTypes['pg/jsonb@1']['output'];
       readonly id: CodecTypes['pg/uuid@1']['output'];
       readonly openedAt: CodecTypes['pg/timestamptz-date@1']['output'] | null;
       readonly slug: CodecTypes['pg/text@1']['output'];
@@ -521,6 +522,7 @@ export type FieldInputTypes = {
       readonly createdAt: CodecTypes['pg/timestamptz-date@1']['input'];
       readonly createdById: CodecTypes['pg/uuid@1']['input'] | null;
       readonly description: CodecTypes['pg/text@1']['input'] | null;
+      readonly highlightedQuestionKeys: CodecTypes['pg/jsonb@1']['input'];
       readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly openedAt: CodecTypes['pg/timestamptz-date@1']['input'] | null;
       readonly slug: CodecTypes['pg/text@1']['input'];
@@ -690,6 +692,7 @@ export type StorageColumnTypes = {
       readonly created_at: CodecTypes['pg/timestamptz-date@1']['output'];
       readonly created_by: CodecTypes['pg/uuid@1']['output'] | null;
       readonly description: CodecTypes['pg/text@1']['output'] | null;
+      readonly highlighted_question_keys: CodecTypes['pg/jsonb@1']['output'];
       readonly id: CodecTypes['pg/uuid@1']['output'];
       readonly opened_at: CodecTypes['pg/timestamptz-date@1']['output'] | null;
       readonly slug: CodecTypes['pg/text@1']['output'];
@@ -859,6 +862,7 @@ export type StorageColumnInputTypes = {
       readonly created_at: CodecTypes['pg/timestamptz-date@1']['input'];
       readonly created_by: CodecTypes['pg/uuid@1']['input'] | null;
       readonly description: CodecTypes['pg/text@1']['input'] | null;
+      readonly highlighted_question_keys: CodecTypes['pg/jsonb@1']['input'];
       readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly opened_at: CodecTypes['pg/timestamptz-date@1']['input'] | null;
       readonly slug: CodecTypes['pg/text@1']['input'];
@@ -1051,6 +1055,7 @@ export namespace Models {
     createdAt: CodecTypes['pg/timestamptz-date@1']['output'];
     createdById: CodecTypes['pg/uuid@1']['output'] | null;
     description: CodecTypes['pg/text@1']['output'] | null;
+    highlightedQuestionKeys: CodecTypes['pg/jsonb@1']['output'];
     id: CodecTypes['pg/uuid@1']['output'];
     openedAt: CodecTypes['pg/timestamptz-date@1']['output'] | null;
     slug: CodecTypes['pg/text@1']['output'];
@@ -1996,6 +2001,15 @@ type ContractBase = Omit<
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
                   readonly nullable: true;
+                };
+                readonly highlighted_question_keys: {
+                  readonly nativeType: 'jsonb';
+                  readonly codecId: 'pg/jsonb@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/jsonb@1', readonly []>;
+                  };
                 };
                 readonly id: {
                   readonly nativeType: 'uuid';
@@ -3367,6 +3381,10 @@ type ContractBase = Omit<
                 readonly nullable: true;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
+              readonly highlightedQuestionKeys: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
+              };
               readonly id: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
@@ -3441,6 +3459,7 @@ type ContractBase = Omit<
                 readonly createdAt: { readonly column: 'created_at' };
                 readonly createdById: { readonly column: 'created_by' };
                 readonly description: { readonly column: 'description' };
+                readonly highlightedQuestionKeys: { readonly column: 'highlighted_question_keys' };
                 readonly id: { readonly column: 'id' };
                 readonly openedAt: { readonly column: 'opened_at' };
                 readonly slug: { readonly column: 'slug' };

@@ -158,6 +158,8 @@ export interface CompanyJob {
   openedAt: string | null;
   closedAt: string | null;
   createdAt: string;
+  /** Keys of the Job's Highlighted questions as last saved; may include keys the latest published form no longer has. */
+  highlightedQuestionKeys: string[];
 }
 
 /** Mirrors Stage in apps/api/src/jobs/job.ts. */
@@ -256,8 +258,18 @@ export async function getJobForm(
   return { draft: pick(form.draft), published: pick(form.published) };
 }
 
-function toCompanyJob({ id, title, slug, description, status, openedAt, closedAt, createdAt }: CompanyJob): CompanyJob {
-  return { id, title, slug, description, status, openedAt, closedAt, createdAt };
+function toCompanyJob({
+  id,
+  title,
+  slug,
+  description,
+  status,
+  openedAt,
+  closedAt,
+  createdAt,
+  highlightedQuestionKeys,
+}: CompanyJob): CompanyJob {
+  return { id, title, slug, description, status, openedAt, closedAt, createdAt, highlightedQuestionKeys };
 }
 
 /** Expose only what the UI needs. */
@@ -274,6 +286,26 @@ export interface ApplicationSummary {
   submittedAt: string;
   candidate: { name: string; email: string };
   stage: JobStage;
+  /**
+   * The answer to each of the Job's Highlighted questions, keyed by Question key:
+   * display text from the API, or null for "—". Empty when the Job has none.
+   */
+  highlights: Record<string, string | null>;
+}
+
+/** Mirrors HighlightedQuestion in apps/api/src/pipeline/pipeline.ts: in form order, with the latest text. */
+export interface HighlightedQuestion {
+  key: string;
+  label: string;
+}
+
+/**
+ * Only a Question's key and label: for the board's Highlighted questions, and for
+ * the published form's Questions that the page hands to the client-side picker
+ * (so a Question's config, auto-reject rules included, never reaches the browser).
+ */
+export function toHighlightedQuestion({ key, label }: HighlightedQuestion): HighlightedQuestion {
+  return { key, label };
 }
 
 /**
@@ -289,12 +321,18 @@ export interface PipelineColumn extends JobStage {
   applications: PipelineCard[];
 }
 
+/** A job's pipeline board: its columns, and the Highlighted questions each card answers. */
+export interface PipelineBoardView {
+  columns: PipelineColumn[];
+  highlightedQuestions: HighlightedQuestion[];
+}
+
 /**
- * A job's pipeline board: its stages in order, each with its applications.
- * The API answers with this shape; the table and the board views both render
- * from this one fetch (the table flattens it with `flattenBoard`).
+ * A job's pipeline board: its stages in order, each with its applications,
+ * plus the Job's Highlighted questions. The table and the board views both
+ * render from this one fetch (the table flattens it with `flattenBoard`).
  */
-export async function getPipelineBoard(companySlug: string, jobSlug: string): Promise<PipelineColumn[]> {
+export async function getPipelineBoard(companySlug: string, jobSlug: string): Promise<PipelineBoardView> {
   'use cache: private';
 
   const response = await apiFetch(`${jobsPath(companySlug, jobSlug)}/applications`);
@@ -307,23 +345,26 @@ export async function getPipelineBoard(companySlug: string, jobSlug: string): Pr
   if (!response.ok) {
     throw new Error(`Could not load the applications (HTTP ${response.status}).`);
   }
-  const board = (await response.json()) as { columns: PipelineColumn[] };
+  const board = (await response.json()) as PipelineBoardView;
   // Expose only what the UI needs.
-  return board.columns
+  const columns = board.columns
     .map(({ id, name, position, kind, applications }) => ({
       id,
       name,
       position,
       kind,
-      applications: applications.map(({ id: applicationId, status, submittedAt, candidate }) => ({
+      applications: applications.map(({ id: applicationId, status, submittedAt, candidate, highlights }) => ({
         id: applicationId,
         status,
         submittedAt,
         appliedLabel: formatDate(submittedAt),
         candidate: { name: candidate.name, email: candidate.email },
+        highlights,
       })),
     }))
     .sort((a, b) => a.position - b.position);
+  const highlightedQuestions = board.highlightedQuestions.map(toHighlightedQuestion);
+  return { columns, highlightedQuestions };
 }
 
 /** The board as one row per application, for the table view. */

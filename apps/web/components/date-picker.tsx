@@ -5,7 +5,7 @@ import { useState, type Ref } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { formatIsoDate } from '@/lib/format';
+import { formatIsoDate } from '@repo/shared';
 import { cn } from '@/lib/utils';
 
 /** `YYYY-MM-DD` as a local-time Date (what the calendar works in), or undefined if it isn't one. */

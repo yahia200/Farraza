@@ -83,6 +83,8 @@ model Job {
   createdById Uuid?                      @map("created_by")
   openedAt    TimestamptzJsDate?         @map("opened_at")
   closedAt    TimestamptzJsDate?         @map("closed_at")
+  /// Highlighted questions: up to three Question keys (`highlightedQuestionKeysSchema` in @repo/shared). No FK: the keys live in form_versions.fields.
+  highlightedQuestionKeys Jsonb          @default(json`[]`) @map("highlighted_question_keys")
   createdAt   TimestamptzJsDate          @default(now()) @map("created_at")
   updatedAt   temporal.updatedAtJsDate() @map("updated_at")
 
@@ -93,6 +95,7 @@ model Job {
   @@unique([companyId, slug])
   @@index([companyId, status])
   @@check(expression: "slug ~ '^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$'", name: "jobs_slug_format")
+  @@check(expression: "jsonb_typeof(highlighted_question_keys) = 'array'", name: "jobs_highlighted_question_keys_array")
   @@map("jobs")
 }
 

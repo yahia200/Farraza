@@ -4,11 +4,12 @@ import { draggable } from '@atlaskit/pragmatic-drag-and-drop/adapter/element-ada
 import { setCustomNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview';
 import { preserveOffsetOnSource } from '@atlaskit/pragmatic-drag-and-drop/utils/preserve-offset-on-source';
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
-import type { PipelineCard } from '@/lib/dal';
+import { useEffect, useId, useRef, useState } from 'react';
+import type { HighlightedQuestion, PipelineCard } from '@/lib/dal';
 import { cn } from '@/lib/utils';
 import { ApplicationStatusBadge } from './application-status-badge';
 import { candidatesHref } from './candidates-href';
+import { HighlightAnswer } from './highlight-answer';
 import { MoveToStageSelect, type MoveStageOption } from './move-to-stage-select';
 import { applicationDragData } from './pipeline-drag';
 
@@ -16,8 +17,10 @@ import { applicationDragData } from './pipeline-drag';
  * One application on the board, used by both the desktop columns and the
  * mobile stage tabs.
  *
- * The card is a div holding two siblings: a link (name, email, date) that
- * opens the detail sheet (?application=<id>), and, for people who can move
+ * The card is a div holding two siblings: a link (the name, then one block
+ * per Highlighted question: the Question in small muted type over the
+ * answer, clamped to two lines, "—" for none) that opens the detail sheet
+ * (?application=<id>), and, for people who can move
  * candidates, the "Move to stage" Select. They are siblings because a
  * control can't sit inside a link (interactive content in <a> is invalid
  * HTML and a click on it would also follow the link).
@@ -31,6 +34,7 @@ import { applicationDragData } from './pipeline-drag';
  */
 export function CandidateCard({
   card,
+  highlightedQuestions,
   stageId,
   stages,
   basePath,
@@ -39,6 +43,8 @@ export function CandidateCard({
   onMove,
 }: {
   card: PipelineCard;
+  /** The Job's Highlighted questions, in form order: one label-over-answer block each, under the name. */
+  highlightedQuestions: HighlightedQuestion[];
   /** The stage the card is in now (the optimistic one). */
   stageId: string;
   stages: MoveStageOption[];
@@ -47,6 +53,7 @@ export function CandidateCard({
   canDrag: boolean;
   onMove: (applicationId: string, toStageId: string) => void;
 }) {
+  const nameId = useId();
   const cardRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<HTMLAnchorElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -100,10 +107,24 @@ export function CandidateCard({
         href={candidatesHref(basePath, { view: 'board', application: card.id })}
         scroll={false}
         draggable={false}
+        // Named by the candidate alone, not every answer below the name.
+        aria-labelledby={nameId}
         className="flex flex-col gap-1 rounded-xl p-3 outline-none transition-colors"
       >
-        <span className="truncate font-medium">{card.candidate.name}</span>
-       
+        <span id={nameId} className="truncate font-medium">{card.candidate.name}</span>
+
+        {highlightedQuestions.length > 0 && (
+          <dl className="mt-1 flex flex-col gap-2">
+            {highlightedQuestions.map(({ key, label }) => (
+              <div key={key} className="flex min-w-0 flex-col gap-0.5">
+                <dt className="truncate text-xs text-muted-foreground">{label}</dt>
+                <dd>
+                  <HighlightAnswer answer={card.highlights[key] ?? null} className="line-clamp-2 wrap-anywhere" />
+                </dd>
+              </div>
+            ))}
+          </dl>
+        )}
       </Link>
       {canMove && (
         <div className="px-3 pb-3">

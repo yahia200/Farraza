@@ -1,28 +1,35 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useTable } from '@tanstack/react-table';
 import { DataTable } from '@/components/data-table/data-table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { JobStage } from '@/lib/dal';
+import type { HighlightedQuestion, JobStage } from '@/lib/dal';
 import { candidateColumns } from './columns';
 import { candidatesTableFeatures, type CandidateRow, type CandidatesTableMeta } from './data-table-features';
 
 /**
  * A job's candidates: a stage filter above the shared <DataTable>. A Select
  * rather than the jobs list's ToggleGroup: six stages plus "All" would wrap.
+ * The Job's Highlighted questions add a column each, after Candidate.
  */
 export function CandidatesTable({
   data,
   stages,
+  highlightedQuestions,
   meta,
 }: {
   data: CandidateRow[];
   stages: JobStage[];
+  highlightedQuestions: HighlightedQuestion[];
   meta: CandidatesTableMeta;
 }) {
+  // Rebuilt only when the Highlighted questions change: TanStack Table expects
+  // the same `columns` array between renders (table-core skills/core/SKILL.md).
+  const columns = useMemo(() => candidateColumns(highlightedQuestions), [highlightedQuestions]);
   const table = useTable({
     features: candidatesTableFeatures,
-    columns: candidateColumns,
+    columns,
     data,
     meta,
     initialState: { sorting: [{ id: 'submittedAt', desc: true }] },
@@ -44,7 +51,9 @@ export function CandidatesTable({
   ];
 
   return (
-    <div className="flex flex-col gap-3">
+    // `w-0 min-w-full`, as on the board's row: the table scrolls inside its own
+    // frame instead of its width (Highlighted questions add columns) widening the whole layout.
+    <div className="flex w-0 min-w-full flex-col gap-3">
       <Select
         items={items}
         value={selected}
