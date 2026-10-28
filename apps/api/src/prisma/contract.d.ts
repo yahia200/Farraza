@@ -34,7 +34,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'0c8d65e2bb3ae93d467907843f360c84902e8ba011a488362edcd7771d6f3591'>;
+  StorageHashBase<'fed4d280821d06638e9aed882f9cbb02b9d6f851ecdce868b9c2e177bdf05786'>;
 export type ExecutionHash =
   ExecutionHashBase<'c19b53563967fe1cdc97d45552456039c34d42f7b292484a823348d6f653f142'>;
 export type ProfileHash =
@@ -355,6 +355,7 @@ export type FieldOutputTypes = {
       readonly highlightedQuestionKeys: CodecTypes['pg/jsonb@1']['output'];
       readonly id: CodecTypes['pg/uuid@1']['output'];
       readonly openedAt: CodecTypes['pg/timestamptz-date@1']['output'] | null;
+      readonly ratingCriteria: CodecTypes['pg/jsonb@1']['output'];
       readonly slug: CodecTypes['pg/text@1']['output'];
       readonly status: 'draft' | 'open' | 'closed';
       readonly title: CodecTypes['pg/text@1']['output'];
@@ -525,6 +526,7 @@ export type FieldInputTypes = {
       readonly highlightedQuestionKeys: CodecTypes['pg/jsonb@1']['input'];
       readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly openedAt: CodecTypes['pg/timestamptz-date@1']['input'] | null;
+      readonly ratingCriteria: CodecTypes['pg/jsonb@1']['input'];
       readonly slug: CodecTypes['pg/text@1']['input'];
       readonly status: 'draft' | 'open' | 'closed';
       readonly title: CodecTypes['pg/text@1']['input'];
@@ -695,6 +697,7 @@ export type StorageColumnTypes = {
       readonly highlighted_question_keys: CodecTypes['pg/jsonb@1']['output'];
       readonly id: CodecTypes['pg/uuid@1']['output'];
       readonly opened_at: CodecTypes['pg/timestamptz-date@1']['output'] | null;
+      readonly rating_criteria: CodecTypes['pg/jsonb@1']['output'];
       readonly slug: CodecTypes['pg/text@1']['output'];
       readonly status: 'draft' | 'open' | 'closed';
       readonly title: CodecTypes['pg/text@1']['output'];
@@ -865,6 +868,7 @@ export type StorageColumnInputTypes = {
       readonly highlighted_question_keys: CodecTypes['pg/jsonb@1']['input'];
       readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly opened_at: CodecTypes['pg/timestamptz-date@1']['input'] | null;
+      readonly rating_criteria: CodecTypes['pg/jsonb@1']['input'];
       readonly slug: CodecTypes['pg/text@1']['input'];
       readonly status: 'draft' | 'open' | 'closed';
       readonly title: CodecTypes['pg/text@1']['input'];
@@ -1058,6 +1062,7 @@ export namespace Models {
     highlightedQuestionKeys: CodecTypes['pg/jsonb@1']['output'];
     id: CodecTypes['pg/uuid@1']['output'];
     openedAt: CodecTypes['pg/timestamptz-date@1']['output'] | null;
+    ratingCriteria: CodecTypes['pg/jsonb@1']['output'];
     slug: CodecTypes['pg/text@1']['output'];
     status: 'draft' | 'open' | 'closed';
     title: CodecTypes['pg/text@1']['output'];
@@ -2024,6 +2029,15 @@ type ContractBase = Omit<
                   readonly nativeType: 'timestamptz';
                   readonly codecId: 'pg/timestamptz-date@1';
                   readonly nullable: true;
+                };
+                readonly rating_criteria: {
+                  readonly nativeType: 'jsonb';
+                  readonly codecId: 'pg/jsonb@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/jsonb@1', readonly []>;
+                  };
                 };
                 readonly slug: {
                   readonly nativeType: 'text';
@@ -3396,6 +3410,10 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/timestamptz-date@1';
                 };
               };
+              readonly ratingCriteria: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
+              };
               readonly slug: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
@@ -3462,6 +3480,7 @@ type ContractBase = Omit<
                 readonly highlightedQuestionKeys: { readonly column: 'highlighted_question_keys' };
                 readonly id: { readonly column: 'id' };
                 readonly openedAt: { readonly column: 'opened_at' };
+                readonly ratingCriteria: { readonly column: 'rating_criteria' };
                 readonly slug: { readonly column: 'slug' };
                 readonly status: { readonly column: 'status' };
                 readonly title: { readonly column: 'title' };
