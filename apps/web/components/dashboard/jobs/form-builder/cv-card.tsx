@@ -1,22 +1,40 @@
 "use client";
 
 import { Controller, type Control } from "react-hook-form";
-import { FileTextIcon } from "lucide-react";
+import {
+  AsteriskIcon,
+  BanIcon,
+  CircleDashedIcon,
+  FileTextIcon,
+  type LucideIcon,
+} from "lucide-react";
 import type { CvMode } from "@repo/shared";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { BuilderValues } from "./question-card";
 
-const CV_OPTIONS: readonly { value: CvMode; label: string; hint: string }[] = [
-  { value: "off", label: "Off", hint: "Applicants aren't asked for a CV." },
+const CV_OPTIONS: readonly {
+  value: CvMode;
+  label: string;
+  hint: string;
+  icon: LucideIcon;
+}[] = [
+  {
+    value: "off",
+    label: "Off",
+    hint: "Applicants aren't asked for a CV.",
+    icon: BanIcon,
+  },
   {
     value: "optional",
     label: "Optional",
     hint: "Applicants can add a CV, or skip it.",
+    icon: CircleDashedIcon,
   },
   {
     value: "required",
     label: "Required",
     hint: "Applicants must add a CV to apply.",
+    icon: AsteriskIcon,
   },
 ];
 
@@ -79,7 +97,7 @@ export function CvCard({
               <ToggleGroup
                 aria-labelledby="cv-card-title"
                 variant="outline"
-                size="sm"
+                spacing={0}
                 value={[field.value]}
                 disabled={disabled}
                 onValueChange={(value) => {
@@ -90,7 +108,8 @@ export function CvCard({
                 }}
               >
                 {CV_OPTIONS.map((option) => (
-                  <ToggleGroupItem key={option.value} value={option.value} className="px-6">
+                  <ToggleGroupItem key={option.value} value={option.value} className="gap-2">
+                    <option.icon />
                     {option.label}
                   </ToggleGroupItem>
                 ))}
