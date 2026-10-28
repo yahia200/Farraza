@@ -8,6 +8,7 @@ import type {
   CvMode,
   FilePurpose,
   FormFields,
+  RatingSummary,
 } from '@repo/shared';
 import { apiFetch } from './api';
 import { formatDate } from './format';
@@ -388,6 +389,21 @@ export function flattenBoard(columns: PipelineColumn[]): (ApplicationSummary & {
 }
 
 /** Mirrors ApplicationDetail in apps/api/src/pipeline/pipeline.ts (dates as ISO strings). */
+/**
+ * One Member's Rating on an Application, as the detail returns it (RatingView in
+ * apps/api/src/pipeline/pipeline.ts). `userId` is null when the author has left the company
+ * (`name` is then "Former member"): that Rating is never the viewer's own. `criteria` holds the
+ * scores as stored, so it can include Criteria the Job no longer uses.
+ */
+export interface RatingView {
+  userId: string | null;
+  name: string;
+  overall: number;
+  criteria: Record<string, number>;
+  /** ISO timestamp. */
+  updatedAt: string;
+}
+
 export interface ApplicationDetailView {
   id: string;
   status: ApplicationStatus;
@@ -405,6 +421,10 @@ export interface ApplicationDetailView {
   /** The application's history and its notes, oldest first; `buildActivityTimeline` joins them. */
   events: ActivityEvent[];
   notes: ActivityNote[];
+  /** Every Member's Rating, oldest first (the order they first rated). */
+  ratings: RatingView[];
+  /** The Average rating and the average per Criterion, over `ratings` (unrounded). */
+  ratingSummary: RatingSummary;
 }
 
 /** One application in full, or null if it isn't in this job (the sheet says so). */
@@ -457,6 +477,18 @@ export async function getApplication(
       authorName,
       createdAt,
     })),
+    ratings: detail.ratings.map(({ userId, name, overall, criteria, updatedAt }) => ({
+      userId,
+      name,
+      overall,
+      criteria,
+      updatedAt,
+    })),
+    ratingSummary: {
+      count: detail.ratingSummary.count,
+      average: detail.ratingSummary.average,
+      criteria: detail.ratingSummary.criteria,
+    },
   };
 }
 

@@ -113,6 +113,7 @@ async function Candidates({
               applicationId={selected}
               stages={job.stages}
               canMove={canMoveApplications(company.role)}
+              ratingCriteria={job.ratingCriteria}
             />
           </Suspense>
         )}
