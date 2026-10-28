@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: resolved
 
 # Ratings on Applications
 
@@ -114,4 +114,20 @@ The concept (everything in the glossary, plus: one Rating per Member per Applica
 
 - Suggested vertical slices, to make tickets from: (1) the shared catalog and rules; (2) the Job stores and saves its Criteria; (3) a Member rates an Application (API); (4) the detail payload carries ratings and the summary; (5) a manager picks Criteria (web); (6) the sheet shows and takes ratings (web); (7) the card and table show the Average rating, with the sort; (8) verification pass and docs sweep. These are the tickets in `.scratch/ratings/issues/`.
 - Per the working agreement in `CLAUDE.md`, each ticket should name the doc it relied on for every library call (`apps/api/prisma-8.md` for the contract and queries, `apps/web/node_modules/@tanstack/table-core` for sorting, the Base UI docs for the controls).
-- The glossary's Application Event entry already mentions "rating given or changed"; keep it in step with the event name if that changes.
+- The glossary's Application Event entry already mentions "rating given or changed"; keep it in step with the event name if that changes. (The event shipped as `rated`; the entry's plain words still match.)
+
+**Follow-up notes after the build (ticket 08).** Where the shipped feature differs from, or settles something the spec left open:
+
+- **Board card with no ratings shows nothing**, not "No ratings". The spec says the card carries "the same" label; the table says "No ratings" (story 17). Chosen in ticket 07 so a new board stays as quiet as before; a one-line change in `candidate-card.tsx` if the owner prefers the label on every card.
+- **The table label has a filled star** before the one-decimal average and the count ("4.2 (3)"), and an sr-only sentence ("Average rating 4.2 from 3 ratings") for screen readers.
+- **Criterion rows are disabled until the viewer has an overall**, with a line saying so (ticket 06): the API requires `overall` on every save and the spec says it is never derived, so a Criterion score cannot be sent alone. The control sends the overall plus only the one Criterion that changed; the API carries the rest over.
+- **A `null` (clear) for a Criterion the Job no longer uses is a 400**, like a score for one (ticket 01 choice): the request only addresses the Job's current Criteria, so a dropped Criterion's old score can be neither changed nor cleared. Spec story 9 (clearing) applies to the Criteria in use.
+- **"Former member" appears only when the author's user row is deleted** (`ratings.user_id` SET NULL). A Member who is merely removed from the company keeps their `user_id` and their real name on the Rating (checked in the browser pass). Spec story 19 ("a Rating stays and still counts when its author leaves the company") holds for both.
+- **The 409 on a unique violation is defensive only.** The upsert is `INSERT ... ON CONFLICT DO UPDATE`, so the (application, user) key cannot raise 23505; two tabs rating for the first time end as two events (the second's `previous` points at the first), the last-write-wins trade the spec accepted. The catch stays as the spec asked and the test fakes the error.
+- **The board's grouped read is skipped when the Job has no Applications** (there are no ids to ask about); with Applications but no Ratings it runs once and returns nothing. Ticket 07's text said it "still runs once with none"; its Answer and `.claude/rules/api.md` describe what the code does, which is the better behaviour, so the ticket text is the stale part.
+- **The stored order of a Job's Criteria is whatever the request sends**, and the web picker always sends catalog order (the picker's ticket 05 choice), so the list does not depend on click order. `docs/db-schema.md` §3.5 now says so; an earlier line said "the order the manager picked them".
+- **Database shape details:** adding `rated` to `application_events.type` *replaced* the CHECK (drop, then add: a "destructive" class in the planner, no data touched; apply with `--no-interactive --confirm <db>`); `ratings` also has Prisma's automatic `(user_id)` index and an `(application_id)` index that duplicates the UNIQUE's leading column.
+- **Detail payload:** Ratings are ordered by `created_at` (first rater first; a re-rate does not move a row), and a Rating's `userId` is `null` when the author's user is gone.
+- **History lines** (web, `activity-items.ts`) name the rater through the detail's `ratings` list (events carry only `actorId`), so the lookup would miss, and read "Former member", only if Ratings ever become removable.
+- **Not built or not reachable:** a `withdrawn` Application cannot be produced yet (no Stage kind writes it), so only Rejected and Hired were exercised; rating is status-blind in the code.
+- **Seen, not caused by ratings:** switching the Table/Board toggle client-side logs "`NaN` is an invalid value for the `left` css style property" once (it did not appear on a fresh load of the table, the board or the open sheet). Not traced; most likely the view toggle's highlight animation, which predates this feature.
