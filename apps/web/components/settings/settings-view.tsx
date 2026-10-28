@@ -14,8 +14,8 @@ import { AppearanceMode } from './appearance-mode';
  */
 export function SettingsView({ account }: { account: ReactNode }) {
   return (
-    <Tabs defaultValue="appearance" className="w-full">
-      <TabsList>
+    <Tabs defaultValue="appearance" className="w-full" aria-label="Settings sections">
+      <TabsList variant="line" className="w-full border-b px-0 *:-mb-1">
         <TabsTrigger value="appearance">
           <PaletteIcon />
           Appearance
