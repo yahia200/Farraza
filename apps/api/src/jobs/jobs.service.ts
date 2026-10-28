@@ -8,6 +8,7 @@ import type { User } from '../users/user.js';
 import { FormsRepository } from '../forms/forms.repository.js';
 import type { CreateJobDto } from './dto/create-job.dto.js';
 import type { SaveHighlightedQuestionsDto } from './dto/save-highlighted-questions.dto.js';
+import type { SaveRatingCriteriaDto } from './dto/save-rating-criteria.dto.js';
 import type { UpdateJobDto } from './dto/update-job.dto.js';
 import type { Job, JobWithStages } from './job.js';
 import { JobPolicy } from './job.policy.js';
@@ -101,6 +102,27 @@ export class JobsService {
       throw new NotFoundException();
     }
     return { keys: saved.highlightedQuestionKeys };
+  }
+
+  /**
+   * Replaces the Job's rating Criteria. Any Job status is allowed and no form is needed: the catalog
+   * is fixed, and the body schema (`saveRatingCriteriaSchema`) already refused unknown keys, more
+   * than `RATING_CRITERIA_LIMIT` and repeats before this runs, so there is nothing left to check.
+   */
+  async saveRatingCriteria(
+    user: User,
+    membership: Membership,
+    jobSlug: string,
+    dto: SaveRatingCriteriaDto,
+  ): Promise<{ keys: string[] }> {
+    await this.authorization.authorize(JobPolicy, 'update', user, membership);
+
+    const job = await this.get(membership, jobSlug);
+    const saved = await this.jobs.replaceRatingCriteria(job.id, dto.keys);
+    if (!saved) {
+      throw new NotFoundException();
+    }
+    return { keys: saved.ratingCriteria };
   }
 
   private async availableSlug(companyId: string, title: string): Promise<string> {

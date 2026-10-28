@@ -19,6 +19,7 @@ import type { FormsRepository } from '../forms/forms.repository.js';
 import type { User } from '../users/user.js';
 import { DEFAULT_STAGES } from './job.js';
 import { saveHighlightedQuestionsSchema } from './dto/save-highlighted-questions.dto.js';
+import { saveRatingCriteriaSchema } from './dto/save-rating-criteria.dto.js';
 import type { Job, JobWithStages } from './job.js';
 import { JobPolicy } from './job.policy.js';
 import type { JobsRepository } from './jobs.repository.js';
@@ -56,6 +57,7 @@ class InMemoryJobsRepository implements PublicApi<JobsRepository> {
       createdAt: now,
       updatedAt: now,
       highlightedQuestionKeys: [],
+      ratingCriteria: [],
       stages: DEFAULT_STAGES.map((stage, index) => ({
         ...stage,
         id: `${id}-stage-${index}`,
@@ -111,6 +113,14 @@ class InMemoryJobsRepository implements PublicApi<JobsRepository> {
     const job = this.jobs.find((row) => row.job.id === id)?.job;
     if (!job) return null;
     job.highlightedQuestionKeys = [...keys];
+    return { ...job };
+  }
+
+  /** Replaces the whole list in one write (mirrors the real unconditional update). */
+  async replaceRatingCriteria(id: string, keys: string[]): Promise<Job | null> {
+    const job = this.jobs.find((row) => row.job.id === id)?.job;
+    if (!job) return null;
+    job.ratingCriteria = [...keys];
     return { ...job };
   }
 
@@ -567,6 +577,166 @@ describe('JobsService', () => {
       await expect(validate({ keys: ['not-a-uuid'] })).rejects.toMatchObject({
         response: { errors: [{ path: 'keys.0' }] },
       });
+    });
+  });
+
+  describe('saveRatingCriteria', () => {
+    it('saves a manager’s Criteria and reports them on the Job', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+
+      const saved = await service.saveRatingCriteria(
+        user,
+        membershipWithRole('recruiter'),
+        job.slug,
+        { keys: ['culture_fit', 'technical_skills'] },
+      );
+
+      expect(saved).toEqual({ keys: ['culture_fit', 'technical_skills'] });
+      expect(
+        (await service.get(membershipWithRole('interviewer'), job.slug))
+          .ratingCriteria,
+      ).toEqual(['culture_fit', 'technical_skills']);
+    });
+
+    it('lets owners and admins save too', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+
+      await service.saveRatingCriteria(user, membershipWithRole('owner'), job.slug, {
+        keys: ['leadership'],
+      });
+      const saved = await service.saveRatingCriteria(
+        user,
+        membershipWithRole('admin'),
+        job.slug,
+        { keys: ['communication'] },
+      );
+
+      expect(saved).toEqual({ keys: ['communication'] });
+    });
+
+    it('saves on a draft, an open and a closed Job', async () => {
+      const membership = membershipWithRole('owner');
+      const draft = jobs.seedJob(company.id, 'Draft Job');
+      const open = jobs.seedJob(company.id, 'Open Job');
+      const closed = jobs.seedJob(company.id, 'Closed Job');
+      jobs.publishFormFor(open.id);
+      jobs.publishFormFor(closed.id);
+      await service.open(user, membership, open.slug);
+      await service.open(user, membership, closed.slug);
+      await service.close(user, membership, closed.slug);
+
+      for (const job of [draft, open, closed]) {
+        await expect(
+          service.saveRatingCriteria(user, membership, job.slug, {
+            keys: ['problem_solving'],
+          }),
+        ).resolves.toEqual({ keys: ['problem_solving'] });
+      }
+      expect((await service.get(membership, closed.slug)).status).toBe('closed');
+    });
+
+    it('forbids an interviewer and leaves the list unchanged', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+
+      const attempt = service.saveRatingCriteria(
+        user,
+        membershipWithRole('interviewer'),
+        job.slug,
+        { keys: ['culture_fit'] },
+      );
+
+      await expect(attempt).rejects.toBeInstanceOf(AuthorizationError);
+      await expect(attempt).rejects.toMatchObject({ reason: 'forbidden' });
+      expect(
+        (await service.get(membershipWithRole('owner'), job.slug)).ratingCriteria,
+      ).toEqual([]);
+    });
+
+    it('replaces the previous list on every save, and an empty list clears it', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+      const membership = membershipWithRole('owner');
+      await service.saveRatingCriteria(user, membership, job.slug, {
+        keys: ['culture_fit', 'leadership', 'communication'],
+      });
+
+      await service.saveRatingCriteria(user, membership, job.slug, {
+        keys: ['relevant_experience'],
+      });
+      expect((await service.get(membership, job.slug)).ratingCriteria).toEqual([
+        'relevant_experience',
+      ]);
+
+      const cleared = await service.saveRatingCriteria(user, membership, job.slug, {
+        keys: [],
+      });
+      expect(cleared).toEqual({ keys: [] });
+      expect((await service.get(membership, job.slug)).ratingCriteria).toEqual([]);
+    });
+
+    it('does not find a job that belongs to another company', async () => {
+      const job = jobs.seedJob('another-company', 'Backend Engineer');
+
+      await expect(
+        service.saveRatingCriteria(user, membershipWithRole('owner'), job.slug, {
+          keys: ['culture_fit'],
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('reads as an empty list on a Job that never had Criteria saved', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+
+      expect(
+        (await service.get(membershipWithRole('owner'), job.slug)).ratingCriteria,
+      ).toEqual([]);
+    });
+  });
+
+  // An unknown key, more than five and repeats are refused before the service runs, by the global
+  // pipe main.ts installs, applying the route's body schema. Same approach as the Highlighted
+  // questions body describe above: the 400 a client gets is checked here; the schema's own rules
+  // are tested in @repo/shared.
+  describe('the save rating criteria request body', () => {
+    const pipe = new StandardSchemaValidationPipe({
+      exceptionFactory: toValidationException,
+    });
+    const validate = (body: unknown) =>
+      pipe.transform(body, { type: 'body', schema: saveRatingCriteriaSchema });
+
+    it('accepts up to five distinct catalog keys, and none', async () => {
+      const five = [
+        'technical_skills',
+        'problem_solving',
+        'communication',
+        'culture_fit',
+        'leadership',
+      ];
+      await expect(validate({ keys: five })).resolves.toEqual({ keys: five });
+      await expect(validate({ keys: [] })).resolves.toEqual({ keys: [] });
+    });
+
+    it('refuses an unknown key, more than five and a repeat, with errors paths', async () => {
+      await expect(validate({ keys: ['charisma'] })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      await expect(validate({ keys: ['charisma'] })).rejects.toMatchObject({
+        response: { errors: [{ path: 'keys.0' }] },
+      });
+      await expect(
+        validate({
+          keys: [
+            'technical_skills',
+            'problem_solving',
+            'communication',
+            'culture_fit',
+            'leadership',
+            'relevant_experience',
+          ],
+        }),
+      ).rejects.toMatchObject({ response: { errors: [{ path: 'keys' }] } });
+      await expect(
+        validate({ keys: ['culture_fit', 'culture_fit'] }),
+      ).rejects.toMatchObject({ response: { errors: [{ path: 'keys.1' }] } });
     });
   });
 

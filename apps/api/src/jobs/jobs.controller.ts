@@ -9,6 +9,10 @@ import {
   saveHighlightedQuestionsSchema,
   type SaveHighlightedQuestionsDto,
 } from './dto/save-highlighted-questions.dto.js';
+import {
+  saveRatingCriteriaSchema,
+  type SaveRatingCriteriaDto,
+} from './dto/save-rating-criteria.dto.js';
 import { updateJobSchema, type UpdateJobDto } from './dto/update-job.dto.js';
 import { JobsService } from './jobs.service.js';
 
@@ -54,6 +58,16 @@ export class JobsController {
     @Body({ schema: saveHighlightedQuestionsSchema }) dto: SaveHighlightedQuestionsDto,
   ) {
     return this.jobs.saveHighlightedQuestions(user, membership, jobSlug, dto);
+  }
+
+  @Put(':jobSlug/rating-criteria')
+  saveRatingCriteria(
+    @CurrentUser() user: User,
+    @CurrentMembership() membership: Membership,
+    @Param('jobSlug') jobSlug: string,
+    @Body({ schema: saveRatingCriteriaSchema }) dto: SaveRatingCriteriaDto,
+  ) {
+    return this.jobs.saveRatingCriteria(user, membership, jobSlug, dto);
   }
 
   @Post(':jobSlug/open')
