@@ -80,7 +80,39 @@ export interface ApplicationDetail {
   answers: Answers;
   events: ApplicationEventView[];
   notes: NoteView[];
+  /** Every Member's Rating of this Application, oldest first. */
+  ratings: RatingView[];
+  /** The count, the average and the per-Criterion averages of `ratings` (`summariseRatings`). */
+  ratingSummary: RatingSummary;
 }
+
+/**
+ * One Member's Rating as the detail shows it. `userId` and `name` describe the author: `userId` is null
+ * and `name` is "Former member" when the author's user is gone (the Rating stays and still counts).
+ * `criteria` is as stored, so it can hold scores for Criteria the Job no longer uses.
+ */
+export interface RatingView {
+  userId: string | null;
+  name: string;
+  overall: number;
+  criteria: Record<string, number>;
+  updatedAt: Date;
+}
+
+/** A Rating as `PipelineRepository` reads it: the author's name is null when the author's user is gone. */
+export interface RatingRow {
+  userId: string | null;
+  userName: string | null;
+  overall: number;
+  criteria: Record<string, number>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** The detail as `PipelineRepository.findDetail` reads it, before the service resolves names and the summary. */
+export type ApplicationDetailRow = Omit<ApplicationDetail, 'ratings' | 'ratingSummary'> & {
+  ratings: RatingRow[];
+};
 
 /**
  * A Rating's scores as stored: the overall and a score per Criterion key, never `null` (a cleared score

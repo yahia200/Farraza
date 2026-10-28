@@ -3,7 +3,7 @@ import type { Answers, FilePurpose, FormFields } from '@repo/shared';
 import type { StageKind } from '../jobs/job.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
-  ApplicationDetail,
+  ApplicationDetailRow,
   CardRow,
   CardRowWithAnswers,
   ApplicationFile,
@@ -73,6 +73,10 @@ export class PipelineRepository {
 
   private get events() {
     return this.prisma.db.orm.public.ApplicationEvent;
+  }
+
+  private get ratings() {
+    return this.prisma.db.orm.public.Rating;
   }
 
   private get notes() {
@@ -177,7 +181,7 @@ export class PipelineRepository {
     companyId: string,
     jobId: string,
     applicationId: string,
-  ): Promise<ApplicationDetail | null> {
+  ): Promise<ApplicationDetailRow | null> {
     const row = await this.applications
       .where({ id: applicationId, companyId, jobId })
       .include('candidate')
@@ -186,7 +190,7 @@ export class PipelineRepository {
       .first();
     if (!row) return null;
 
-    const [eventRows, noteRows] = await Promise.all([
+    const [eventRows, noteRows, ratingRows] = await Promise.all([
       this.events
         .where({ applicationId })
         .orderBy((event) => event.createdAt.asc())
@@ -195,6 +199,13 @@ export class PipelineRepository {
         .where({ applicationId })
         .include('author')
         .orderBy((note) => note.createdAt.asc())
+        .all(),
+      // One query for every Member's Rating with the author's name (the `user` relation is null once the
+      // user is gone: `user_id` is SET NULL). The Application above is already this company's and Job's.
+      this.ratings
+        .where({ companyId, applicationId })
+        .include('user')
+        .orderBy((rating) => rating.createdAt.asc())
         .all(),
     ]);
 
@@ -229,6 +240,13 @@ export class PipelineRepository {
         authorId: note.authorId,
         authorName: note.author?.name ?? null,
         createdAt: note.createdAt,
+      })),
+      ratings: ratingRows.map((rating) => ({
+        userId: rating.userId,
+        userName: rating.user?.name ?? null,
+        ...toRatingValues(rating),
+        createdAt: rating.createdAt,
+        updatedAt: rating.updatedAt,
       })),
     };
   }

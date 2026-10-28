@@ -351,6 +351,7 @@ A Member's own Rating of an Application (`GLOSSARY.md`, "Rating"): one overall s
 - UNIQUE (`application_id`, `user_id`): one Rating per Member per Application, and the conflict target of the upsert. Postgres treats NULLs as distinct, so Ratings whose author is gone (`user_id` NULL) never clash. INDEX (`application_id`) and INDEX (`user_id`) (Prisma adds one for every FK; the first also serves the board's grouped read).
 - CHECK `ratings_overall_range`: `overall BETWEEN 1 AND 5` (shown as `overall >= 1 AND overall <= 5` by Postgres). CHECK `ratings_criteria_object`: `jsonb_typeof(criteria) = 'object'`.
 - A save (`PUT .../applications/:applicationId/rating`) upserts this row and writes a `rated` event in the same transaction (`PipelineRepository.saveRating`). Ratings cannot be removed through the API.
+- The Application detail (`GET .../applications/:applicationId`, `PipelineRepository.findDetail`) reads every Rating of the Application in one query joined to the author's name (`include('user')`, filtered by `company_id` and `application_id`, oldest `created_at` first, after the Application itself was found for the company and Job). A NULL `user_id` gives the name "Former member" in the service; the Rating still counts in the summary. The payload (`ratings`, `ratingSummary`) is described in `.claude/rules/api.md` (Pipeline, "Detail payload"). No public route reads this table.
 
 ## 4. JSONB shapes
 
