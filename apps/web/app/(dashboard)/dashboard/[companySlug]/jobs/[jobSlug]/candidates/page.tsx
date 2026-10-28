@@ -47,7 +47,7 @@ async function Candidates({
   const canPickHighlights = canManageJobs(company.role);
   // One fetch of the board feeds both views. The form is read only for the
   // Highlighted questions picker, which interviewers don't get.
-  const [columns, { application, view: viewParam }, form] = await Promise.all([
+  const [{ columns }, { application, view: viewParam }, form] = await Promise.all([
     getPipelineBoard(company.slug, job.slug),
     searchParams,
     canPickHighlights ? getJobForm(company.slug, job.slug) : null,

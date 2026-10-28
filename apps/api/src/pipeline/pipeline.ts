@@ -9,6 +9,28 @@ export interface ApplicationCard {
   status: ApplicationStatus;
   submittedAt: Date;
   candidate: { name: string; email: string };
+  /**
+   * The answer to each of the Job's Highlighted questions, keyed by Question key: display text
+   * (`formatHighlightText`), or null when unanswered or when this Application's form version has
+   * no such Question. Empty when the Job has none.
+   */
+  highlights: Record<string, string | null>;
+}
+
+/** A card as `PipelineRepository` reads it, before the service adds the Highlighted answers. */
+export type CardRow = Omit<ApplicationCard, 'highlights'>;
+
+/** A card row plus what the service needs to resolve its Highlighted answers. Stays inside the API. */
+export interface CardRowWithAnswers extends CardRow {
+  /** The form version the applicant answered, whose Questions resolve the answers. */
+  formVersionId: string;
+  answers: Answers;
+}
+
+/** One of a Job's Highlighted questions, with its text from the latest published form. */
+export interface HighlightedQuestion {
+  key: string;
+  label: string;
 }
 
 export interface BoardColumn {

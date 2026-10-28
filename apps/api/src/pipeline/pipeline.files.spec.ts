@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { AuthorizationService } from '@nestjs/authorization';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { MemberRole, Membership } from '../companies/company.js';
+import type { FormsRepository } from '../forms/forms.repository.js';
 import type { JobWithStages } from '../jobs/job.js';
 import type { JobsService } from '../jobs/jobs.service.js';
 import type { StorageService } from '../storage/storage.service.js';
@@ -172,6 +173,7 @@ describe('files on an Application (recruiter side)', () => {
       new FakeJobs() as unknown as JobsService,
       { authorize: async () => {} } as unknown as AuthorizationService,
       storage as unknown as StorageService,
+      {} as FormsRepository,
     );
     repository.seedApplication('company-1', 'job-1', 'application-1');
     repository.seedApplication('company-1', 'job-1', 'application-2');
