@@ -1,4 +1,4 @@
-import type { AnswerValue } from './answers.js';
+import { isBlankAnswer, type AnswerValue } from './answers.js';
 import { formatIsoDate } from './dates.js';
 import type { LeafFormField } from './form-fields.js';
 
@@ -6,7 +6,8 @@ import type { LeafFormField } from './form-fields.js';
  * A single-answer Question's answer as text, read against the Question the applicant saw (the form
  * version stored with the Application), so option labels stay those of that version. `null` means
  * no answer. A multi-select is its labels, one per item; an option id that version doesn't have is
- * "Unknown option".
+ * "Unknown option". Text is returned as stored, blank text included: the sheet's output is fixed,
+ * and only `formatHighlightText` turns blank text into `null`.
  */
 export function formatAnswerText(field: LeafFormField, value: AnswerValue | undefined): string | string[] | null {
   if (value === undefined) {
@@ -40,7 +41,8 @@ export const HIGHLIGHT_MAX_CHARACTERS = 200;
  * A Highlighted question's answer for the candidate list: one line of plain text, or `null` when
  * there is no answer. A multi-select's labels are joined with ", ", a link is its trimmed text (never
  * a link, so clicking a row can't leave the page), and anything over `HIGHLIGHT_MAX_CHARACTERS` is cut
- * there with "…". The sheet shows the full answer.
+ * there with "…". Blank text (spaces or line breaks only) is no answer, the rule of `isBlankAnswer`,
+ * so it shows "—" rather than an empty cell. The sheet shows the full answer.
  */
 export function formatHighlightText(field: LeafFormField, value: AnswerValue | undefined): string | null {
   const text = formatAnswerText(field, value);
@@ -48,7 +50,7 @@ export function formatHighlightText(field: LeafFormField, value: AnswerValue | u
     return null;
   }
   const line = Array.isArray(text) ? text.join(', ') : field.type === 'url' ? text.trim() : text;
-  return line === '' ? null : truncate(line, HIGHLIGHT_MAX_CHARACTERS);
+  return isBlankAnswer(line) ? null : truncate(line, HIGHLIGHT_MAX_CHARACTERS);
 }
 
 /**

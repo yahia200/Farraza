@@ -69,6 +69,11 @@ describe('formatAnswerText', () => {
     expect(formatAnswerText(shortText, undefined)).toBeNull();
     expect(formatAnswerText(singleSelect, undefined)).toBeNull();
   });
+
+  it('keeps blank text as written, as the sheet has always shown it', () => {
+    expect(formatAnswerText(shortText, '')).toBe('');
+    expect(formatAnswerText(longText, '   ')).toBe('   ');
+  });
 });
 
 describe('formatHighlightText', () => {
@@ -90,6 +95,17 @@ describe('formatHighlightText', () => {
   it('is null when there is no answer', () => {
     expect(formatHighlightText(shortText, undefined)).toBeNull();
     expect(formatHighlightText(multiSelect, [])).toBeNull();
+  });
+
+  it('is null for blank text, spaces or line breaks only, like isBlankAnswer', () => {
+    expect(formatHighlightText(shortText, '')).toBeNull();
+    expect(formatHighlightText(shortText, '   ')).toBeNull();
+    expect(formatHighlightText(longText, ' \n\t ')).toBeNull();
+    expect(formatHighlightText(url, '  ')).toBeNull();
+  });
+
+  it('keeps text with words in it as written', () => {
+    expect(formatHighlightText(shortText, '  Cairo ')).toBe('  Cairo ');
   });
 
   it('keeps 200 characters and cuts longer text there with an ellipsis', () => {
