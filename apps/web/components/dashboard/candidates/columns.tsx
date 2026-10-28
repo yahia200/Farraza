@@ -75,10 +75,15 @@ function highlightColumn({ key, label }: HighlightedQuestion) {
       <Tooltip>
         {/*
           A span, not Base UI's default <button>: the header does nothing when
-          pressed. The tooltip is for mouse users only (Base UI disables
-          tooltips on touch); screen readers read the full text from the span.
+          pressed. tabIndex={0} lets keyboard users focus it, which opens the
+          tooltip (Base UI opens it on focus as well as hover), so a cut-off
+          Question can be read in full. Base UI disables tooltips on touch;
+          screen readers read the full text from the span.
         */}
-        <TooltipTrigger render={<span />} className={`block ${HIGHLIGHT_WIDTH} truncate`}>
+        <TooltipTrigger
+          render={<span tabIndex={0} />}
+          className={`block ${HIGHLIGHT_WIDTH} truncate rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/30`}
+        >
           {label}
         </TooltipTrigger>
         <TooltipContent>{label}</TooltipContent>
