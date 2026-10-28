@@ -5,6 +5,7 @@ import {
   formatHighlightText,
   highlightableQuestions,
   previewKindOf,
+  summariseRatings,
   type RatingCriteriaScores,
 } from '@repo/shared';
 import { isUniqueViolation } from '../common/db-errors.js';
@@ -18,7 +19,7 @@ import type { SaveRatingDto } from './dto/save-rating.dto.js';
 import { StorageService } from '../storage/storage.service.js';
 import { DOWNLOAD_URL_TTL_SECONDS } from '../storage/storage.js';
 import { FormsRepository } from '../forms/forms.repository.js';
-import type { ApplicationCard, BoardColumn, FileLink, HighlightedQuestion, SavedRating } from './pipeline.js';
+import type { ApplicationCard, ApplicationDetail, BoardColumn, FileLink, HighlightedQuestion, SavedRating } from './pipeline.js';
 import { PipelineRepository } from './pipeline.repository.js';
 
 /**
@@ -35,6 +36,9 @@ function mergeCriteria(existing: Record<string, number>, requested: RatingCriter
   }
   return merged;
 }
+
+/** What the detail calls a Rating's author once their user is gone (`ratings.user_id` is null). */
+const FORMER_MEMBER_NAME = 'Former member';
 
 @Injectable()
 export class PipelineService {
@@ -124,11 +128,19 @@ export class PipelineService {
     });
   }
 
-  async detail(membership: Membership, jobSlug: string, applicationId: string) {
+  async detail(membership: Membership, jobSlug: string, applicationId: string): Promise<ApplicationDetail> {
     const job = await this.jobs.get(membership, jobSlug);
     const detail = await this.pipeline.findDetail(membership.company.id, job.id, applicationId);
     if (!detail) throw new NotFoundException();
-    return detail;
+    const { ratings: ratingRows, ...rest } = detail;
+    const ratings = ratingRows.map((rating) => ({
+      userId: rating.userId,
+      name: rating.userName ?? FORMER_MEMBER_NAME,
+      overall: rating.overall,
+      criteria: rating.criteria,
+      updatedAt: rating.updatedAt,
+    }));
+    return { ...rest, ratings, ratingSummary: summariseRatings(ratings) };
   }
 
   /**
