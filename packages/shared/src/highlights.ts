@@ -41,8 +41,11 @@ export function isHighlightable(fields: readonly FormField[], key: string): bool
   return highlightableQuestions(fields).some((question) => question.key === key);
 }
 
-// Keys come from the picker, not from typing, so a bad one means a stale page or a bug.
-const RELOAD = 'Something went wrong. Reload the page and try again.';
+/**
+ * The message for a malformed list of keys. Keys come from the picker, not from typing, so a bad
+ * one means a stale page or a bug. Exported so the web action can use it as its fallback too.
+ */
+export const HIGHLIGHT_RELOAD_MESSAGE = 'Something went wrong. Reload the page and try again.';
 
 /**
  * The Highlighted questions a Job stores: at most `HIGHLIGHT_LIMIT` Question keys, each a UUID and
@@ -50,12 +53,12 @@ const RELOAD = 'Something went wrong. Reload the page and try again.';
  * that against the latest published form. Order carries no meaning (the list follows form order).
  */
 export const highlightedQuestionKeysSchema = z
-  .array(z.uuid({ error: RELOAD }), { error: RELOAD })
+  .array(z.uuid({ error: HIGHLIGHT_RELOAD_MESSAGE }), { error: HIGHLIGHT_RELOAD_MESSAGE })
   .max(HIGHLIGHT_LIMIT, { error: `Choose up to ${HIGHLIGHT_LIMIT} questions.` })
   .superRefine((keys, ctx) => {
     keys.forEach((key, index) => {
       if (keys.indexOf(key) !== index) {
-        ctx.addIssue({ code: 'custom', message: RELOAD, path: [index] });
+        ctx.addIssue({ code: 'custom', message: HIGHLIGHT_RELOAD_MESSAGE, path: [index] });
       }
     });
   });
