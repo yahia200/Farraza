@@ -51,7 +51,9 @@ export function CandidatesTable({
   ];
 
   return (
-    <div className="flex flex-col gap-3">
+    // `w-0 min-w-full`, as on the board's row: the table scrolls inside its own
+    // frame instead of its width (Highlighted questions add columns) widening the whole layout.
+    <div className="flex w-0 min-w-full flex-col gap-3">
       <Select
         items={items}
         value={selected}
