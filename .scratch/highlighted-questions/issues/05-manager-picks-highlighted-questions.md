@@ -13,7 +13,7 @@
 
 - [x] The button appears for owner, admin and recruiter, not for interviewers, and not for a Job with no published form
 - [x] The popover lists only highlightable Questions of the latest published form, in form order, with the current choice ticked
-- [ ] Ticking or unticking saves immediately and the table and cards update without a reload
+- [x] Ticking or unticking saves immediately and the table and cards update without a reload
 - [x] At three ticked the others are disabled with an explanation; unticking one re-enables them
 - [x] A failed save toasts and the checkboxes return to the saved state
 - [x] The choice persists after a reload and is the same for another member

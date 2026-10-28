@@ -9,17 +9,17 @@
 
 **Blocked by:** 03.
 
-**Status:** needs-triage
+**Status:** resolved
 
-- [ ] The table shows a column per Highlighted question after Candidate, headers truncated with a tooltip, cells on one line
-- [ ] The board card shows a label-over-answer block per Highlighted question under the name, answers clamped to two lines
-- [ ] A `null` answer shows `—` in both views
-- [ ] A Job with no Highlighted questions renders both views unchanged
-- [ ] Sorting and the stage filter still work; the new columns are not sortable
-- [ ] Drag and drop, the Move select and opening the sheet still work on a card with blocks
-- [ ] Checked in the browser pane at desktop and phone width (table and board tabs); no console errors
-- [ ] `.claude/rules/web.md` updated for the table columns and the card
-- [ ] `pnpm lint` and `pnpm check-types` pass
+- [x] The table shows a column per Highlighted question after Candidate, headers truncated with a tooltip, cells on one line
+- [x] The board card shows a label-over-answer block per Highlighted question under the name, answers clamped to two lines
+- [x] A `null` answer shows `—` in both views
+- [x] A Job with no Highlighted questions renders both views unchanged
+- [x] Sorting and the stage filter still work; the new columns are not sortable
+- [x] Drag and drop, the Move select and opening the sheet still work on a card with blocks
+- [x] Checked in the browser pane at desktop and phone width (table and board tabs); no console errors
+- [x] `.claude/rules/web.md` updated for the table columns and the card
+- [x] `pnpm lint` and `pnpm check-types` pass
 
 ## Comments
 
