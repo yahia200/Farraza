@@ -22,6 +22,7 @@ import { PipelineService } from './pipeline.service.js';
 type PublicApi<T> = { [K in keyof T]: T[K] };
 
 interface StoredApplication extends CardRowWithAnswers {
+  companyId: string;
   jobId: string;
 }
 
@@ -52,6 +53,7 @@ class InMemoryPipelineRepository implements Pick<
 
   seedApplication(row: Partial<StoredApplication> & { id: string }): void {
     this.applications.push({
+      companyId: 'company-1',
       jobId: 'job-1',
       stageId: 'stage-applied',
       status: 'active',
@@ -63,14 +65,14 @@ class InMemoryPipelineRepository implements Pick<
     });
   }
 
-  private ofJob(jobId: string): StoredApplication[] {
+  private ofJob(companyId: string, jobId: string): StoredApplication[] {
     return this.applications
-      .filter((a) => a.jobId === jobId)
+      .filter((a) => a.companyId === companyId && a.jobId === jobId)
       .sort((a, b) => b.submittedAt.getTime() - a.submittedAt.getTime());
   }
 
-  async findCards(jobId: string): Promise<CardRow[]> {
-    return this.ofJob(jobId).map(
+  async findCards(companyId: string, jobId: string): Promise<CardRow[]> {
+    return this.ofJob(companyId, jobId).map(
       ({ id, stageId, status, submittedAt, candidate }) => ({
         id,
         stageId,
@@ -81,9 +83,9 @@ class InMemoryPipelineRepository implements Pick<
     );
   }
 
-  async findCardsWithAnswers(jobId: string): Promise<CardRowWithAnswers[]> {
+  async findCardsWithAnswers(companyId: string, jobId: string): Promise<CardRowWithAnswers[]> {
     this.answerReads += 1;
-    return this.ofJob(jobId).map(
+    return this.ofJob(companyId, jobId).map(
       ({
         id,
         stageId,
@@ -574,6 +576,24 @@ describe('the pipeline board', () => {
         service.board(member('company-2', 'owner'), 'engineer'),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(repository.answerReads).toBe(0);
+    });
+
+    it("lists no other company's Applications, with or without Highlighted questions", async () => {
+      publish('version-1', formOf([city]));
+      repository.seedApplication({
+        id: 'mine',
+        answers: { [Q.city]: 'Cairo' },
+      });
+      repository.seedApplication({
+        id: 'theirs',
+        companyId: 'company-2',
+        answers: { [Q.city]: 'Giza' },
+      });
+
+      expect((await cardsOf()).map((card) => card.id)).toEqual(['mine']);
+
+      highlight(Q.city);
+      expect((await cardsOf()).map((card) => card.id)).toEqual(['mine']);
     });
 
     it('lets an interviewer read the board with its Highlighted answers', async () => {

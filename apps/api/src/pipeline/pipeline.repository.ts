@@ -76,10 +76,10 @@ export class PipelineRepository {
    * the board reads those through `findCardsWithAnswers`, and only when the Job has Highlighted
    * questions.
    */
-  async findCards(jobId: string): Promise<CardRow[]> {
+  async findCards(companyId: string, jobId: string): Promise<CardRow[]> {
     const rows = await this.applications
       .select('id', 'stageId', 'status', 'submittedAt', 'email')
-      .where({ jobId })
+      .where({ companyId, jobId })
       .include('candidate')
       .orderBy((application) => application.submittedAt.desc())
       .all();
@@ -92,10 +92,10 @@ export class PipelineRepository {
    * they answer. The versions themselves are not joined (`include('formVersion')` would repeat a
    * version's whole `fields` on every row); `findFormFields` reads each distinct one once.
    */
-  async findCardsWithAnswers(jobId: string): Promise<CardRowWithAnswers[]> {
+  async findCardsWithAnswers(companyId: string, jobId: string): Promise<CardRowWithAnswers[]> {
     const rows = await this.applications
       .select('id', 'stageId', 'status', 'submittedAt', 'email', 'formVersionId', 'answers')
-      .where({ jobId })
+      .where({ companyId, jobId })
       .include('candidate')
       .orderBy((application) => application.submittedAt.desc())
       .all();

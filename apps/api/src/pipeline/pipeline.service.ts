@@ -74,11 +74,11 @@ export class PipelineService {
     highlighted: HighlightedQuestion[],
   ): Promise<ApplicationCard[]> {
     if (highlighted.length === 0) {
-      const rows = await this.pipeline.findCards(jobId);
+      const rows = await this.pipeline.findCards(companyId, jobId);
       return rows.map((row) => ({ ...row, highlights: {} }));
     }
 
-    const rows = await this.pipeline.findCardsWithAnswers(jobId);
+    const rows = await this.pipeline.findCardsWithAnswers(companyId, jobId);
     const versionIds = [...new Set(rows.map((row) => row.formVersionId))];
     const versions = await this.pipeline.findFormFields(companyId, jobId, versionIds);
     // Per version, its highlightable Questions by key: a key the version lacks, or has on a
