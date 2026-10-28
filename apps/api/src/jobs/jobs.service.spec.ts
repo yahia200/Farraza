@@ -445,8 +445,8 @@ describe('JobsService', () => {
         response: {
           message: expect.any(String),
           errors: [
-            { path: '0', message: expect.any(String) },
-            { path: '2', message: expect.any(String) },
+            { path: 'keys.0', message: expect.any(String) },
+            { path: 'keys.2', message: expect.any(String) },
           ],
         },
       });
@@ -459,7 +459,7 @@ describe('JobsService', () => {
             keys: [Q.school],
           },
         ),
-      ).rejects.toMatchObject({ response: { errors: [{ path: '0' }] } });
+      ).rejects.toMatchObject({ response: { errors: [{ path: 'keys.0' }] } });
       expect(
         (await service.get(membershipWithRole('owner'), job.slug))
           .highlightedQuestionKeys,
@@ -483,7 +483,7 @@ describe('JobsService', () => {
 
       await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
       await expect(attempt).rejects.toMatchObject({
-        response: { errors: [{ path: '1' }, { path: '2' }] },
+        response: { errors: [{ path: 'keys.1' }, { path: 'keys.2' }] },
       });
     });
 

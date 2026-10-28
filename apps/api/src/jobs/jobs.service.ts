@@ -90,7 +90,9 @@ export class JobsService {
     if (!checked.ok) {
       throw new BadRequestException({
         message: 'Some questions can’t be shown in the list.',
-        errors: checked.errors,
+        // The shared check reports `<index>` (relative to the list); the body schema's errors from
+        // the validation pipe are `keys.<index>`, so prefix these to give one path shape per route.
+        errors: checked.errors.map((error) => ({ ...error, path: `keys.${error.path}` })),
       });
     }
 
