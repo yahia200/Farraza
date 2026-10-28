@@ -75,12 +75,12 @@ export class PipelineRepository {
     return this.prisma.db.orm.public.ApplicationEvent;
   }
 
-  private get ratings() {
-    return this.prisma.db.orm.public.Rating;
-  }
-
   private get notes() {
     return this.prisma.db.orm.public.Note;
+  }
+
+  private get ratings() {
+    return this.prisma.db.orm.public.Rating;
   }
 
   private get formVersions() {
@@ -121,6 +121,32 @@ export class PipelineRepository {
       formVersionId: row.formVersionId,
       answers: row.answers as Answers,
     }));
+  }
+
+  /**
+   * The Average rating of each of these Applications of one company, by Application id, in one
+   * grouped query (`GROUP BY application_id`). An Application with no Rating has no entry. `count`
+   * is the number of Ratings (a Rating whose author left still counts, as in `summariseRatings`),
+   * and `average` the plain mean of `overall`, never rounded.
+   */
+  async findRatingSummaries(
+    companyId: string,
+    applicationIds: readonly string[],
+  ): Promise<Map<string, { count: number; average: number }>> {
+    if (applicationIds.length === 0) return new Map();
+    const rows = await this.ratings
+      .where({ companyId })
+      .where((rating) => rating.applicationId.in(applicationIds))
+      .groupBy('applicationId')
+      .aggregate((aggregate) => ({
+        count: aggregate.count(),
+        average: aggregate.avg('overall'),
+      }));
+
+    // `avg` is nullable in the types because an empty group has none; a group here has a row.
+    return new Map(
+      rows.map((row) => [row.applicationId, { count: row.count, average: row.average ?? 0 }]),
+    );
   }
 
   /**

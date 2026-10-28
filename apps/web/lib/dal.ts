@@ -282,6 +282,16 @@ function toMyCompany({ id, name, slug, logoUrl, brandColor, role }: MyCompany): 
 
 // --- Applications (apps/api/src/pipeline) ------------------------------------
 
+/**
+ * A card's Average rating, mirroring CardRating in apps/api/src/pipeline/pipeline.ts: the plain mean
+ * of the overall Ratings (not rounded; the UI shows one decimal) and how many Members gave one.
+ * `{ average: null, count: 0 }` with none.
+ */
+export interface CardRating {
+  average: number | null;
+  count: number;
+}
+
 /** One application in a job's list, with the stage it's in. */
 export interface ApplicationSummary {
   id: string;
@@ -294,6 +304,7 @@ export interface ApplicationSummary {
    * display text from the API, or null for "—". Empty when the Job has none.
    */
   highlights: Record<string, string | null>;
+  rating: CardRating;
 }
 
 /** Mirrors HighlightedQuestion in apps/api/src/pipeline/pipeline.ts: in form order, with the latest text. */
@@ -356,13 +367,14 @@ export async function getPipelineBoard(companySlug: string, jobSlug: string): Pr
       name,
       position,
       kind,
-      applications: applications.map(({ id: applicationId, status, submittedAt, candidate, highlights }) => ({
+      applications: applications.map(({ id: applicationId, status, submittedAt, candidate, highlights, rating }) => ({
         id: applicationId,
         status,
         submittedAt,
         appliedLabel: formatDate(submittedAt),
         candidate: { name: candidate.name, email: candidate.email, phone: candidate.phone },
         highlights,
+        rating: { average: rating.average, count: rating.count },
       })),
     }))
     .sort((a, b) => a.position - b.position);

@@ -3,6 +3,12 @@ import type { StageKind } from '../jobs/job.js';
 
 export type ApplicationStatus = 'active' | 'rejected' | 'hired' | 'withdrawn';
 
+/**
+ * A card's Average rating: the same `count` and `average` as `summariseRatings` (the mean of the
+ * `overall` scores, not rounded, `null` with no Ratings), without the per-Criterion part.
+ */
+export type CardRating = Pick<RatingSummary, 'count' | 'average'>;
+
 export interface ApplicationCard {
   id: string;
   stageId: string;
@@ -15,10 +21,12 @@ export interface ApplicationCard {
    * no such Question. Empty when the Job has none.
    */
   highlights: Record<string, string | null>;
+  /** The Average rating and how many Members gave one; `{ average: null, count: 0 }` with none. */
+  rating: CardRating;
 }
 
-/** A card as `PipelineRepository` reads it, before the service adds the Highlighted answers. */
-export type CardRow = Omit<ApplicationCard, 'highlights'>;
+/** A card as `PipelineRepository` reads it, before the service adds the Highlighted answers and the rating. */
+export type CardRow = Omit<ApplicationCard, 'highlights' | 'rating'>;
 
 /** A card row plus what the service needs to resolve its Highlighted answers. Stays inside the API. */
 export interface CardRowWithAnswers extends CardRow {

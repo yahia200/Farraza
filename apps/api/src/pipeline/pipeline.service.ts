@@ -57,7 +57,8 @@ export class PipelineService {
   async board(membership: Membership, jobSlug: string) {
     const job = await this.jobs.get(membership, jobSlug);
     const highlightedQuestions = await this.highlightedQuestionsOf(job.id, job.highlightedQuestionKeys);
-    const cards = await this.cardsOf(membership.company.id, job.id, highlightedQuestions);
+    const rows = await this.cardsOf(membership.company.id, job.id, highlightedQuestions);
+    const cards = await this.withRatings(membership.company.id, rows);
 
     const columns: BoardColumn[] = job.stages.map((stage) => ({
       id: stage.id,
@@ -99,7 +100,7 @@ export class PipelineService {
     companyId: string,
     jobId: string,
     highlighted: HighlightedQuestion[],
-  ): Promise<ApplicationCard[]> {
+  ): Promise<Omit<ApplicationCard, 'rating'>[]> {
     if (highlighted.length === 0) {
       const rows = await this.pipeline.findCards(companyId, jobId);
       return rows.map((row) => ({ ...row, highlights: {} }));
@@ -126,6 +127,26 @@ export class PipelineService {
       }
       return { ...row, highlights };
     });
+  }
+
+  /**
+   * Adds each card's Average rating. One grouped query for the whole board, by the ids of the cards
+   * just read (a Rating has no job id); none at all when the Job has no Applications. A card whose
+   * Application has no Rating gets `{ average: null, count: 0 }`.
+   */
+  private async withRatings(
+    companyId: string,
+    cards: Omit<ApplicationCard, 'rating'>[],
+  ): Promise<ApplicationCard[]> {
+    if (cards.length === 0) return [];
+    const summaries = await this.pipeline.findRatingSummaries(
+      companyId,
+      cards.map((card) => card.id),
+    );
+    return cards.map((card) => ({
+      ...card,
+      rating: summaries.get(card.id) ?? { average: null, count: 0 },
+    }));
   }
 
   async detail(membership: Membership, jobSlug: string, applicationId: string): Promise<ApplicationDetail> {
