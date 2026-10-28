@@ -80,8 +80,20 @@ _Avoid_: Transition, drag
 A free-text comment a Member leaves on an Application. Append-only — notes are never edited or deleted.
 _Avoid_: Comment, remark
 
+**Rating**:
+A Member's overall judgement of an Application, from 1 to 5, shown with who gave it. The overall is always given by the Member, never worked out from Criteria. It can also carry a 1 to 5 score for each Criterion the Job uses. It belongs to the Application, not the Candidate, so the same person can be rated differently for different Jobs. A Member has at most one Rating per Application and can change it at any time, whatever the Application's status, but never remove it; every change is kept in the Application's history. A Rating stays when its Member leaves the company. Every Member who can view the Application sees all its Ratings.
+_Avoid_: Score, Review, Vote, Evaluation
+
+**Criterion**:
+One predefined dimension a Rating can score besides the overall, such as technical skills, problem solving, communication, culture fit, leadership or relevant experience. A manager picks up to five from a fixed catalog for each Job, so every Member rating that Job scores the same ones. A Job that picks none is rated on the overall alone. Scores already given for a Criterion the Job later drops stay on their Ratings.
+_Avoid_: Category, Skill, Dimension, Question (a Question is on the application form)
+
+**Average rating**:
+The mean of the overall Ratings on an Application, shown with how many Members gave one, on the candidate list and the board.
+_Avoid_: Score, Overall (the overall is one Member's Rating)
+
 **Application Event**:
-A record in an Application's append-only history: applied, auto-rejected, moved, hired, rejected, or note added. Together these form the audit trail of everything that has happened to an Application.
+A record in an Application's append-only history: applied, auto-rejected, moved, hired, rejected, note added, or rating given or changed. Together these form the audit trail of everything that has happened to an Application.
 _Avoid_: Log, activity, audit record
 
 **Auto-reject rule**:
