@@ -1,17 +1,40 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { AuthorizationService } from '@nestjs/authorization';
-import { formatHighlightText, highlightableQuestions, previewKindOf } from '@repo/shared';
+import {
+  checkRatingCriteria,
+  formatHighlightText,
+  highlightableQuestions,
+  previewKindOf,
+  type RatingCriteriaScores,
+} from '@repo/shared';
+import { isUniqueViolation } from '../common/db-errors.js';
 import type { Membership } from '../companies/company.js';
 import { JobsService } from '../jobs/jobs.service.js';
 import type { User } from '../users/user.js';
 import { ApplicationPolicy } from './application.policy.js';
 import type { CreateNoteDto } from './dto/create-note.dto.js';
 import type { MoveApplicationDto } from './dto/move-application.dto.js';
+import type { SaveRatingDto } from './dto/save-rating.dto.js';
 import { StorageService } from '../storage/storage.service.js';
 import { DOWNLOAD_URL_TTL_SECONDS } from '../storage/storage.js';
 import { FormsRepository } from '../forms/forms.repository.js';
-import type { ApplicationCard, BoardColumn, FileLink, HighlightedQuestion } from './pipeline.js';
+import type { ApplicationCard, BoardColumn, FileLink, HighlightedQuestion, SavedRating } from './pipeline.js';
 import { PipelineRepository } from './pipeline.repository.js';
+
+/**
+ * The Criteria scores to store after a save: start from the Member's existing scores, drop each
+ * Criterion the request sends as `null` (clear), set each number, and leave every other key alone.
+ * That last part is how a score for a Criterion the Job no longer uses survives a re-rate (the
+ * request can only address the Job's current Criteria). Nothing stored is ever `null`.
+ */
+function mergeCriteria(existing: Record<string, number>, requested: RatingCriteriaScores): Record<string, number> {
+  const merged = { ...existing };
+  for (const [key, score] of Object.entries(requested)) {
+    if (score === null || score === undefined) delete merged[key];
+    else merged[key] = score;
+  }
+  return merged;
+}
 
 @Injectable()
 export class PipelineService {
@@ -215,5 +238,56 @@ export class PipelineService {
       author: { id: user.id, name: user.name },
       body: dto.body,
     });
+  }
+
+  /**
+   * Gives or replaces the caller's own Rating on an Application (any status) and records a `rated`
+   * event. The user is the session's, never the body's.
+   */
+  async rate(
+    user: User,
+    membership: Membership,
+    jobSlug: string,
+    applicationId: string,
+    dto: SaveRatingDto,
+  ): Promise<SavedRating> {
+    await this.authorization.authorize(ApplicationPolicy, 'rate', user, membership);
+
+    const job = await this.jobs.get(membership, jobSlug);
+    const stageId = await this.pipeline.findStageOf(membership.company.id, job.id, applicationId);
+    if (!stageId) throw new NotFoundException();
+    const stage = job.stages.find((candidate) => candidate.id === stageId);
+    if (!stage) throw new NotFoundException();
+
+    const requested = dto.criteria ?? {};
+    const checked = checkRatingCriteria(requested, job.ratingCriteria);
+    if (!checked.ok) {
+      throw new BadRequestException({
+        message: 'Some criteria are not used for this job.',
+        // The shared check reports the Criterion key; the validation pipe's errors are paths into the
+        // body, so prefix these to give one path shape per route (as saveHighlightedQuestions does).
+        errors: checked.errors.map((error) => ({ ...error, path: `criteria.${error.path}` })),
+      });
+    }
+
+    try {
+      return await this.pipeline.saveRating({
+        companyId: membership.company.id,
+        applicationId,
+        userId: user.id,
+        stageName: stage.name,
+        resolve: (previous) => ({
+          overall: dto.overall,
+          criteria: mergeCriteria(previous?.criteria ?? {}, requested),
+        }),
+      });
+    } catch (error) {
+      // The save is an upsert (`ON CONFLICT`), so the (application, user) key cannot clash with
+      // itself; this guards any other unique constraint the table may gain, in the repo's usual way.
+      if (isUniqueViolation(error)) {
+        throw new ConflictException('Your rating was just saved from somewhere else. Try again.');
+      }
+      throw error;
+    }
   }
 }

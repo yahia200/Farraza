@@ -10,6 +10,8 @@ import type {
   ApplicationStatus,
   DownloadableFile,
   NoteView,
+  RatingValues,
+  SavedRating,
 } from './pipeline.js';
 import { EVENT_FOR_STAGE, STATUS_FOR_STAGE } from './pipeline.js';
 
@@ -31,6 +33,15 @@ function toApplicationFile(row: {
     sizeBytes: row.sizeBytes,
     durationSeconds: row.durationSeconds,
   };
+}
+
+/**
+ * `criteria` is CHECKed to be an object and written only from the service's merge of a parsed
+ * `saveRatingSchema` body (catalog keys to 1-5, never `null`), so the cast is as safe as the one for
+ * `highlightedQuestionKeys`.
+ */
+function toRatingValues(row: { overall: number; criteria: unknown }): RatingValues {
+  return { overall: row.overall, criteria: row.criteria as RatingValues['criteria'] };
 }
 
 function toCardRow(row: {
@@ -255,6 +266,54 @@ export class PipelineRepository {
       });
 
       return { status };
+    });
+  }
+
+  /**
+   * Gives or replaces one Member's Rating and appends the `rated` event, in one transaction.
+   * `resolve` gets the Member's current Rating as read inside the transaction (`null` on a first
+   * rating) and returns the values to store, so the service owns the rules (carrying over dropped
+   * Criteria) while the read and the write cannot be separated by another save. The event's `previous`
+   * is that same read. This is last-write-wins by design (spec, "Confirmed details" 2): no condition
+   * on `updated_at`, so two tabs of one Member saving at once can record a slightly wrong `previous`.
+   */
+  async saveRating(input: {
+    companyId: string;
+    applicationId: string;
+    userId: string;
+    stageName: string;
+    resolve: (previous: RatingValues | null) => RatingValues;
+  }): Promise<SavedRating> {
+    return this.prisma.db.transaction(async (tx) => {
+      const existing = await tx.orm.public.Rating
+        .where({ applicationId: input.applicationId, userId: input.userId })
+        .first();
+      const previous = existing ? toRatingValues(existing) : null;
+      const current = input.resolve(previous);
+
+      // `update` is non-empty, so the ORM also sets `updated_at` on the update branch
+      // (`applyUpdateDefaults` in orm-client.mjs only runs when `update` has values).
+      const saved = await tx.orm.public.Rating.upsert({
+        create: {
+          companyId: input.companyId,
+          applicationId: input.applicationId,
+          userId: input.userId,
+          overall: current.overall,
+          criteria: current.criteria,
+        },
+        update: { overall: current.overall, criteria: current.criteria },
+        conflictOn: { applicationId: input.applicationId, userId: input.userId },
+      });
+
+      await tx.orm.public.ApplicationEvent.create({
+        companyId: input.companyId,
+        applicationId: input.applicationId,
+        type: 'rated',
+        actorId: input.userId,
+        data: { previous, current, stage: input.stageName },
+      });
+
+      return { ...toRatingValues(saved), updatedAt: saved.updatedAt };
     });
   }
 

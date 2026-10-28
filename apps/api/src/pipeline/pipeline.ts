@@ -74,6 +74,16 @@ export interface ApplicationDetail {
   notes: NoteView[];
 }
 
+/**
+ * A Rating's scores as stored: the overall and a score per Criterion key, never `null` (a cleared score
+ * is removed). A `type`, not an `interface`, so it is assignable to the JSON value the `rated` event
+ * and the `criteria` column take (an interface has no implicit index signature).
+ */
+export type RatingValues = { overall: number; criteria: Record<string, number> };
+
+/** A Rating as the API answers after a save: the Member's own scores and when they were saved. */
+export type SavedRating = RatingValues & { updatedAt: Date };
+
 /** A file an applicant sent with an Application, as recruiters see it: no storage key. */
 export interface ApplicationFile {
   id: string;
