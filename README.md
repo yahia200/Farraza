@@ -1,159 +1,51 @@
-# Turborepo starter
+# Farraza
 
-This Turborepo starter is maintained by the Turborepo core team.
+A multi-tenant hiring pipeline (a small ATS). Companies create jobs, build an application form for each job, publish a public apply page, and move applicants through a stage pipeline.
 
-## Using this example
+## Stack
 
-Run the following command:
+- **`apps/api`**: NestJS REST API with Prisma on PostgreSQL
+- **`apps/web`**: Next.js (App Router), Tailwind, shadcn
+- **`packages/shared`**: Zod schemas and shared logic for form fields and answers
+- **`packages/typescript-config`, `packages/eslint-config`**: shared configs
 
-```sh
-npx create-turbo@latest
-```
+A pnpm + Turborepo monorepo.
 
-## What's inside?
+## Getting started
 
-This Turborepo includes the following packages/apps:
-
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `@next/eslint-plugin-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+Requires Node 26+, pnpm 12 and Docker.
 
 ```sh
-cd my-turborepo
-turbo build
+pnpm install
+docker compose up -d   # Postgres on :5432, S3-compatible storage on :9000
 ```
 
-Without global `turbo`, use your package manager:
+Create the env files (the API refuses to boot and lists anything missing):
+
+- `apps/api/.env`: `PORT`, `DATABASE_URL`, `APP_URL`, `INTERNAL_API_SECRET`, `S3_BUCKET`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+- `apps/web/.env.local`: `API_URL`, `INTERNAL_API_SECRET` (same value as the API's)
+
+Then apply the schema and start everything:
 
 ```sh
-cd my-turborepo
-npx turbo build
-pnpm exec turbo build
-pnpm exec turbo build
+pnpm --filter api exec prisma db update
+pnpm dev               # web on :3000, API on :3001
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+## Commands
 
 ```sh
-turbo build --filter=docs
+pnpm dev | build | lint | check-types
+pnpm format
+pnpm --filter api test
+pnpm --filter @repo/shared test
 ```
 
-Without global `turbo`:
+After editing `apps/api/src/prisma/contract.prisma`, run `pnpm --filter api exec prisma contract emit`.
 
-```sh
-npx turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
+## More
 
-### Develop
-
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+- [`CLAUDE.md`](CLAUDE.md): architecture notes, conventions, doc references
+- [`docs/db-schema.md`](docs/db-schema.md): the database schema
+- [`docs/adr/`](docs/adr): architecture decisions
+- [`GLOSSARY.md`](GLOSSARY.md): domain terms
