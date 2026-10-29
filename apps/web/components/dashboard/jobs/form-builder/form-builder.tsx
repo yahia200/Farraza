@@ -187,7 +187,9 @@ export function FormBuilder({
       const result = await publishForm(
         companySlug,
         jobSlug,
-        isDirty ? content : null,
+        // With no draft on the server there is nothing to publish yet, so send the
+        // form as it stands (a new job's defaults) for the action to save first.
+        isDirty || !status.hasDraft ? content : null,
       );
       setConfirmPublish(false);
       if (result.ok) {
@@ -204,7 +206,9 @@ export function FormBuilder({
     });
   }
 
-  const canPublish = isDirty || status.hasDraft;
+  // A job that was never published can publish its default form as is (no edit needed).
+  const canPublish =
+    isDirty || status.hasDraft || status.publishedVersion === null;
   const editable = canEdit && !offerRestore;
 
   function add(type: BuilderFieldType) {
