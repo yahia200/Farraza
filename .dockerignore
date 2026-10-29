@@ -1,0 +1,22 @@
+# Keeps secrets, build output and unrelated apps out of the build context.
+# Docs: https://docs.docker.com/build/concepts/context/#dockerignore-files
+
+**/node_modules
+**/dist
+# A stale incremental-build cache can make tsc skip emitting files.
+**/*.tsbuildinfo
+**/.turbo
+**/.next
+
+# Secrets. Production values go through Cloud Run env vars and Secret Manager.
+**/.env
+**/.env.*
+
+.git
+.claude
+.trail
+.scratch
+.turbo-clone-temp
+docs
+docker
+apps/web
