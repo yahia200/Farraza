@@ -40,6 +40,10 @@ Layers 2 to 4 all need the CV as text. Today a CV is a PDF or DOCX file and noth
 - **No text layer** (a scanned PDF): record "unreadable" and show that to the reviewer. A requirement must never read as "missing" because the extraction failed.
 - **Empty or very short result**: treat the same way.
 
+### Language
+
+CVs are English only (the owner confirmed there are no Arabic CVs). No layer handles right-to-left text, Arabic or mixed-language documents: keywords are given in English, and Layer 3 can use an English-only embedding model. If that changes, Layer 2's terms and Layer 3's model choice are the two places to revisit.
+
 ### Never on protected attributes
 
 A free-text Requirement or a rule on a date could be used to filter on age, gender, nationality, religion and similar. The editor should say so in helper text, and Layer 1 should not offer a date-of-birth rule. Whether to add a blocklist or a warning, and the legal review, are open decisions.
@@ -110,7 +114,6 @@ For each Requirement, check whether the CV text and the relevant text answers co
 
 - Synonyms and misspellings it was not told about.
 - Negation and context: "no experience with Postgres" matches "Postgres".
-- A CV in another language than the terms. The phone default is `EG`, so Arabic and mixed-language CVs are likely; terms need to be given in each language that matters.
 - Failed extraction, covered above.
 
 For must-haves this is more reliable than an embedding, which is why it sits below Layer 1 and above Layer 3.
@@ -146,8 +149,7 @@ At about 1,500 tokens per CV, that is roughly $0.00003 to $0.00009 per candidate
 A local model removes the per-call cost and keeps CVs in-house. The cost moves to the host.
 
 - **How.** Run an open embedding model inside the API process with ONNX Runtime or `@huggingface/transformers` (transformers.js), or as a small separate inference service. I have not checked either library's current API; read the installed docs before using one.
-- **Candidate models.** Small sentence-embedding models such as `all-MiniLM-L6-v2`, `bge-small-en-v1.5` and `multilingual-e5-small`. These names and their sizes are from memory: confirm dimensions, input-length limit and licence on each model card. Small models often cap input at a few hundred tokens, so chunking is needed.
-- **Language.** Because Arabic CVs are likely, pick a multilingual model and test it on real Arabic and mixed CVs. English-only models may rank them poorly.
+- **Candidate models.** Small English sentence-embedding models such as `all-MiniLM-L6-v2` and `bge-small-en-v1.5`. These names and their sizes are from memory: confirm dimensions, input-length limit and licence on each model card. Small models often cap input at a few hundred tokens, so chunking is needed. Because CVs are English only (see "Language" above), an English-only model is enough and a multilingual one is not needed.
 - **Costs to weigh.** Model files add image size and memory; a cold start has to load the model; CPU inference is slower than an API call; the API runs on Cloud Run with a single instance (`.claude/rules/api.md`), so inference would compete with request handling unless it is a background job or a separate service; quality is usually below the larger hosted models.
 - **When it pays off.** The hosted price is already a few cents per thousand candidates, so a local model saves little money. The reasons to choose it are data residency and avoiding a second provider.
 
