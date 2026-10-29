@@ -5,6 +5,8 @@ import { CredentialsService } from './credentials.service.js';
 import { SessionAuth } from './session-auth.provider.js';
 import { PrismaSessionStore } from './prisma-session.store.js';
 import { PrismaEmailTokenStore } from './prisma-email-token.store.js';
+import { PrismaRefreshTokenStore } from './prisma-refresh-token.store.js';
+import { PrismaMfaStore } from './prisma-mfa.store.js';
 import { EmailVerificationController } from './email-verification.controller.js';
 import { EmailVerificationMailer } from './email-verification.mailer.js';
 import { VerificationService } from './verification.service.js';
@@ -28,6 +30,8 @@ import { PasswordRecoveryService } from './password-recovery.service.js';
     CredentialsService,
     PrismaSessionStore,
     PrismaEmailTokenStore,
+    PrismaRefreshTokenStore,
+    PrismaMfaStore,
     EmailVerificationMailer,
     VerificationService,
     AccountLinker,

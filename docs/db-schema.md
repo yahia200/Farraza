@@ -9,7 +9,7 @@ Sections 1–7 describe what is built. Section 8 lists designed tables and const
 ## 1. Conventions
 
 - **Naming:** tables and columns are snake_case in Postgres. In `contract.prisma`, models are PascalCase and fields camelCase, mapped with `@@map` / `@map`. Each table below gives its model name, and each column gives its contract field name.
-- **Primary keys:** `id uuid DEFAULT gen_random_uuid()` on every table except `sessions`, `email_tokens` and `oidc_states`, whose text keys come from the auth library. `gen_random_uuid()` is built into PostgreSQL 13+, so no extension is needed.
+- **Primary keys:** `id uuid DEFAULT gen_random_uuid()` on every table except `sessions`, `email_tokens`, `oidc_states`, `refresh_tokens`, `revoked_refresh_families`, `mfa_totp` and `mfa_recovery_codes`, whose keys come from the auth library or are the user's id. `gen_random_uuid()` is built into PostgreSQL 13+, so no extension is needed.
 - **Timestamps:** `timestamptz` (`TimestamptzJsDate` in the contract). `created_at` defaults to `now()`. `updated_at` is `NOT NULL` with **no database default**: the contract declares it as `temporal.updatedAtJsDate()`, and the Prisma ORM sets it on every create and update. Any write that bypasses the ORM must set it too.
 - **Enums are text plus a CHECK.** Contract `enum`s become `text` columns with a `CHECK (col IN (...))` constraint, not Postgres enum types. The contract uses PascalCase member names (for example `Draft = "draft"`), but only the lowercase string values are stored.
 - **Emails:** plain `text`, not `citext`. The application normalizes them before writing (trim, Unicode NFC, lowercase), and `CHECK (email = lower(email))` backs this up, which makes uniqueness case-insensitive.
@@ -353,6 +353,66 @@ A Member's own Rating of an Application (`GLOSSARY.md`, "Rating"): one overall s
 - A save (`PUT .../applications/:applicationId/rating`) upserts this row and writes a `rated` event in the same transaction (`PipelineRepository.saveRating`). Ratings cannot be removed through the API.
 - The Application detail (`GET .../applications/:applicationId`, `PipelineRepository.findDetail`) reads every Rating of the Application in one query joined to the author's name (`include('user')`, filtered by `company_id` and `application_id`, oldest `created_at` first, after the Application itself was found for the company and Job). A NULL `user_id` gives the name "Former member" in the service; the Rating still counts in the summary. `user_id` becomes NULL only when the **user row** is deleted (SET NULL); a Member who is merely removed from the company (`memberships` row deleted) keeps their `user_id` and so their real name on the Rating (checked in the browser pass). The payload (`ratings`, `ratingSummary`) is described in `.claude/rules/api.md` (Pipeline, "Detail payload"). No public route reads this table.
 
+### 3.17 `refresh_tokens` (model `RefreshToken`)
+Refresh tokens of the auth library's `RefreshTokenStore`, persisted by `PrismaRefreshTokenStore`. Each rotation of a token stays in the **family** of the original sign-in. Nothing issues refresh tokens yet (the `accessToken` option is not configured); the table exists because the library's production guard requires a store for them.
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `text` | PK (SHA-256 of the token; the token itself is never stored) |
+| `family_id` | `familyId` | `text` | NOT NULL |
+| `user_id` | `userId` | `uuid` | NOT NULL, FK → `users.id` ON DELETE CASCADE |
+| `created_at` | `createdAt` | `timestamptz` | NOT NULL (no default: set by the auth library) |
+| `expires_at` | `expiresAt` | `timestamptz` | NOT NULL |
+| `family_expires_at` | `familyExpiresAt` | `timestamptz` | NOT NULL (the family cannot be extended past this, however often it rotates) |
+| `used_at` | `usedAt` | `timestamptz` | NULL (set once, by the conditional update that detects reuse) |
+| `claims` | `claims` | `jsonb` | NULL (claims fixed at sign-in, such as `amr`, carried by every token of the family) |
+
+- INDEX (`family_id`), INDEX (`user_id`), INDEX (`family_expires_at`) for pruning on save.
+- Saving a token deletes the tokens whose `family_expires_at` has passed. There is no row cap: refresh tokens are only minted for authenticated sign-ins.
+
+### 3.18 `revoked_refresh_families` (model `RevokedRefreshFamily`)
+Families whose tokens must all be refused. A separate table, not a column on `refresh_tokens`, because a revocation has to cover tokens saved **after** it (a refresh that lost the race to a reuse may still save its successor).
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `family_id` | `familyId` | `text` | PK, **no FK** |
+| `expires_at` | `expiresAt` | `timestamptz` | NOT NULL (the family's `family_expires_at`; when the family has no stored token, `now() + 365 days` by the database clock, the only place the store uses it) |
+
+- INDEX (`expires_at`) for pruning on save.
+
+### 3.19 `mfa_totp` (model `MfaTotp`)
+A user's authenticator app, persisted by `PrismaMfaStore` (the library's `MfaStore`). Nothing enrolls authenticators yet (the `mfa` option is not configured).
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `user_id` | `userId` | `uuid` | PK, FK → `users.id` ON DELETE CASCADE |
+| `secret` | `secret` | `text` | NOT NULL (sealed by the library with the encryption key before it reaches the store) |
+| `confirmed` | `confirmed` | `boolean` | NOT NULL (false until the user proved the authenticator works) |
+| `pending_secret` | `pendingSecret` | `text` | NULL (a replacement staged by `enroll({ replace: true })`; `secret` stays active until it is confirmed) |
+| `last_used_step` | `lastUsedStep` | `int4` | NULL (last accepted TOTP time step, for replay protection; a step is about 58.7 million, well inside int4) |
+
+### 3.20 `mfa_recovery_codes` (model `MfaRecoveryCode`)
+Hashes of a user's recovery codes. A code is spent by deleting its row.
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `user_id` | `userId` | `uuid` | FK → `users.id` ON DELETE CASCADE |
+| `hash` | `hash` | `text` | |
+
+- PK (`user_id`, `hash`); INDEX (`user_id`) (Prisma adds one for every FK; it duplicates the PK's leading column, as `ratings.application_id` does).
+
+### 3.21 `mfa_failures` (model `MfaFailure`)
+Failed second-factor attempts, counted inside the lockout window.
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK, DEFAULT `gen_random_uuid()` |
+| `user_id` | `userId` | `uuid` | NOT NULL, FK → `users.id` ON DELETE CASCADE |
+| `at` | `at` | `timestamptz` | NOT NULL (the attempt's time from the library's clock) |
+
+- INDEX (`user_id`, `at`) for counting a user's recent failures; INDEX (`at`) for the global prune; INDEX (`user_id`) (Prisma adds one for every FK).
+- Recording a failure deletes every user's failures older than the window, so the table stays bounded even for users who never return.
+
 ## 4. JSONB shapes
 
 The database does not validate these. The application does, using the Zod schemas and parsers in `packages/shared` (`@repo/shared`).
@@ -484,7 +544,7 @@ An object from a Criterion key (the catalog `RATING_CRITERIA` in `packages/share
 These are the relations declared in `contract.prisma`. Columns marked "no FK" above are not relations.
 
 - A `company` has many `memberships`, `jobs`, `stages`, `form_versions`, `candidates`, `applications`, and `files`.
-- A `user` has many `memberships`, `sessions`, `identities` and `email_tokens`, and is referenced by `jobs.created_by`, `notes.author_id`, `ratings.user_id` and `oidc_states.link_user_id`.
+- A `user` has many `memberships`, `sessions`, `identities`, `email_tokens`, `refresh_tokens`, one `mfa_totp`, and many `mfa_recovery_codes` and `mfa_failures`, and is referenced by `jobs.created_by`, `notes.author_id`, `ratings.user_id` and `oidc_states.link_user_id`.
 - A `job` has many `form_versions`, `stages`, `applications`, and `files`.
 - A `candidate` has many `applications`.
 - An `application` belongs to one `job`, one `candidate`, one `form_version`, and one `stage`, and has many `application_events`, `notes`, `ratings`, and `files`.
@@ -522,6 +582,7 @@ The database cannot check these, so the services must:
 - Each job has exactly one `hired` and one `rejected` stage (currently guaranteed by `DEFAULT_STAGES`).
 - Emails are normalized (trim, NFC, lowercase) before they are written to `users` or `candidates`.
 - `email_tokens` and `oidc_states` rows are consumed with one atomic `DELETE … RETURNING`, so a link or a callback works exactly once. Saving a row first deletes expired rows and enforces a cap, so anyone asking for links or starting logins can't grow the tables without bound (the store contracts in `@nestjs/authentication`'s `email-token-store.interface.d.ts` and `oidc-state-store.interface.d.ts`).
+- The refresh-token and MFA stores (`@nestjs/authentication`'s `refresh-token-store.interface.d.ts` and `mfa-store.interface.d.ts`) rely on single atomic writes, never a read followed by a write: `markRefreshTokenUsed` is `UPDATE … WHERE used_at IS NULL` (one winner per token, the rest are a reuse), `claimTotpStep` is an update that only raises `last_used_step`, `consumeRecoveryCode` is one `DELETE`, and `saveTotp` is an upsert whose `last_used_step` is `GREATEST(stored, new)` so it is never lowered. `recordMfaFailure` is deliberately three separate statements without a transaction (insert, prune, count) so that every recorded attempt is visible to the next caller at once. A revocation row can exist before or after the family's tokens, which is why `revoked_refresh_families` has no FK.
 - A Google sign-in is matched to a user through `identities` (`provider`, `subject`) only. Linking a new identity to an existing user by email is allowed only when both Google and `users.email_verified` say the address is verified.
 
 ## 8. Not built yet

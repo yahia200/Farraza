@@ -406,3 +406,78 @@ model OidcState {
   @@check(expression: "(link_user_id IS NULL) = (link_session_id IS NULL)", name: "oidc_states_link_complete")
   @@map("oidc_states")
 }
+
+/// A refresh token of @nestjs/authentication's RefreshTokenStore. Each rotation
+/// stays in the family of the original sign-in; a spent token coming back
+/// revokes the family.
+model RefreshToken {
+  /// SHA-256 of the token.
+  id              String             @id
+  familyId        String             @map("family_id")
+  userId          Uuid               @map("user_id")
+  createdAt       TimestamptzJsDate  @map("created_at")
+  expiresAt       TimestamptzJsDate  @map("expires_at")
+  /// The family cannot be extended past this, however often it rotates.
+  familyExpiresAt TimestamptzJsDate  @map("family_expires_at")
+  usedAt          TimestamptzJsDate? @map("used_at")
+  /// Claims fixed at sign-in (amr, auth_time, ...) that every token of the family carries.
+  claims          Jsonb?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+  @@index([userId])
+  @@index([familyExpiresAt])
+  @@map("refresh_tokens")
+}
+
+/// Revoked refresh-token families. A row outlives the tokens of its family on
+/// purpose: a refresh that lost a race may still save its successor afterwards,
+/// and that token must be refused. No FK for the same reason.
+model RevokedRefreshFamily {
+  familyId  String            @id @map("family_id")
+  expiresAt TimestamptzJsDate @map("expires_at")
+
+  @@index([expiresAt])
+  @@map("revoked_refresh_families")
+}
+
+/// A User's authenticator app (TOTP), the package's MfaStore. The secret is
+/// sealed by the package before it reaches this table.
+model MfaTotp {
+  userId        Uuid    @id @map("user_id")
+  secret        String
+  confirmed     Boolean
+  /// A replacement secret staged by enroll({ replace: true }); `secret` stays active until it is confirmed.
+  pendingSecret String? @map("pending_secret")
+  /// Last accepted time step, for replay protection. Only ever raised.
+  lastUsedStep  Int?    @map("last_used_step")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("mfa_totp")
+}
+
+/// Hashes of a User's recovery codes; a code is spent by deleting its row.
+model MfaRecoveryCode {
+  userId Uuid   @map("user_id")
+  hash   String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, hash])
+  @@map("mfa_recovery_codes")
+}
+
+/// Failed second-factor attempts, counted inside the lockout window.
+model MfaFailure {
+  id     Uuid              @id @default(sql`gen_random_uuid()`)
+  userId Uuid              @map("user_id")
+  at     TimestamptzJsDate
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, at])
+  @@index([at])
+  @@map("mfa_failures")
+}
