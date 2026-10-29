@@ -11,7 +11,6 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
   // The web app's origin (APP_URL in .env), the only one allowed to call with cookies.
   app.enableCors({ origin: config.getOrThrow<string>('APP_URL'), credentials: true });
-  app.enableCors({ origin: "http://192.168.1.100:3000", credentials: true });
   // Refuses state-changing requests a browser reports as cross-origin (Fetch
   // Metadata, then Origin vs Host), unless the Origin is trusted. Server Actions
   // call the API server-to-server with neither header, so they pass; GETs (the
