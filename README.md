@@ -11,6 +11,24 @@ A multi-tenant hiring pipeline (a small ATS). Companies create jobs, build an ap
 
 A pnpm + Turborepo monorepo.
 
+## Screenshots
+
+**Build a versioned application form per job**, with optional auto-reject rules on choice questions.
+
+<img src="apps/web/public/landing/form-builder-auto-reject.webp" alt="The form builder, with a CV setting and an expanded multiple-choice question with auto-reject options" width="720">
+
+**Applicants answer one question at a time** on a public apply page, on any screen size.
+
+<img src="apps/web/public/landing/apply-on-phone.webp" alt="The public apply page showing a single-choice question" width="480">
+
+**Track candidates through the pipeline** in a sortable table (or a board).
+
+<img src="apps/web/public/landing/pipeline-table.webp" alt="The candidates table with stage, status and applied date columns" width="720">
+
+**Review each application**: contact details, CV preview and download, and answers.
+
+<img src="apps/web/public/landing/candidate-sheet.webp" alt="The candidate sheet with contact details, CV and answers" width="720">
+
 ## Getting started
 
 Requires Node 26+, pnpm 12 and Docker.
