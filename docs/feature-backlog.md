@@ -24,6 +24,22 @@ Check that the CV and text answers mention each Requirement's terms. Shows match
 - Terms are manager-supplied keywords and synonyms (recommended) or auto-extracted.
 - Matching in app code, or Postgres full-text search (not yet verified against the Prisma 8 contract).
 
+### Repeating group full support
+
+Adding the repeating group full support.
+
+v1 shipped deliberately narrow (`.scratch/repeating-groups/spec.md`, "Out of Scope", and ADR-0004, "v1 limits"). "Full support" means widening these, none of which should break stored data. Pick from this list when this is scheduled:
+
+- **Auto-reject rules and matching:** `findKnockout` ignores groups and the schema refuses a rule on a sub-question. Rules over entries (entry count, total duration, any-entry match) are specified in Layer 1 of candidate matching, so build them together.
+- **Sub-question types:** only `short_text`, `long_text`, `single_select`, `multi_select` and `yes_no` are allowed. Check whether `number`, `date` and `url` can now go inside a group (the v1 presets use free text for dates and years), and whether `file` or nested groups are worth allowing.
+- **Builder:** recruiters can only insert presets and edit labels, help text, `required` and `maxEntries`. Missing: a blank group, adding, removing and reordering sub-questions, editing option lists, and saving their own presets.
+- **Minimum entries:** `required` means at least one entry and there is no minimum setting.
+- **Single-question presets** (for example notice period): the preset key design allows them, none ship.
+- **Conditional logic** on sub-questions and groups.
+- **Candidate list:** no columns, filters or search over group answers.
+- **CV autofill:** preset keys are recorded so autofill can recognise a school or job title, but nothing uses them yet. Needs CV parsing from Layer 2.
+- **Apply page:** a group is one step with entry cards, and the letter-shortcut choices only work on top-level steps.
+
 ## Medium priority
 
 ### Candidate matching, Layer 3: embeddings
@@ -41,22 +57,6 @@ Per-Requirement verdict with an evidence quote and a reason. The only layer that
 - Never on every application. Triggers: top N after Layer 3, a chosen stage, or on demand for one candidate.
 - Guardrails: manual by default, cost estimate before a bulk run, monthly caps, results marked stale on Requirement edits, never auto-reject.
 - Build only if reviewers need explanations.
-
-### Repeating group full support
-
-Adding the repeating group full support.
-
-v1 shipped deliberately narrow (`.scratch/repeating-groups/spec.md`, "Out of Scope", and ADR-0004, "v1 limits"). "Full support" means widening these, none of which should break stored data. Pick from this list when this is scheduled:
-
-- **Auto-reject rules and matching:** `findKnockout` ignores groups and the schema refuses a rule on a sub-question. Rules over entries (entry count, total duration, any-entry match) are specified in Layer 1 of candidate matching, so build them together.
-- **Sub-question types:** only `short_text`, `long_text`, `single_select`, `multi_select` and `yes_no` are allowed. Check whether `number`, `date` and `url` can now go inside a group (the v1 presets use free text for dates and years), and whether `file` or nested groups are worth allowing.
-- **Builder:** recruiters can only insert presets and edit labels, help text, `required` and `maxEntries`. Missing: a blank group, adding, removing and reordering sub-questions, editing option lists, and saving their own presets.
-- **Minimum entries:** `required` means at least one entry and there is no minimum setting.
-- **Single-question presets** (for example notice period): the preset key design allows them, none ship.
-- **Conditional logic** on sub-questions and groups.
-- **Candidate list:** no columns, filters or search over group answers.
-- **CV autofill:** preset keys are recorded so autofill can recognise a school or job title, but nothing uses them yet. Needs CV parsing from Layer 2.
-- **Apply page:** a group is one step with entry cards, and the letter-shortcut choices only work on top-level steps.
 
 ## Low priority
 
