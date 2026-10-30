@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { ChevronsUpDownIcon, LogOutIcon, SettingsIcon } from 'lucide-react';
 import { signOut } from '@/app/actions/auth';
 import type { CurrentUser } from '@/lib/dal';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
-import { initials } from './initials';
+import { UserAvatar } from './user-avatar';
 
 /** Adapted from shadcn block sidebar-07 (nav-user): just the account and sign out for now. */
 export function NavUser({ user }: { user: CurrentUser }) {
@@ -26,9 +25,7 @@ export function NavUser({ user }: { user: CurrentUser }) {
 
   const identity = (
     <>
-      <Avatar>
-        <AvatarFallback>{initials(user.name)}</AvatarFallback>
-      </Avatar>
+      <UserAvatar seed={user.id} />
       <div className="grid flex-1 text-left text-sm leading-tight">
         <span className="truncate font-medium">{user.name}</span>
         <span className="truncate text-xs">{user.email}</span>

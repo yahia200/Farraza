@@ -3,9 +3,8 @@
 import { createColumnHelper } from '@tanstack/react-table';
 import { compareRoles } from '@repo/shared';
 import { DataTableSortButton } from '@/components/data-table/data-table';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { initials } from '../initials';
+import { UserAvatar } from '../user-avatar';
 import type { MemberRow, MembersTableFeatures } from './data-table-features';
 import { MemberActions } from './member-actions';
 import { ROLE_LABELS } from './role-labels';
@@ -22,9 +21,7 @@ export const memberColumns = columnHelper.columns([
       const isYou = member.userId === table.options.meta?.currentUserId;
       return (
         <div className="flex items-center gap-3">
-          <Avatar className="size-8">
-            <AvatarFallback className="text-xs">{initials(member.name)}</AvatarFallback>
-          </Avatar>
+          <UserAvatar seed={member.userId} className="size-8" />
           <div className="grid leading-tight">
             <span className="font-medium">
               {member.name}
