@@ -168,6 +168,7 @@ enum ApplicationEventType {
   Withdrawn    = "withdrawn"
   NoteAdded    = "note_added"
   Rated        = "rated"
+  Flagged      = "flagged"
 }
 
 model Candidate {
@@ -201,6 +202,8 @@ model Application {
   status              ApplicationStatus          @default(Active)
   answers             Jsonb                      @default(json`{}`)
   source              String?
+  /// The flag-outcome Screening rules that fired at submit: [{ ruleId, questionKey, questionLabel, reason }]. Stored text, so later rule edits never rewrite it. No FK.
+  flags               Jsonb                      @default(json`[]`)
   rejectionNotifiedAt TimestamptzJsDate?         @map("rejection_notified_at")
   submittedAt         TimestamptzJsDate          @default(now()) @map("submitted_at")
   updatedAt           temporal.updatedAtJsDate() @map("updated_at")
@@ -217,6 +220,7 @@ model Application {
   @@unique([jobId, phone])
   @@check(expression: "email = lower(email)", name: "applications_email_lowercase")
   @@check(expression: "phone ~ '^[+][1-9][0-9]{6,14}$'", name: "applications_phone_format")
+  @@check(expression: "jsonb_typeof(flags) = 'array'", name: "applications_flags_array")
   @@index([jobId, stageId])
   @@index([candidateId])
   @@map("applications")
