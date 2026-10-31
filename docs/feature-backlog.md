@@ -6,17 +6,17 @@ Priority levels: **High** (next up), **Medium** (soon), **Low** (nice to have, n
 
 ## High priority
 
-Candidate matching: design notes in [`.scratch/candidate-matching/layers.md`](../.scratch/candidate-matching/layers.md) (draft, not yet a spec). Four layers, cheapest first. Everything except Layer 1's auto-reject is advisory.
+Candidate matching: design notes in [`.scratch/candidate-matching/layers.md`](../.scratch/candidate-matching/layers.md) (draft, not yet a spec). Four layers, cheapest first. Everything except Layer 1's reject outcome is advisory.
 
-### Candidate matching, Layer 1: expand the auto-reject rules
+### Candidate matching, Layer 1: Screening rules (first slice shipped)
 
-Today rules exist only for `yes_no` and `single_select`, and the only outcome is reject. Decided in the grilling session of 2026-10-31 (the glossary calls them **Screening rules**):
+The first slice is built (`.scratch/screening-rules/spec.md`, ADR-0005, `docs/db-schema.md` §3.5): Screening rules live on the Job, with reject and flag outcomes, for every question type except `file`, `url` and `repeating_group`. Decided in the grilling session of 2026-10-31 (the glossary calls them **Screening rules**); what the first slice delivered, and what is left:
 
-- **Storage:** a Job-level `jobs.screening_rules` list keyed by question key, replaced whole by one `PUT` like Rating Criteria. `rejectWhen` and `rejectOptionIds` leave the field `config`. No data migration: only test jobs exist, so they are cleared.
-- **Outcomes in this slice:** reject (today) and flag (marker plus a generated reason, application stays put; shown on the board card, table row and candidate sheet, with a new `flagged` event). Reject wins over flag, every rule that fired is recorded, and rules are evaluated once at submit.
-- **Types in this slice:** `single_select` (also an accept-list), `multi_select` (any-of, none-of-required, all-of), `number` (min, max, range), `date` (fixed or relative to the submission date), `short_text` and `long_text` (words: any-of, all-of, none-of, whole-word and case-insensitive), `yes_no` (as today). A blank answer never fires a rule. No guard on protected attributes: a manager may screen on any question.
-- **Editor:** a new **Settings** tab on the Job (`/settings`) hosting Screening rules and Rating Criteria (moved there). Publishing a form version that drops a question a rule points to is blocked until the rule is removed.
-- **Later slices:** move to a chosen non-final stage as an outcome, `repeating_group` rules (entry count, total duration, any-entry match), `url` rules.
+- **Storage:** a Job-level `jobs.screening_rules` list keyed by question key, replaced whole by one `PUT` like Rating Criteria. `rejectWhen` and `rejectOptionIds` left the field `config` (old stored versions are tolerated and stripped).
+- **Outcomes (built):** reject and flag (marker plus a generated reason, application stays put; shown on the board card, table row and candidate sheet, with a new `flagged` event). Reject wins over flag, every rule that fired is recorded, and rules are evaluated once at submit.
+- **Types (built):** `single_select` (also an accept-list), `multi_select` (any-of, none-of-required, all-of), `number` (min, max, range), `date` (fixed or relative to the submission date), `short_text` and `long_text` (words: any-of, all-of, none-of, whole-word and case-insensitive), `yes_no` (as today). A blank answer never fires a rule. No guard on protected attributes: a manager may screen on any question.
+- **Editor (built):** the **Settings** tab on the Job (`/settings`) hosts Screening rules and Rating criteria. Publishing a form version that drops a question a rule points to is blocked until the rule is removed.
+- **Still to do (later slices):** move to a chosen non-final stage as an outcome, `repeating_group` rules (entry count, total duration, any-entry match), `url` rules, regex matching.
 
 ### Candidate matching, Layer 2: keyword match
 
@@ -32,7 +32,7 @@ Adding the repeating group full support.
 
 v1 shipped deliberately narrow (`.scratch/repeating-groups/spec.md`, "Out of Scope", and ADR-0004, "v1 limits"). "Full support" means widening these, none of which should break stored data. Pick from this list when this is scheduled:
 
-- **Auto-reject rules and matching:** `findKnockout` ignores groups and the schema refuses a rule on a sub-question. Rules over entries (entry count, total duration, any-entry match) are specified in Layer 1 of candidate matching, so build them together.
+- **Screening rules and matching:** Screening rules ignore groups and the schema refuses a rule on a sub-question. Rules over entries (entry count, total duration, any-entry match) are specified in Layer 1 of candidate matching, so build them together.
 - **Sub-question types:** only `short_text`, `long_text`, `single_select`, `multi_select` and `yes_no` are allowed. Check whether `number`, `date` and `url` can now go inside a group (the v1 presets use free text for dates and years), and whether `file` or nested groups are worth allowing.
 - **Builder:** recruiters can only insert presets and edit labels, help text, `required` and `maxEntries`. Missing: a blank group, adding, removing and reordering sub-questions, editing option lists, and saving their own presets.
 - **Minimum entries:** `required` means at least one entry and there is no minimum setting.

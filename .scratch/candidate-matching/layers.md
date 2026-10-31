@@ -1,14 +1,14 @@
-Status: draft (design notes, not yet a spec)
+Status: draft (design notes, not yet a spec). Layer 1's first slice has shipped as Screening rules (`.scratch/screening-rules/spec.md`, ADR-0005): reject and flag outcomes on a Job, for every type except `file`, `url` and `repeating_group`. Move-to-stage, `repeating_group`, `url` and regex rules are still future; Layers 2 to 4 are not started.
 
 # Candidate matching: four layers, cheapest first
 
-Related: the auto-reject rules (`findKnockout` in `packages/shared/src/answers.ts`, the rule properties in `packages/shared/src/form-fields.ts`), the Rating Criteria spec (`.scratch/ratings/spec.md`, the pattern a Job-level list follows), ADR-0002 (the CV as a built-in form slot, `docs/adr/0002-cv-as-built-in-form-slot.md`), `docs/db-schema.md` (§3.5 `jobs`, the files table, line 288 on a future CV parse table), and the glossary entries **Rating**, **Criterion**, **Average rating** and the auto-reject rule (`GLOSSARY.md`).
+Related: the Screening rules (`packages/shared/src/screening-rules.ts`, ADR-0005; they replaced the field-level `rejectWhen`/`rejectOptionIds` rules and `findKnockout`), the Rating Criteria spec (`.scratch/ratings/spec.md`, the pattern a Job-level list follows), ADR-0002 (the CV as a built-in form slot, `docs/adr/0002-cv-as-built-in-form-slot.md`), `docs/db-schema.md` (§3.5 `jobs`, the files table, line 288 on a future CV parse table), and the glossary entries **Rating**, **Criterion**, **Average rating** and **Screening rule** (`GLOSSARY.md`).
 
 ## Problem
 
 A job can attract hundreds of Applications and a reviewer opens them one by one. The team wants help sorting them, and the help has to be cheap enough to run on every Job without a second thought. A model call per candidate is the obvious answer and the most expensive one, so this doc layers the options: do the free things first, and spend money only on the candidates and moments where it changes a decision.
 
-Every layer here is **advisory except Layer 1's auto-reject**. Nothing in Layers 2 to 4 moves an Application, rejects it or notifies anyone. They add flags, a sort order and explanations that a human reads.
+Every layer here is **advisory except Layer 1's reject outcome**. Nothing in Layers 2 to 4 moves an Application, rejects it or notifies anyone. They add flags, a sort order and explanations that a human reads.
 
 ## The layers at a glance
 
@@ -48,19 +48,11 @@ CVs are English only (the owner confirmed there are no Arabic CVs). No layer han
 
 A free-text Requirement or a rule on a date could be used to filter on age, gender, nationality, religion and similar. Decided (2026-10-31): no guard. A manager may screen on any question, including dates and numbers, with no helper text, warning or blocklist. The legal review of automated ranking in hiring remains open.
 
-## Layer 1: rules (expand the auto-reject rules)
+## Layer 1: rules (Screening rules)
 
-### Today
+### Built (first slice)
 
-The auto-reject rules cover two of the ten question types, and only the "reject" outcome:
-
-| Type | Rule today |
-|---|---|
-| `yes_no` | `rejectWhen`: `true`, `false` or `null`. |
-| `single_select` | `rejectOptionIds`: reject when the chosen option is in the list. |
-| `short_text`, `long_text`, `multi_select`, `number`, `date`, `url`, `file`, `repeating_group` | None. |
-
-`findKnockout` runs server-side on submit and the first match places the Application in the Rejected stage. A sub-question inside a repeating group cannot carry a rule (`parseFormFields` refuses it), and `findKnockout` ignores groups. The rule properties live in each field's `config` inside the form version, and `toPublicFields` strips them before applicants see the form.
+Screening rules (`jobs.screening_rules`, saved on the Job's Settings tab, ADR-0005) are built. A rule is about one top-level question and has a reject or flag outcome; `evaluateScreeningRules` runs once at submit, and a rule that fired records a generated reason. Covered types: `single_select`, `multi_select`, `number`, `date`, `short_text`, `long_text`, `yes_no`. Not covered yet: `url`, `file` (presence is `required`) and `repeating_group` (a rule on a sub-question is refused and groups are ignored). Reject sends the Application to Rejected with an `auto_rejected` event; flag stores the reasons on the Application with a `flagged` event, and the candidate list, board and sheet show a marker. The old field-level rule properties and `findKnockout` are gone (`parseFormFields` strips them from versions saved earlier). The rest of Layer 1 below is the design the first slice followed; the rows marked future are not built.
 
 ### Expansion: more types, finer conditions
 
@@ -80,13 +72,13 @@ Each row below is a candidate rule. All are exact comparisons on a typed answer,
 
 ### Expansion: more outcomes, not just reject
 
-Auto-reject is a blunt outcome for a soft condition. Each rule should choose one:
+Reject is a blunt outcome for a soft condition. Each rule chooses one:
 
 | Outcome | Effect |
 |---|---|
-| Reject | Place in Rejected (today). Recorded as an auto-reject event. |
-| Flag | Leave the Application where it is and show an "unmet requirement" marker on the card, the table row and the sheet, with the reason. |
-| Move to stage | Place in a chosen non-final stage (for example Screening), for conditions that mean "look at this first". |
+| Reject | Built. Place in Rejected, recorded as an `auto_rejected` event with the reasons. |
+| Flag | Built. Leave the Application where it is and show a marker on the card, the table row and the sheet, with the reason (a `flagged` event). |
+| Move to stage | Future. Place in a chosen non-final stage (for example Screening), for conditions that mean "look at this first". |
 
 A rule can also carry the Requirement's tier: a must-have that fails flags more loudly than a nice-to-have.
 

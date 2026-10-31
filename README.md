@@ -13,7 +13,7 @@ A pnpm + Turborepo monorepo.
 
 ## Screenshots
 
-**Build a versioned application form per job**, with optional auto-reject rules on choice questions.
+**Build a versioned application form per job**, with optional screening rules (reject or flag an application from one answer) set on the job.
 
 <img src="apps/web/public/landing/form-builder-auto-reject.webp" alt="The form builder, with a CV setting and an expanded multiple-choice question with auto-reject options" width="720">
 

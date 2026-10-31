@@ -27,7 +27,7 @@ const steps: Step[] = [
   },
   {
     title: "Build the form",
-    text: "Ask exactly what this job needs: text, choices, file and video uploads, and a CV. Add an auto-reject rule and answers that don't fit go straight to Rejected.",
+    text: "Ask exactly what this job needs: text, choices, file and video uploads, and a CV. Add a screening rule and answers that don't fit are rejected or flagged for review.",
     image: {
       src: "/landing/form-builder-auto-reject.webp",
       alt: 'Form builder with a React experience question whose "Less than 2 years" option is marked auto-reject',

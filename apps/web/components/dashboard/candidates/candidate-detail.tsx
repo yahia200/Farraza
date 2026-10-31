@@ -102,7 +102,7 @@ export async function CandidateDetail({
                   ))}
                 </ul>
               ) : (
-                'Their answers matched an auto-reject rule.'
+                'Their answers matched a screening rule.'
               )}
             </AlertDescription>
           </Alert>
