@@ -39,7 +39,7 @@ Use the local docs first: they match the installed version. Paths are relative t
 | Prisma CLI (`prisma`) | 8.0.0-rc.20 | `prisma <command> --help` (authoritative); `apps/api/node_modules/prisma/README.md` | https://github.com/prisma/prisma-cli/blob/main/docs/README.md |
 | Nest Standard Schema validation | 12.1 | `apps/api/node_modules/@nestjs/common/pipes/standard-schema-validation.pipe.d.ts` | https://docs.nestjs.com/application/validation |
 | React Hook Form, `@hookform/resolvers` | 7.90 / 5.9 | `.d.ts` in `apps/web/node_modules/react-hook-form` | https://react-hook-form.com, https://ui.shadcn.com/docs/forms/react-hook-form |
-| Zod | 4.4.3 | `packages/shared/node_modules/zod/README.md`, or `apps/api/node_modules/zod/` (also a direct `apps/api` dependency, for the env schema and API-only query schemas); types in `v4/classic/schemas.d.ts` | https://zod.dev |
+| Zod | 4.6.7 | `packages/shared/node_modules/zod/README.md`, or `apps/api/node_modules/zod/` (also a direct `apps/api` dependency, for the env schema and API-only query schemas); types in `v4/classic/schemas.d.ts` | https://zod.dev |
 | TypeScript | 6.0.3 (`packages/shared`, `apps/api`); 5.9.3 (`apps/web`); 7.0.2 (root `package.json` devDependency only) | `lib.esnext.temporal.d.ts` and the other libs in `apps/api/node_modules/typescript/lib/` (6.x only; web's 5.9 has no Temporal lib) | https://www.typescriptlang.org/docs/ |
 | `temporal-polyfill` (web only) | 1.0.6 | `apps/web/node_modules/temporal-polyfill/README.md`; loaded in `apps/web/instrumentation-client.ts` (decision: question-types ticket 01, Owner decisions) | https://github.com/fullcalendar/temporal-polyfill |
 | Vitest | 4.1.11 | `.d.ts` in `apps/api/node_modules/vitest` | https://vitest.dev |
