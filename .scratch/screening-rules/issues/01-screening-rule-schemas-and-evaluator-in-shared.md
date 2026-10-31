@@ -16,12 +16,16 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Every condition above parses, and malformed ones are refused with `<path>` errors
-- [ ] The evaluator fires correctly per type and condition, including boundaries (min equals the answer, range ends) and relative dates
-- [ ] A blank answer never fires; several rules on one question each evaluate; every fired rule is returned with its reason
-- [ ] Word matching is whole-word and case-insensitive ("sql" does not match "mysql")
-- [ ] Caps are enforced; the form validator catches wrong type, unknown option and unknown question
-- [ ] `findKnockout` and the legacy rule properties still exist and their tests still pass
-- [ ] `pnpm --filter @repo/shared test`, `pnpm lint` and `pnpm check-types` pass
+- [x] Every condition above parses, and malformed ones are refused with `<path>` errors
+- [x] The evaluator fires correctly per type and condition, including boundaries (min equals the answer, range ends) and relative dates
+- [x] A blank answer never fires; several rules on one question each evaluate; every fired rule is returned with its reason
+- [x] Word matching is whole-word and case-insensitive ("sql" does not match "mysql")
+- [x] Caps are enforced; the form validator catches wrong type, unknown option and unknown question
+- [x] `findKnockout` and the legacy rule properties still exist and their tests still pass
+- [x] `pnpm --filter @repo/shared test`, `pnpm lint` and `pnpm check-types` pass
+
+## Answer
+
+Merged in bdcc1d6 (`packages/shared/src/screening-rules.ts`, `saveScreeningRulesSchema` in `jobs.ts`). `findKnockout` was left in place by this ticket and removed in ticket 04. Orchestrator re-ran the shared tests, type-check, lint and build after each later merge; the final run on ada25f1 passed (550 shared tests).
