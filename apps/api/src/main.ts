@@ -19,6 +19,10 @@ async function bootstrap() {
   app.enableCsrfProtection({
     trustedOrigins: [config.getOrThrow<string>('APP_URL')],
   });
+  // Security response headers (CSP, HSTS, nosniff, ...). Built into Nest 12.1 with
+  // helmet 8's defaults and option names, so no helmet package is needed:
+  // node_modules/@nestjs/common/interfaces/http/security-headers-options.interface.d.ts
+  app.useSecurityHeaders();
   // Validates every @Body/@Query/@Param that declares `{ schema }` (Zod schemas
   // from @repo/shared); parameters without one pass through untouched.
   app.useGlobalPipes(new StandardSchemaValidationPipe({ exceptionFactory: toValidationException }));
