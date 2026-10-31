@@ -377,62 +377,67 @@ function ConditionEditor({
   label: string;
   onChange: (condition: ScreeningCondition) => void;
 }) {
-  if (condition.type === 'yes_no') {
-    return (
-      <ToggleGroup
-        aria-label={`${label}: the answer`}
-        variant="outline"
-        spacing={0}
-        className="self-start"
-        value={[condition.answer ? 'yes' : 'no']}
-        disabled={disabled}
-        onValueChange={(value) => {
-          const next = value[0];
-          if (next) onChange({ type: 'yes_no', answer: next === 'yes' });
-        }}
-      >
-        <ToggleGroupItem value="yes" className="gap-2">
-          <CheckIcon />
-          Yes
-        </ToggleGroupItem>
-        <ToggleGroupItem value="no" className="gap-2">
-          <XIcon />
-          No
-        </ToggleGroupItem>
-      </ToggleGroup>
-    );
-  }
+  switch (condition.type) {
+    case 'yes_no':
+      return (
+        <ToggleGroup
+          aria-label={`${label}: the answer`}
+          variant="outline"
+          spacing={0}
+          className="self-start"
+          value={[condition.answer ? 'yes' : 'no']}
+          disabled={disabled}
+          onValueChange={(value) => {
+            const next = value[0];
+            if (next) onChange({ type: 'yes_no', answer: next === 'yes' });
+          }}
+        >
+          <ToggleGroupItem value="yes" className="gap-2">
+            <CheckIcon />
+            Yes
+          </ToggleGroupItem>
+          <ToggleGroupItem value="no" className="gap-2">
+            <XIcon />
+            No
+          </ToggleGroupItem>
+        </ToggleGroup>
+      );
 
-  if (condition.type === 'number') {
-    return <NumberConditionEditor condition={condition} disabled={disabled} label={label} onChange={onChange} />;
-  }
+    case 'number':
+      return <NumberConditionEditor condition={condition} disabled={disabled} label={label} onChange={onChange} />;
 
-  if (condition.type === 'date') {
-    return <DateConditionEditor condition={condition} disabled={disabled} label={label} onChange={onChange} />;
-  }
+    case 'date':
+      return <DateConditionEditor condition={condition} disabled={disabled} label={label} onChange={onChange} />;
 
-  if (condition.type === 'short_text' || condition.type === 'long_text') {
-    return <WordsConditionEditor condition={condition} disabled={disabled} label={label} onChange={onChange} />;
-  }
+    case 'short_text':
+    case 'long_text':
+      return <WordsConditionEditor condition={condition} disabled={disabled} label={label} onChange={onChange} />;
 
-  if ((condition.type === 'single_select' || condition.type === 'multi_select') && 'options' in field.config) {
-    const chosen = new Set(condition.optionIds);
-    return (
-      <fieldset className="flex min-w-0 flex-col gap-1">
-        <legend className="sr-only">{label}: options</legend>
-        {field.config.options.map((option) => (
-          <Label key={option.id} className="min-h-11 py-1 leading-snug font-normal sm:min-h-8">
-            <Checkbox
-              checked={chosen.has(option.id)}
-              disabled={disabled}
-              onCheckedChange={(checked) => onChange(toggleConditionOption(condition, field, option.id, checked))}
-            />
-            <span className="min-w-0 wrap-break-words">{option.label}</span>
-          </Label>
-        ))}
-      </fieldset>
-    );
-  }
+    case 'single_select':
+    case 'multi_select': {
+      if (!('options' in field.config)) return null;
+      const chosen = new Set(condition.optionIds);
+      return (
+        <fieldset className="flex min-w-0 flex-col gap-1">
+          <legend className="sr-only">{label}: options</legend>
+          {field.config.options.map((option) => (
+            <Label key={option.id} className="min-h-11 py-1 leading-snug font-normal sm:min-h-8">
+              <Checkbox
+                checked={chosen.has(option.id)}
+                disabled={disabled}
+                onCheckedChange={(checked) => onChange(toggleConditionOption(condition, field, option.id, checked))}
+              />
+              <span className="min-w-0 wrap-break-words">{option.label}</span>
+            </Label>
+          ))}
+        </fieldset>
+      );
+    }
 
-  return null;
+    default: {
+      // Adding a condition type to the schema fails the build here until it gets a case.
+      const unhandled: never = condition;
+      return unhandled;
+    }
+  }
 }

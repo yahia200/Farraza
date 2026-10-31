@@ -1,6 +1,13 @@
 'use client';
 
-import { SCREENING_WORD_MAX_LENGTH, SCREENING_WORDS_LIMIT, type ScreeningCondition } from '@repo/shared';
+import {
+  isDuplicateScreeningWord,
+  MAX_RELATIVE_DAYS,
+  normaliseScreeningWord,
+  SCREENING_WORD_MAX_LENGTH,
+  SCREENING_WORDS_LIMIT,
+  type ScreeningCondition,
+} from '@repo/shared';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { useId, useState, type KeyboardEvent } from 'react';
 import { DatePicker } from '@/components/date-picker';
@@ -17,9 +24,6 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
  */
 
 type Of<T extends ScreeningCondition['type']> = Extract<ScreeningCondition, { type: T }>;
-
-/** A relative date may reach this many days either side (screening-rules.ts `MAX_RELATIVE_DAYS`, not exported). */
-const MAX_RELATIVE_DAYS = 3650;
 
 /**
  * A number the manager types. The text is kept while typing ("-", "1.", empty) and only a finite
@@ -222,8 +226,8 @@ export function WordsConditionEditor({
   const [draft, setDraft] = useState('');
   const { words } = condition;
   const full = words.length >= SCREENING_WORDS_LIMIT;
-  const word = draft.trim();
-  const duplicate = words.some((existing) => existing.toLowerCase() === word.toLowerCase());
+  const word = normaliseScreeningWord(draft);
+  const duplicate = isDuplicateScreeningWord(words, word);
   const canAdd = word !== '' && !full && !duplicate;
 
   function add() {

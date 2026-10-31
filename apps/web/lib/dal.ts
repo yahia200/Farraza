@@ -168,7 +168,7 @@ export interface CompanyJob {
   highlightedQuestionKeys: string[];
   /** Keys of the rating Criteria raters may score on this Job (catalog keys from `@repo/shared`, at most five). */
   ratingCriteria: string[];
-  /** The Job's Screening rules as last saved (reject or flag, one question each); the editor arrives in a later ticket. */
+  /** The Job's Screening rules as last saved (reject or flag, one question each); edited on the job's Settings tab. */
   screeningRules: ScreeningRule[];
 }
 
