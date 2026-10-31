@@ -93,12 +93,12 @@ The mean of the overall Ratings on an Application, shown with how many Members g
 _Avoid_: Score, Overall (the overall is one Member's Rating)
 
 **Application Event**:
-A record in an Application's append-only history: applied, auto-rejected, moved, hired, rejected, note added, or rating given or changed. Together these form the audit trail of everything that has happened to an Application.
+A record in an Application's append-only history: applied, auto-rejected, flagged, moved, hired, rejected, note added, or rating given or changed. Together these form the audit trail of everything that has happened to an Application.
 _Avoid_: Log, activity, audit record
 
-**Auto-reject rule**:
-A rule on a form question that sends an Application straight to the Rejected stage when the answer matches.
-_Avoid_: Knockout (the internal code term; say "auto-reject" in anything user-facing), filter
+**Screening rule**:
+A rule a manager sets on a Job, about one form question, that is checked once when an Application is submitted. Each rule has an outcome: reject sends the Application straight to the Rejected stage; flag leaves it where it is and marks it with the reason. The reason is worked out from the rule and the answer, and only the Job's Members see it. Rules are checked against the answer alone, never the CV. Editing a Screening rule never changes Applications already submitted.
+_Avoid_: Auto-reject rule (the old name, from when reject was the only outcome), Knockout (the internal code term), filter
 
 ## Accounts
 

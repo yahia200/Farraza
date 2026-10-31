@@ -15,7 +15,7 @@ Every layer here is **advisory except Layer 1's auto-reject**. Nothing in Layers
 | Layer | What it does | Marginal cost per candidate | New infrastructure |
 |---|---|---|---|
 | 1. Rules | Exact checks on typed form answers. Can reject, flag or move. | $0 | None. Extends what exists. |
-| 2. Keyword match | Checks that the CV and text answers mention each requirement's terms. | $0 | CV text extraction. |
+| 2. Keyword match | Checks that the CV mentions each requirement's terms. | $0 | CV text extraction. |
 | 3. Embeddings | Ranks candidates by topical similarity between the CV and each requirement. | About $0.00003 hosted, $0 local | Vector storage and a background embed step. |
 | 4. LLM | Judges each requirement with a verdict, evidence and a reason. | About $0.001 to $0.05 | An API call per candidate scored. |
 
@@ -46,7 +46,7 @@ CVs are English only (the owner confirmed there are no Arabic CVs). No layer han
 
 ### Never on protected attributes
 
-A free-text Requirement or a rule on a date could be used to filter on age, gender, nationality, religion and similar. The editor should say so in helper text, and Layer 1 should not offer a date-of-birth rule. Whether to add a blocklist or a warning, and the legal review, are open decisions.
+A free-text Requirement or a rule on a date could be used to filter on age, gender, nationality, religion and similar. Decided (2026-10-31): no guard. A manager may screen on any question, including dates and numbers, with no helper text, warning or blocklist. The legal review of automated ranking in hiring remains open.
 
 ## Layer 1: rules (expand the auto-reject rules)
 
@@ -72,9 +72,9 @@ Each row below is a candidate rule. All are exact comparisons on a typed answer,
 | `multi_select` | **Any-of**: reject if any selected option is in a set. **None-of-required**: reject unless at least one of a set is selected. **All-of**: reject unless every option in a set is selected. |
 | `yes_no` | As today. |
 | `number` | Below a minimum, above a maximum, or outside a range. This is separate from the field's own `min`/`max`, which only validate input. |
-| `date` | Before or after a fixed date. Relative to the submission date, for example "available within 60 days" (`Temporal.PlainDate`, as `dates.ts` already uses). No date-of-birth rules. |
+| `date` | Before or after a fixed date. Relative to the submission date, for example "available within 60 days" (`Temporal.PlainDate`, as `dates.ts` already uses). |
 | `url` | Present or absent; optionally the host must be in an allow-list (for example a profile link on a given site). Low value, so last on the list. |
-| `short_text`, `long_text` | Only length or presence checks here. Anything about the content belongs to Layer 2. |
+| `short_text`, `long_text` | **Words**: any-of, all-of or none-of a list, whole-word and case-insensitive, on that one answer. Layer 1 owns text answers; Layer 2 reads the CV only. Length and presence stay with the field's own limits and `required`. Regex is deferred (backlog, low priority: it needs a linear-time engine to avoid ReDoS). |
 | `repeating_group` | **Entry count** at least N. **Total duration** at least N months, summed over the entries of the `experience` preset from its start and end dates. **Any entry** whose sub-answer matches (a title containing a word, a level in a set). Needs the Preset keys; a rule must look inside the group that carries the matching group key, not anywhere on the form (`docs/db-schema.md`, Preset keys). |
 | `file` | Presence is already `required`. No rule. |
 
@@ -92,13 +92,13 @@ A rule can also carry the Requirement's tier: a must-have that fails flags more 
 
 ### Where rules live
 
-Today a rule is part of the form version. More rule types mean more edits to published forms, and each edit is a new version. The alternative is a Job-level list keyed by question key (the same place as the Requirements). That is a decision, see "Open decisions". Either way, `findKnockout` stays server-side only and `toPublicFields` must keep stripping rules.
+Decided (2026-10-31): a Job-level `jobs.screening_rules` list keyed by question key, replaced whole by one `PUT` like `rating_criteria`, edited on a new Job **Settings** tab beside Rating Criteria. Rules leave the field `config` (no data migration: only test jobs exist). They are evaluated once at submit and the result is stored on the Application, so editing a rule never changes past Applications. Reject wins over flag; every rule that fired is recorded, with a reason generated from the rule and the answer (events: `auto_rejected` keeps its name, a new `flagged` is added). A blank answer never fires a rule. Publishing a form version that drops a question a rule points to is blocked. The evaluator stays server-side only; the public form never carries rules. Layer 1's first slice is reject and flag only; move-to-stage, `repeating_group` and `url` rules are later slices.
 
 ## Layer 2: keyword match
 
 ### What it does
 
-For each Requirement, check whether the CV text and the relevant text answers contain the Requirement's **terms**. The output per Requirement is matched or not matched, plus the terms that matched, so a reviewer sees why. A must-have with no match raises a flag. It never rejects.
+For each Requirement, check whether the CV text contains the Requirement's **terms**. The CV only: text answers are matched by Layer 1's word rules (decided 2026-10-31). The output per Requirement is matched or not matched, plus the terms that matched, so a reviewer sees why. A must-have with no match raises a flag. It never rejects.
 
 ### Where the terms come from
 
@@ -203,9 +203,9 @@ Never run it on every Application at submit.
 
 ## Open decisions
 
-1. **Where Layer 1 rules live:** on the field in the form version (today) or on the Job keyed by question key.
-2. **Which outcomes a rule may have:** reject, flag, move; and whether a tier changes how a flag looks.
-3. **Name:** "Requirement" (assumed here; not yet checked against `GLOSSARY.md`) versus anything else, and a glossary entry.
+1. ~~Where Layer 1 rules live~~ Decided: on the Job (see "Where rules live").
+2. ~~Which outcomes a rule may have~~ Decided for the first slice: reject and flag. Move-to-stage and whether a tier changes a flag's look stay open.
+3. **Name:** (the Layer 1 rule is now the **Screening rule** in `GLOSSARY.md`; this item is only about "Requirement" for Layers 2 to 4) "Requirement" (assumed here; not yet checked against `GLOSSARY.md`) versus anything else, and a glossary entry.
 4. **Keywords:** manager-supplied, auto-extracted, or both.
 5. **Embedding source:** hosted API, local model, or none.
 6. **Vector storage:** plain column with app-code cosine, or pgvector (needs a Prisma 8 check).

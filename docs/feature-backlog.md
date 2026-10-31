@@ -10,15 +10,17 @@ Candidate matching: design notes in [`.scratch/candidate-matching/layers.md`](..
 
 ### Candidate matching, Layer 1: expand the auto-reject rules
 
-Today rules exist only for `yes_no` and `single_select`, and the only outcome is reject.
+Today rules exist only for `yes_no` and `single_select`, and the only outcome is reject. Decided in the grilling session of 2026-10-31 (the glossary calls them **Screening rules**):
 
-- More types: `multi_select` (any-of, none-of-required, all-of), `number` (min, max, range), `date` (fixed or relative to submission, no date-of-birth rules), `repeating_group` (entry count, total duration, any-entry match), `url` (low value, last).
-- More outcomes: reject (today), flag (marker plus reason, application stays put), move to a chosen non-final stage.
-- Open: do rules stay on the form field or move to a Job-level list keyed by question key?
+- **Storage:** a Job-level `jobs.screening_rules` list keyed by question key, replaced whole by one `PUT` like Rating Criteria. `rejectWhen` and `rejectOptionIds` leave the field `config`. No data migration: only test jobs exist, so they are cleared.
+- **Outcomes in this slice:** reject (today) and flag (marker plus a generated reason, application stays put; shown on the board card, table row and candidate sheet, with a new `flagged` event). Reject wins over flag, every rule that fired is recorded, and rules are evaluated once at submit.
+- **Types in this slice:** `single_select` (also an accept-list), `multi_select` (any-of, none-of-required, all-of), `number` (min, max, range), `date` (fixed or relative to the submission date), `short_text` and `long_text` (words: any-of, all-of, none-of, whole-word and case-insensitive), `yes_no` (as today). A blank answer never fires a rule. No guard on protected attributes: a manager may screen on any question.
+- **Editor:** a new **Settings** tab on the Job (`/settings`) hosting Screening rules and Rating Criteria (moved there). Publishing a form version that drops a question a rule points to is blocked until the rule is removed.
+- **Later slices:** move to a chosen non-final stage as an outcome, `repeating_group` rules (entry count, total duration, any-entry match), `url` rules.
 
 ### Candidate matching, Layer 2: keyword match
 
-Check that the CV and text answers mention each Requirement's terms. Shows matched or not matched plus the terms found. Flags a missed must-have, never rejects.
+Check that the CV mentions each Requirement's terms. Shows matched or not matched plus the terms found. Flags a missed must-have, never rejects. Layer 2 reads the CV only: text answers are Layer 1's (word rules on `short_text` and `long_text`).
 
 - Needs a Requirements list on the Job and CV text extraction (a scanned PDF must read as "unreadable", not "missing").
 - Terms are manager-supplied keywords and synonyms (recommended) or auto-extracted.
@@ -59,6 +61,13 @@ Per-Requirement verdict with an evidence quote and a reason. The only layer that
 - Build only if reviewers need explanations.
 
 ## Low priority
+
+### Screening rules: regex matching on text answers
+
+A regex condition for `short_text` and `long_text` Screening rules, left out of Layer 1.
+
+- A manager's pattern runs on the server against applicant text, so a backtracking engine (native `RegExp`) risks ReDoS. Use a linear-time engine such as `re2js` (pure-JS RE2 port); read its installed README and `.d.ts` first, it is not yet verified.
+- Validate the pattern when the rule is saved, so a bad one is an editor error and never a failure at submit.
 
 ### Two-factor authentication (2FA) with TOTP
 
