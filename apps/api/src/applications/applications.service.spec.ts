@@ -3,7 +3,13 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
-import { CV_DOCX_TYPE, CV_PDF_TYPE, type CvMode, type FormFields } from '@repo/shared';
+import {
+  CV_DOCX_TYPE,
+  CV_PDF_TYPE,
+  type CvMode,
+  type FormFields,
+  type ScreeningRule,
+} from '@repo/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { SNIFF_BYTES } from '../storage/file-sniff.js';
 import type {
@@ -82,6 +88,7 @@ class InMemoryApplicationsRepository implements PublicApi<ApplicationsRepository
     cvMode: CvMode;
     open?: boolean;
     fields?: FormFields;
+    screeningRules?: ScreeningRule[];
     logoUrl?: string | null;
     brandColor?: string | null;
   }): OpenJob {
@@ -103,6 +110,7 @@ class InMemoryApplicationsRepository implements PublicApi<ApplicationsRepository
         fields: options.fields ?? [],
         cvMode: options.cvMode,
       },
+      screeningRules: options.screeningRules ?? [],
       firstStageId: 'stage-applied',
       rejectedStageId: 'stage-rejected',
     };
@@ -1096,9 +1104,17 @@ describe('ApplicationsService', () => {
               label: 'Can you work weekends?',
               helpText: null,
               required: true,
-              config: { rejectWhen: false },
+              config: { rejectWhen: null },
             },
             fields[0]!,
+          ],
+          screeningRules: [
+            {
+              id: 'b9999999-9999-4999-8999-999999999999',
+              questionKey: WORKS_WEEKENDS,
+              outcome: 'reject',
+              condition: { type: 'yes_no', answer: true },
+            },
           ],
         });
         const cvBytes = samplePdf();
@@ -1112,12 +1128,12 @@ describe('ApplicationsService', () => {
           applicant({ cvFileId: cv, answers: { [WORKS_WEEKENDS]: false, [SAMPLE]: sample } }),
         );
 
-        // Rejected by the knockout rule...
+        // Rejected by the Screening rule...
         expect(repository.applications).toHaveLength(1);
         expect(repository.applications[0]).toMatchObject({
           status: 'rejected',
           stageId: 'stage-rejected',
-          events: [{ type: 'applied' }, { type: 'auto_rejected', data: { fieldKey: WORKS_WEEKENDS } }],
+          events: [{ type: 'applied' }, { type: 'auto_rejected', data: { rules: [{ questionKey: WORKS_WEEKENDS }] } }],
         });
         // ...yet the files are kept with it, so a recruiter can still open them.
         expect(repository.applications[0]!.files.map((file) => file.id).sort()).toEqual([cv, sample].sort());
@@ -1666,6 +1682,219 @@ describe('ApplicationsService', () => {
 
       expect(job.cvMode).toBe('required');
       expect(JSON.stringify(job)).not.toContain('signed');
+    });
+  });
+
+  // Screening rules (.scratch/screening-rules/spec.md, ticket 04): the Job's rules decide the stage at
+  // submit. Only a reject acts here; a flag is ticket 05's.
+  describe('submit: Screening rules', () => {
+    const WEEKENDS = 'e5555555-5555-4555-8555-555555555555';
+    const LEVEL = 'e6666666-6666-4666-8666-666666666666';
+    const JUNIOR = 'a1111111-1111-4111-8111-111111111111';
+    const SENIOR = 'a2222222-2222-4222-8222-222222222222';
+    const YEARS = 'e7777777-7777-4777-8777-777777777777';
+    const RULE_WEEKENDS = 'b1111111-1111-4111-8111-111111111111';
+    const RULE_LEVEL = 'b2222222-2222-4222-8222-222222222222';
+    const RULE_YEARS = 'b3333333-3333-4333-8333-333333333333';
+
+    const fields = [
+      { key: WEEKENDS, type: 'yes_no', label: 'Can you work weekends?', helpText: null, required: true, config: { rejectWhen: null } },
+      {
+        key: LEVEL,
+        type: 'single_select',
+        label: 'Level',
+        helpText: null,
+        required: true,
+        config: {
+          options: [
+            { id: JUNIOR, label: 'Junior' },
+            { id: SENIOR, label: 'Senior' },
+          ],
+          rejectOptionIds: [],
+        },
+      },
+      {
+        key: YEARS,
+        type: 'number',
+        label: 'Years of experience',
+        helpText: null,
+        required: false,
+        config: { min: null, max: null, integerOnly: true },
+      },
+    ] as FormFields;
+
+    const weekendsRule: ScreeningRule = {
+      id: RULE_WEEKENDS,
+      questionKey: WEEKENDS,
+      outcome: 'reject',
+      condition: { type: 'yes_no', answer: true },
+    };
+    const levelRule: ScreeningRule = {
+      id: RULE_LEVEL,
+      questionKey: LEVEL,
+      outcome: 'reject',
+      condition: { type: 'single_select', op: 'in', optionIds: [SENIOR] },
+    };
+    const yearsRule: ScreeningRule = {
+      id: RULE_YEARS,
+      questionKey: YEARS,
+      outcome: 'reject',
+      condition: { type: 'number', op: 'min', value: 5 },
+    };
+
+    const seed = (rules: ScreeningRule[]) =>
+      repository.seedJob({ slug: 'screened', cvMode: 'off', fields, screeningRules: rules });
+    const submit = (answers: Record<string, unknown>) =>
+      service.submit(
+        'acme',
+        'screened',
+        applicant({ answers: { [WEEKENDS]: true, [LEVEL]: SENIOR, ...answers } as never }),
+      );
+
+    it('sends an Application to Rejected when a reject rule fires, with the rules and reasons on the event', async () => {
+      seed([weekendsRule]);
+
+      await submit({ [WEEKENDS]: false });
+
+      expect(repository.applications).toHaveLength(1);
+      expect(repository.applications[0]).toMatchObject({
+        status: 'rejected',
+        stageId: 'stage-rejected',
+        events: [
+          { type: 'applied', fromStageId: null, toStageId: 'stage-applied' },
+          {
+            type: 'auto_rejected',
+            fromStageId: 'stage-applied',
+            toStageId: 'stage-rejected',
+            data: {
+              rules: [
+                {
+                  ruleId: RULE_WEEKENDS,
+                  questionKey: WEEKENDS,
+                  questionLabel: 'Can you work weekends?',
+                  outcome: 'reject',
+                  reason: 'Can you work weekends? was No, expected Yes',
+                },
+              ],
+            },
+          },
+        ],
+      });
+    });
+
+    // A condition states the acceptable answers; the rule fires outside it.
+    it.each([
+      ['in', [SENIOR]],
+      ['not_in', [JUNIOR]],
+    ] as const)('rejects on a single-select %s rule when the answer is outside it', async (op, optionIds) => {
+      seed([{ ...levelRule, condition: { type: 'single_select', op, optionIds: [...optionIds] } }]);
+
+      await submit({ [LEVEL]: JUNIOR });
+
+      expect(repository.applications[0]).toMatchObject({ status: 'rejected', stageId: 'stage-rejected' });
+    });
+
+    it('does not reject on a single-select rule when the answer is acceptable', async () => {
+      seed([levelRule]);
+
+      await submit({ [LEVEL]: SENIOR });
+
+      expect(repository.applications[0]).toMatchObject({ status: 'active' });
+    });
+
+    it('lists every reject rule that fired', async () => {
+      seed([weekendsRule, yearsRule]);
+
+      await submit({ [WEEKENDS]: false, [YEARS]: 2 });
+
+      const rejected = repository.applications[0]!.events[1]!;
+      expect(rejected.type).toBe('auto_rejected');
+      expect(
+        (rejected.data as unknown as { rules: Array<{ ruleId: string }> }).rules.map((rule) => rule.ruleId),
+      ).toEqual([RULE_WEEKENDS, RULE_YEARS]);
+    });
+
+    it('never fires on a skipped optional question', async () => {
+      seed([yearsRule]);
+
+      await submit({});
+
+      expect(repository.applications[0]).toMatchObject({ status: 'active', stageId: 'stage-applied' });
+    });
+
+    it('places the Application as before when no rule fires', async () => {
+      seed([weekendsRule, levelRule, yearsRule]);
+
+      await submit({ [YEARS]: 8 });
+
+      expect(repository.applications[0]).toMatchObject({ status: 'active', stageId: 'stage-applied' });
+      expect(repository.applications[0]!.events.map((event) => event.type)).toEqual(['applied']);
+    });
+
+    it('places the Application as before when the Job has no rules', async () => {
+      seed([]);
+
+      await submit({ [WEEKENDS]: false });
+
+      expect(repository.applications[0]).toMatchObject({ status: 'active', stageId: 'stage-applied' });
+    });
+
+    it('ignores a flag outcome: nothing is rejected, stored or recorded', async () => {
+      seed([{ ...weekendsRule, outcome: 'flag' }]);
+
+      await submit({ [WEEKENDS]: false });
+
+      expect(repository.applications[0]).toMatchObject({ status: 'active', stageId: 'stage-applied' });
+      expect(repository.applications[0]!.events.map((event) => event.type)).toEqual(['applied']);
+    });
+
+    it('rejects on the reject rule and leaves out a flag that fired beside it', async () => {
+      seed([{ ...yearsRule, outcome: 'flag' }, weekendsRule]);
+
+      await submit({ [WEEKENDS]: false, [YEARS]: 1 });
+
+      const rejected = repository.applications[0]!.events[1]!;
+      expect((rejected.data as unknown as { rules: unknown[] }).rules).toHaveLength(1);
+    });
+
+    it('no longer acts on the field-level reject setting', async () => {
+      const old = fields.map((field) =>
+        field.key === WEEKENDS ? { ...field, config: { rejectWhen: false } } : field,
+      ) as FormFields;
+      repository.seedJob({ slug: 'old', cvMode: 'off', fields: old });
+
+      await service.submit(
+        'acme',
+        'old',
+        applicant({ answers: { [WEEKENDS]: false, [LEVEL]: SENIOR } as never }),
+      );
+
+      expect(repository.applications[0]).toMatchObject({ status: 'active', stageId: 'stage-applied' });
+    });
+
+    it('leaves a past Application as it was when the rules change afterwards', async () => {
+      const job = seed([weekendsRule]);
+      await submit({ [WEEKENDS]: false });
+      const before = structuredClone(repository.applications[0]);
+
+      job.screeningRules = [];
+
+      expect(repository.applications[0]).toEqual(before);
+    });
+
+    it('returns no rules or reasons from any public route', async () => {
+      seed([weekendsRule, levelRule]);
+
+      const payloads = [
+        await service.getPublicJob('acme', 'screened'),
+        await service.listCompanyJobs('acme'),
+        await service.getCompanyBranding('acme'),
+        await submit({ [WEEKENDS]: false }),
+      ];
+
+      for (const payload of payloads) {
+        expect(JSON.stringify(payload)).not.toMatch(/screeningRules|reason|expected Yes|ruleId|outcome/);
+      }
     });
   });
 

@@ -1,9 +1,18 @@
-import type { Answers, CvMode, FilePurpose, FormFields } from '@repo/shared';
+import type {
+  Answers,
+  CvMode,
+  FilePurpose,
+  FormFields,
+  ScreeningOutcome,
+  ScreeningRule,
+} from '@repo/shared';
 
 export interface OpenJob {
   company: { id: string; name: string; slug: string; logoUrl: string | null; brandColor: string | null };
   job: { id: string; title: string; description: string | null };
   form: { id: string; fields: FormFields; cvMode: CvMode };
+  /** The job's Screening rules, read at submit. Never leaves the API: no public payload carries them. */
+  screeningRules: ScreeningRule[];
   firstStageId: string;
   rejectedStageId: string;
 }
@@ -83,6 +92,17 @@ export interface NewApplication {
     type: 'applied' | 'auto_rejected';
     fromStageId: string | null;
     toStageId: string;
-    data: Record<string, string | null>;
+    /** `applied` carries the source; `auto_rejected` carries the reject rules that fired, with reasons. */
+    data:
+      | { source: string | null }
+      | {
+          rules: Array<{
+            ruleId: string;
+            questionKey: string;
+            questionLabel: string;
+            outcome: ScreeningOutcome;
+            reason: string;
+          }>;
+        };
   }>;
 }

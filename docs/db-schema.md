@@ -465,7 +465,7 @@ Rules across properties:
 - Option ids are unique within a field. Options are referenced by `id`, not label, so relabelling an option does not break old answers.
 - Every id in `rejectOptionIds` must be one of the field's options. The list may be empty.
 - `maxSelections` cannot exceed the number of options.
-- `number`: `min` may not be above `max` (reported on `config.min`). `date`: `min` and `max` must be real ISO `YYYY-MM-DD` dates (`2026-02-30` and `2026-2-5` are refused) and `min` may not be after `max` (reported on `config.min`). `url` has no config. None of the three has auto-reject rules: extra rule properties are dropped by the schema, and `findKnockout()` ignores them. They are leaf types, so they work inside a Repeating group through the same checks.
+- `number`: `min` may not be above `max` (reported on `config.min`). `date`: `min` and `max` must be real ISO `YYYY-MM-DD` dates (`2026-02-30` and `2026-2-5` are refused) and `min` may not be after `max` (reported on `config.min`). `url` has no config. None of the three has auto-reject rules: extra rule properties are dropped by the schema, and Screening rules ignore them. They are leaf types, so they work inside a Repeating group through the same checks.
 - Dates are checked with the platform's `Temporal.PlainDate.from(value, { overflow: 'reject' })` plus a round trip to the same text (`packages/shared/src/dates.ts`). The shared package uses plain `Temporal` (typed through `"esnext.temporal"` in its `lib`); Node >= 26 supplies it on the server and the web app loads a polyfill. `0` counts as an answer when blank Entries are dropped.
 - A repeating group counts as one question toward the 50-question limit; its sub-questions do not count.
 - A group's sub-questions can't be `file` questions or other groups (`parseFormFields` reports it on the sub-question's `type`), and the group needs at least one.
@@ -518,7 +518,7 @@ An object keyed by field key, checked with `parseAnswers()` in `answers.ts` agai
   - Fully blank Entries (every sub-answer empty) are dropped. A required group with no Entries left fails with "This question needs an answer."; an optional one is omitted from `answers`. An Entry with any answer must satisfy its sub-questions' own `required` flags.
   - More Entries than `maxEntries`, an answer that is not an array, an Entry that is not an object, and a key in an Entry that isn't a sub-question are rejected. `maxEntries` is checked against the Entries left after the blank ones are dropped, so a request with blank extras beyond the limit is not an error (the apply page's "Add another" stops at the limit, but the API does not count blank cards).
   - Errors from a group use the path `<groupKey>.<index>.<childKey>`, where `index` is the Entry's position in the submitted array (blank Entries still take up an index). Two kinds of group-answer error are not at that three-part path: an Entry that is not an object is reported at `<groupKey>.<index>`, and "too many Entries" (like "not an array" and a missing required group) at `<groupKey>` itself.
-  - `findKnockout()` ignores groups, and `toPublicFields()` passes them through whole (their sub-questions have no auto-reject rules to strip).
+  - Screening rules ignore groups, and `toPublicFields()` passes them through whole (their sub-questions have no auto-reject rules to strip).
 - **Known gap (size):** nothing caps the total size of `answers` beyond the request limits: the API's JSON body is limited to body-parser's default `100kb` (no override in `main.ts`) and a Server Action to 1MB. A form with several `long_text` questions answered at their limit (up to 10,000 characters each) can already be refused with a 413. Not handled yet.
 
 ### 4.3 `application_events.data`
@@ -526,7 +526,7 @@ An object keyed by field key, checked with `parseAnswers()` in `answers.ts` agai
 | Event type | Written when | `data` | Stages | `actor_id` |
 |---|---|---|---|---|
 | `applied` | An application is submitted | `{ "source": "linkedin" }` (or `null`) | `NULL` → first stage | `NULL` |
-| `auto_rejected` | A knockout rule matched on submit | `{ "fieldKey": "uuid", "fieldLabel": "..." }` | first stage → rejected stage | `NULL` |
+| `auto_rejected` | A reject Screening rule fired on submit | `{ "rules": [{ "ruleId": "uuid", "questionKey": "uuid", "questionLabel": "...", "outcome": "reject", "reason": "..." }] }` (events before the Screening rules change hold `{ "fieldKey", "fieldLabel" }`) | first stage → rejected stage | `NULL` |
 | `stage_changed` | Moved to a `normal` stage | `{ "fromStageName": "...", "toStageName": "..." }` | from → to | user |
 | `hired` | Moved to the `hired` stage | `{ "fromStageName": "...", "toStageName": "..." }` | from → to | user |
 | `rejected` | Moved to the `rejected` stage | `{ "fromStageName": "...", "toStageName": "..." }` | from → to | user |
@@ -534,7 +534,7 @@ An object keyed by field key, checked with `parseAnswers()` in `answers.ts` agai
 | `rated` | A Member gives or changes their Rating | `{ "previous": { "overall": 3, "criteria": {} } \| null, "current": { "overall": 4, "criteria": { "communication": 5 } }, "stage": "Interview" }` | `NULL` | the rater |
 | `withdrawn` | Not written yet | | | |
 
-A knocked-out application is created directly in the Rejected stage with `status = 'rejected'`. It gets both an `applied` and an `auto_rejected` event.
+A rejected-on-submit application is created directly in the Rejected stage with `status = 'rejected'`. It gets both an `applied` and an `auto_rejected` event.
 
 A `rated` event is written on every save of a Rating, even one that changes nothing. `previous` is the Member's Rating as read inside the same transaction (`null` for a first rating), `current` is what was stored (including scores carried over for Criteria the Job no longer uses), and `stage` is the name of the Application's stage when it was rated.
 
