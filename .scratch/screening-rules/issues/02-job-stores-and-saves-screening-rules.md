@@ -8,15 +8,15 @@
 
 **Blocked by:** 01.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The column exists with its default and CHECK; contract files and snapshots are committed
-- [ ] A manager saves a valid list and gets it back; an interviewer gets 403
-- [ ] Draft, open and closed Jobs can all save
-- [ ] Rules the shared validator refuses (unknown question, wrong type, unknown option, over the cap) are 400 with `errors` paths
-- [ ] A Job with no published form accepts `[]` and refuses a non-empty list
-- [ ] Saving again replaces the previous list; another company's Job is 404
-- [ ] The Job payload carries `screeningRules`
-- [ ] Service specs on the in-memory fake repository (pattern: `jobs.service.spec.ts`) cover every case above
-- [ ] `docs/db-schema.md` (jobs table, no-FK list in §7) and `.claude/rules/api.md` updated
-- [ ] `pnpm lint`, `pnpm check-types` and `pnpm --filter api test` pass
+- [x] The column exists with its default and CHECK; contract files and snapshots are committed
+- [x] A manager saves a valid list and gets it back; an interviewer gets 403
+- [x] Draft, open and closed Jobs can all save
+- [x] Rules the shared validator refuses (unknown question, wrong type, unknown option, over the cap) are 400 with `errors` paths
+- [x] A Job with no published form accepts `[]` and refuses a non-empty list
+- [x] Saving again replaces the previous list; another company's Job is 404
+- [x] The Job payload carries `screeningRules`
+- [x] Service specs on the in-memory fake repository (pattern: `jobs.service.spec.ts`) cover every case above
+- [x] `docs/db-schema.md` (jobs table, no-FK list in §7) and `.claude/rules/api.md` updated
+- [x] `pnpm lint`, `pnpm check-types` and `pnpm --filter api test` pass
