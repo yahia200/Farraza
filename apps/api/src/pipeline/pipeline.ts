@@ -7,6 +7,7 @@ import type {
   HighlightKind,
   RatingSummary,
   RatingValues,
+  ScreeningFlag,
 } from '@repo/shared';
 import type { StageKind } from '../jobs/job.js';
 
@@ -33,6 +34,8 @@ export interface ApplicationCard {
   highlights: Record<string, Highlight | null>;
   /** The Average rating and how many Members gave one; `{ average: null, count: 0 }` with none. */
   rating: CardRating;
+  /** The flag-outcome Screening rules that fired at submit, as stored (`applications.flags`); `[]` for none. */
+  flags: ScreeningFlag[];
 }
 
 /** A card as `PipelineRepository` reads it, before the service adds the Highlighted answers and the rating. */
@@ -90,6 +93,8 @@ export interface ApplicationDetail {
   /** The CV setting of the form version the applicant saw, so the sheet knows whether a CV was asked for. */
   cvMode: CvMode;
   answers: Answers;
+  /** The flag-outcome Screening rules that fired at submit, with their reasons (members only); `[]` for none. */
+  flags: ScreeningFlag[];
   events: ApplicationEventView[];
   notes: NoteView[];
   /** Every Member's Rating of this Application, oldest first. */

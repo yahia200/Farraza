@@ -27,7 +27,7 @@ Sections 1–7 describe what is built. Section 8 lists designed tables and const
 | `StageKind` | `stages.kind` | `normal`, `hired`, `rejected` |
 | `PublicLabel` | `stages.public_label` | `received`, `in_review`, `interview`, `offer`, `closed` |
 | `ApplicationStatus` | `applications.status` | `active`, `rejected`, `hired`, `withdrawn` |
-| `ApplicationEventType` | `application_events.type` | `applied`, `auto_rejected`, `stage_changed`, `rejected`, `hired`, `withdrawn`, `note_added`, `rated` |
+| `ApplicationEventType` | `application_events.type` | `applied`, `auto_rejected`, `stage_changed`, `rejected`, `hired`, `withdrawn`, `note_added`, `rated`, `flagged` |
 | `CvMode` | `form_versions.cv_mode` | `off`, `optional`, `required` |
 | `FilePurpose` | `files.purpose` | `cv`, `answer` |
 | `FileStatus` | `files.status` | `pending`, `uploaded` |
@@ -217,13 +217,14 @@ A company's own record of a person: what was submitted to that company. It is wr
 | `status` | `status` | `text` (`ApplicationStatus`) | NOT NULL, DEFAULT `'active'` |
 | `answers` | `answers` | `jsonb` | NOT NULL, DEFAULT `'{}'` (shape in §4.2) |
 | `source` | `source` | `text` | NULL (for example a `utm_source` value, max 100 chars) |
+| `flags` | `flags` | `jsonb` | NOT NULL, DEFAULT `'[]'`, **no FK** (the flag-outcome Screening rules that fired at submit; shape in §4.2a) |
 | `rejection_notified_at` | `rejectionNotifiedAt` | `timestamptz` | NULL (meant to gate when candidates see a rejection; not set by any code yet) |
 | `submitted_at` | `submittedAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
 | `updated_at` | `updatedAt` | `timestamptz` | NOT NULL, set by the ORM |
 
 - UNIQUE (`job_id`, `candidate_id`): one application per person per job.
 - UNIQUE (`job_id`, `email`) and UNIQUE (`job_id`, `phone`): one application per job per email and per phone, so a second email can't get the same person (phone) a second application. Any of these returns 409 ("You've already applied for this job.").
-- CHECK `applications_email_lowercase`: `email = lower(email)`; CHECK `applications_phone_format`: E.164, as on `candidates`.
+- CHECK `applications_email_lowercase`: `email = lower(email)`; CHECK `applications_phone_format`: E.164, as on `candidates`; CHECK `applications_flags_array`: `jsonb_typeof(flags) = 'array'`.
 - `email`/`phone` are copied from the submission, unlike `candidates`, which keeps only the latest; the pipeline views show these.
 - INDEX (`job_id`, `stage_id`) for the pipeline board
 - INDEX (`candidate_id`), INDEX (`company_id`), INDEX (`job_id`), INDEX (`form_version_id`), INDEX (`stage_id`)
@@ -521,12 +522,17 @@ An object keyed by field key, checked with `parseAnswers()` in `answers.ts` agai
   - Screening rules ignore groups, and `toPublicFields()` passes them through whole (their sub-questions have no auto-reject rules to strip).
 - **Known gap (size):** nothing caps the total size of `answers` beyond the request limits: the API's JSON body is limited to body-parser's default `100kb` (no override in `main.ts`) and a Server Action to 1MB. A form with several `long_text` questions answered at their limit (up to 10,000 characters each) can already be refused with a 413. Not handled yet.
 
+### 4.2a `applications.flags`
+
+`[{ "ruleId": "uuid", "questionKey": "uuid", "questionLabel": "...", "reason": "..." }]` (`ScreeningFlag` in `packages/shared/src/screening-rules.ts`): the Screening rules with outcome `flag` that fired when the application was submitted, in rule order; `[]` for none. Written once, in the submit transaction, and never changed: the label and reason are stored text, so editing or deleting a rule (or the question) later does not rewrite them. `ruleId` and `questionKey` have no FK and may point at a rule or question that no longer exists. Members only: no public route returns it. Older applications read as `[]`.
+
 ### 4.3 `application_events.data`
 
 | Event type | Written when | `data` | Stages | `actor_id` |
 |---|---|---|---|---|
 | `applied` | An application is submitted | `{ "source": "linkedin" }` (or `null`) | `NULL` → first stage | `NULL` |
 | `auto_rejected` | A reject Screening rule fired on submit | `{ "rules": [{ "ruleId": "uuid", "questionKey": "uuid", "questionLabel": "...", "outcome": "reject", "reason": "..." }] }` (events before the Screening rules change hold `{ "fieldKey", "fieldLabel" }`) | first stage → rejected stage | `NULL` |
+| `flagged` | One or more flag Screening rules fired on submit | `{ "rules": [{ "ruleId": "uuid", "questionKey": "uuid", "questionLabel": "...", "reason": "..." }] }` (the same list as `applications.flags`) | `NULL` → the stage the application was placed in (first stage, or rejected stage when a reject also fired) | `NULL` |
 | `stage_changed` | Moved to a `normal` stage | `{ "fromStageName": "...", "toStageName": "..." }` | from → to | user |
 | `hired` | Moved to the `hired` stage | `{ "fromStageName": "...", "toStageName": "..." }` | from → to | user |
 | `rejected` | Moved to the `rejected` stage | `{ "fromStageName": "...", "toStageName": "..." }` | from → to | user |
@@ -534,7 +540,7 @@ An object keyed by field key, checked with `parseAnswers()` in `answers.ts` agai
 | `rated` | A Member gives or changes their Rating | `{ "previous": { "overall": 3, "criteria": {} } \| null, "current": { "overall": 4, "criteria": { "communication": 5 } }, "stage": "Interview" }` | `NULL` | the rater |
 | `withdrawn` | Not written yet | | | |
 
-A rejected-on-submit application is created directly in the Rejected stage with `status = 'rejected'`. It gets both an `applied` and an `auto_rejected` event.
+A rejected-on-submit application is created directly in the Rejected stage with `status = 'rejected'`. It gets both an `applied` and an `auto_rejected` event (carrying the reject rules only). If flag rules also fired, a `flagged` event follows (flag rules only) and `applications.flags` holds them; with no flag rule fired there is no `flagged` event.
 
 A `rated` event is written on every save of a Rating, even one that changes nothing. `previous` is the Member's Rating as read inside the same transaction (`null` for a first rating), `current` is what was stored (including scores carried over for Criteria the Job no longer uses), and `stage` is the name of the Application's stage when it was rated.
 

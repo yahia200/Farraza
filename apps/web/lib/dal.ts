@@ -14,7 +14,7 @@ import type {
   RatingSummary,
   RatingValues,
 } from '@repo/shared';
-import { highlightKindOf, type ScreeningRule } from '@repo/shared';
+import { highlightKindOf, type ScreeningFlag, type ScreeningRule } from '@repo/shared';
 import { apiFetch } from './api';
 import { formatDate } from './format';
 
@@ -315,6 +315,8 @@ export interface ApplicationSummary {
    */
   highlights: Record<string, Highlight | null>;
   rating: CardRating;
+  /** The flag-outcome Screening rules that fired at submit, mirroring ApplicationCard.flags in apps/api/src/pipeline/pipeline.ts. `[]` for none. */
+  flags: ScreeningFlag[];
 }
 
 /** Mirrors HighlightedQuestion in apps/api/src/pipeline/pipeline.ts: in form order, with the latest text. */
@@ -381,7 +383,7 @@ export async function getPipelineBoard(companySlug: string, jobSlug: string): Pr
       name,
       position,
       kind,
-      applications: applications.map(({ id: applicationId, status, submittedAt, candidate, highlights, rating }) => ({
+      applications: applications.map(({ id: applicationId, status, submittedAt, candidate, highlights, rating, flags }) => ({
         id: applicationId,
         status,
         submittedAt,
@@ -389,6 +391,7 @@ export async function getPipelineBoard(companySlug: string, jobSlug: string): Pr
         candidate: { name: candidate.name, email: candidate.email, phone: candidate.phone },
         highlights,
         rating: { average: rating.average, count: rating.count },
+        flags,
       })),
     }))
     .sort((a, b) => a.position - b.position);
@@ -414,6 +417,32 @@ export interface RatingView extends RatingValues {
   updatedAt: string;
 }
 
+/** The questions whose reject rules fired, from an `auto_rejected` event (see `autoRejectedByOf`). */
+export interface AutoRejectedBy {
+  questionKeys: string[];
+  questionLabels: string[];
+}
+
+/**
+ * Reads an `auto_rejected` event's data in both shapes: `{ rules: [{ questionKey, questionLabel, ... }] }`
+ * (Screening rules, docs/db-schema.md 4.3) and the older `{ fieldKey, fieldLabel }` from the field-level
+ * reject setting. Anything unreadable gives empty lists, so the sheet never prints "undefined".
+ */
+export function autoRejectedByOf(data: unknown): AutoRejectedBy {
+  const record = typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : {};
+  if (Array.isArray(record.rules)) {
+    const rules = record.rules.filter(
+      (rule): rule is { questionKey: string; questionLabel: string } =>
+        typeof rule?.questionKey === 'string' && typeof rule?.questionLabel === 'string',
+    );
+    return { questionKeys: rules.map((r) => r.questionKey), questionLabels: rules.map((r) => r.questionLabel) };
+  }
+  return {
+    questionKeys: typeof record.fieldKey === 'string' ? [record.fieldKey] : [],
+    questionLabels: typeof record.fieldLabel === 'string' ? [record.fieldLabel] : [],
+  };
+}
+
 /** Mirrors ApplicationDetail in apps/api/src/pipeline/pipeline.ts (dates as ISO strings). */
 export interface ApplicationDetailView {
   id: string;
@@ -427,8 +456,10 @@ export interface ApplicationDetailView {
   /** That version's CV setting: whether the applicant was asked for a CV. */
   cvMode: CvMode;
   answers: Answers;
-  /** Set when an auto-reject rule moved the application to Rejected. */
-  autoRejectedBy: { fieldKey: string; fieldLabel: string } | null;
+  /** Set when a reject Screening rule moved the application to Rejected: the questions of the rules that fired. */
+  autoRejectedBy: AutoRejectedBy | null;
+  /** The flag rules that fired at submit, with their reasons (members only), mirroring ApplicationDetail.flags. `[]` for none. */
+  flags: ScreeningFlag[];
   /** The application's history and its notes, oldest first; `buildActivityTimeline` joins them. */
   events: ActivityEvent[];
   notes: ActivityNote[];
@@ -471,7 +502,8 @@ export async function getApplication(
     fields: detail.fields,
     cvMode: detail.cvMode,
     answers: detail.answers,
-    autoRejectedBy: autoRejected ? (autoRejected.data as { fieldKey: string; fieldLabel: string }) : null,
+    autoRejectedBy: autoRejected ? autoRejectedByOf(autoRejected.data) : null,
+    flags: detail.flags ?? [],
     events: detail.events.map(({ id, type, fromStageId, toStageId, actorId, data, createdAt }) => ({
       id,
       type,

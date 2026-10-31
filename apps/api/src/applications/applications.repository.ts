@@ -228,6 +228,7 @@ export class ApplicationsRepository {
           stageId: input.stageId,
           status: input.status,
           answers: input.answers,
+          flags: input.flags,
           source: input.source,
         });
 
