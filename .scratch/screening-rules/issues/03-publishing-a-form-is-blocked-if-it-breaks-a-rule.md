@@ -12,12 +12,12 @@ The manager removes or edits the rule first, then publishes. Saving a draft is n
 
 **Blocked by:** 02.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Each of the three cases above is refused on publish with errors that say which question and rule
-- [ ] Relabelling a question or option, adding questions, and reordering still publish
-- [ ] A Job with no rules publishes exactly as before
-- [ ] Removing the offending rule then publishing succeeds
-- [ ] Service specs on the in-memory fakes cover every case
-- [ ] `docs/db-schema.md` (§7 rules) and `.claude/rules/api.md` updated
-- [ ] `pnpm lint`, `pnpm check-types` and `pnpm --filter api test` pass
+- [x] Each of the three cases above is refused on publish with errors that say which question and rule
+- [x] Relabelling a question or option, adding questions, and reordering still publish
+- [x] A Job with no rules publishes exactly as before
+- [x] Removing the offending rule then publishing succeeds
+- [x] Service specs on the in-memory fakes cover every case
+- [x] `docs/db-schema.md` (§7 rules) and `.claude/rules/api.md` updated
+- [x] `pnpm lint`, `pnpm check-types` and `pnpm --filter api test` pass
