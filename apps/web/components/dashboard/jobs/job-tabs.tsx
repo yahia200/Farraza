@@ -9,6 +9,7 @@ const TABS = [
   { title: 'Overview', path: '' },
   { title: 'Application form', path: '/form' },
   { title: 'Candidates', path: '/candidates' },
+  { title: 'Settings', path: '/settings' },
 ] as const;
 
 /**

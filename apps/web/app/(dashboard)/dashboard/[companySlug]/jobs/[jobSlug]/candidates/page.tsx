@@ -9,7 +9,6 @@ import { CandidatesViewToggle } from '@/components/dashboard/candidates/candidat
 import type { CandidateRow } from '@/components/dashboard/candidates/data-table-features';
 import { HighlightedQuestionsPicker } from '@/components/dashboard/candidates/highlighted-questions-picker';
 import { PipelineBoard } from '@/components/dashboard/candidates/pipeline-board';
-import { RatingCriteriaPicker } from '@/components/dashboard/candidates/rating-criteria-picker';
 import { JobPageTransition } from '@/components/dashboard/jobs/job-page-transition';
 import { JobPage, type LoadedJob } from '@/components/dashboard/jobs/job-page';
 import { CandidatesSkeleton } from '@/components/dashboard/skeletons';
@@ -32,8 +31,8 @@ export const metadata: Metadata = { title: 'Candidates · Farraza' };
  * ?view=table|board picks the view (table by default); ?application=<id>
  * opens one candidate in a side sheet, in either view. Those who can manage
  * jobs (canManageJobs) also get the Highlighted questions picker beside the
- * view toggle, once the job has a published form, and the rating Criteria
- * picker, which needs no form (the catalog is fixed).
+ * view toggle, once the job has a published form. The rating Criteria are
+ * chosen on the Settings tab.
  */
 export default function JobCandidatesPage({
   params,
@@ -84,9 +83,6 @@ async function Candidates({
             questions={pickerQuestions}
             savedKeys={job.highlightedQuestionKeys}
           />
-        )}
-        {canManage && (
-          <RatingCriteriaPicker companySlug={company.slug} jobSlug={job.slug} savedKeys={job.ratingCriteria} />
         )}
       </div>
       {view === 'board' ? (

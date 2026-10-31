@@ -197,16 +197,53 @@ export function FormBuilderSkeleton({ questions = 3 }: { questions?: number }) {
   );
 }
 
-/** The candidates page: view toggle and the two picker buttons, then the table. */
+/** The candidates page: view toggle and the Highlighted questions picker button, then the table. */
 export function CandidatesSkeleton() {
   return (
     <SkeletonGroup label="Loading candidates" className="flex flex-col gap-4">
       <div className="flex items-center gap-2" aria-hidden="true">
         <Skeleton className="h-8 w-40" />
         <Skeleton className="size-8" />
-        <Skeleton className="size-8" />
       </div>
       <TableSkeleton columns={4} rows={6} />
+    </SkeletonGroup>
+  );
+}
+
+/** Job Settings: the Screening rules heading, one rule card and its buttons, then the rating Criteria. */
+export function JobSettingsSkeleton() {
+  return (
+    <SkeletonGroup label="Loading settings" className="flex max-w-3xl flex-col gap-10">
+      <div className="flex flex-col gap-3" aria-hidden="true">
+        <div className="space-y-2">
+          <Skeleton className="h-5 w-36" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-2/3" />
+        </div>
+        <div className="flex flex-col gap-3 rounded-2xl border p-4">
+          <Skeleton className="h-4 w-14" />
+          <Skeleton className="h-8 w-full sm:max-w-md" />
+          <div className="flex flex-wrap gap-2">
+            <Skeleton className="h-8 w-40" />
+            <Skeleton className="h-8 w-48" />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Skeleton className="h-8 w-28" />
+          <Skeleton className="h-8 w-28" />
+        </div>
+      </div>
+      <div className="flex flex-col gap-3" aria-hidden="true">
+        <div className="space-y-2">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-4 w-full" />
+        </div>
+        <div className="grid gap-2 rounded-2xl border p-3 sm:grid-cols-2">
+          {Array.from({ length: 6 }, (_, i) => (
+            <Skeleton key={i} className="h-8 w-48 max-w-full" />
+          ))}
+        </div>
+      </div>
     </SkeletonGroup>
   );
 }

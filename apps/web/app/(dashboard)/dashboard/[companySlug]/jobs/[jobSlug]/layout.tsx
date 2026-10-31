@@ -10,7 +10,7 @@ import { JobHeaderSkeleton } from '@/components/dashboard/skeletons';
 import { hasPublishedForm } from '@/lib/dal';
 
 /**
- * Shared by a job's sections (Overview, Application form, Candidates).
+ * Shared by a job's sections (Overview, Application form, Candidates, Settings).
  * Awaits nothing at the top: the header waits for params and data behind
  * <Suspense> (inside JobPage), the tabs and {children} stay in the static shell.
  */

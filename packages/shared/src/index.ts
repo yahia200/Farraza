@@ -9,6 +9,7 @@ export * from './highlights.js';
 export * from './rating-criteria.js';
 export * from './ratings.js';
 export * from './screening-rules.js';
+export * from './screening-rule-editor.js';
 export { formatIsoDate } from './dates.js';
 export * from './auth.js';
 export * from './oidc.js';
