@@ -21,6 +21,7 @@ import {
   toPublicFields,
   type Answers,
   type FieldError,
+  type ScreeningFlag,
 } from '@repo/shared';
 import { SNIFF_BYTES, sniffFileType } from '../storage/file-sniff.js';
 import { StorageService } from '../storage/storage.service.js';
@@ -184,26 +185,34 @@ export class ApplicationsService {
     const wanted = wantedFiles(found, dto, parsed.answers);
     const files = await this.verifyFiles(found, wanted);
 
-    // Only a reject acts for now; a fired flag is left alone (ticket 05). The day is taken in UTC:
-    // the server does not know the applicant's time zone.
+    // A reject moves the Application to Rejected; a flag only marks it. The day is taken in UTC: the
+    // server does not know the applicant's time zone.
     // Docs: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Temporal/Now/plainDateISO
-    const rejections = evaluateScreeningRules(
+    const fired = evaluateScreeningRules(
       found.screeningRules,
       found.form.fields,
       parsed.answers,
       Temporal.Now.plainDateISO('UTC'),
-    ).filter((fired) => fired.outcome === 'reject');
+    );
+    const rejections = fired.filter((rule) => rule.outcome === 'reject');
+    const flags: ScreeningFlag[] = fired
+      .filter((rule) => rule.outcome === 'flag')
+      .map(({ ruleId, questionKey, questionLabel, reason }) => ({ ruleId, questionKey, questionLabel, reason }));
     const rejected = rejections.length > 0;
     const source = dto.source ?? null;
+    // `auto_rejected` carries the reject rules only and `flagged` the flag rules only, so each event
+    // says what its outcome did. When both fire, the flags are still stored and recorded.
+    const placedIn = rejected ? found.rejectedStageId : found.firstStageId;
 
     const result = await this.applications.submit({
       companyId: found.company.id,
       jobId: found.job.id,
       formVersionId: found.form.id,
-      stageId: rejected ? found.rejectedStageId : found.firstStageId,
+      stageId: placedIn,
       status: rejected ? 'rejected' : 'active',
       candidate: { email: dto.email, name: dto.name.trim(), phone: dto.phone.trim() },
       answers: parsed.answers,
+      flags,
       files,
       source,
       events: [
@@ -217,6 +226,9 @@ export class ApplicationsService {
                 data: { rules: rejections },
               },
             ]
+          : []),
+        ...(flags.length > 0
+          ? [{ type: 'flagged' as const, fromStageId: null, toStageId: placedIn, data: { rules: flags } }]
           : []),
       ],
     });

@@ -3,6 +3,7 @@ import type {
   CvMode,
   FilePurpose,
   FormFields,
+  ScreeningFlag,
   ScreeningOutcome,
   ScreeningRule,
 } from '@repo/shared';
@@ -86,15 +87,21 @@ export interface NewApplication {
   status: 'active' | 'rejected';
   candidate: { email: string; name: string; phone: string };
   answers: Answers;
+  /** The flag-outcome rules that fired, stored on the Application (`applications.flags`); `[]` for none. */
+  flags: ScreeningFlag[];
   files: FileToAttach[];
   source: string | null;
   events: Array<{
-    type: 'applied' | 'auto_rejected';
+    type: 'applied' | 'auto_rejected' | 'flagged';
     fromStageId: string | null;
     toStageId: string;
-    /** `applied` carries the source; `auto_rejected` carries the reject rules that fired, with reasons. */
+    /**
+     * `applied` carries the source; `auto_rejected` the reject rules that fired, with reasons;
+     * `flagged` the flag rules that fired (the same list as `flags`).
+     */
     data:
       | { source: string | null }
+      | { rules: ScreeningFlag[] }
       | {
           rules: Array<{
             ruleId: string;

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Answers, FilePurpose, FormFields, RatingValues } from '@repo/shared';
+import type { Answers, FilePurpose, FormFields, RatingValues, ScreeningFlag } from '@repo/shared';
 import type { StageKind } from '../jobs/job.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
@@ -50,6 +50,7 @@ function toCardRow(row: {
   submittedAt: Date;
   email: string;
   phone: string;
+  flags: unknown;
   candidate: { name: string };
 }): CardRow {
   return {
@@ -59,6 +60,8 @@ function toCardRow(row: {
     submittedAt: row.submittedAt,
     // The email and phone this application was sent with (the candidate row keeps the latest).
     candidate: { name: row.candidate.name, email: row.email, phone: row.phone },
+    // CHECKed to be an array and written only by the submit from the evaluator's flag rules.
+    flags: row.flags as ScreeningFlag[],
   };
 }
 
@@ -93,7 +96,7 @@ export class PipelineRepository {
    */
   async findCards(companyId: string, jobId: string): Promise<CardRow[]> {
     const rows = await this.applications
-      .select('id', 'stageId', 'status', 'submittedAt', 'email', 'phone')
+      .select('id', 'stageId', 'status', 'submittedAt', 'email', 'phone', 'flags')
       .where({ companyId, jobId })
       .include('candidate')
       .orderBy((application) => application.submittedAt.desc())
@@ -109,7 +112,7 @@ export class PipelineRepository {
    */
   async findCardsWithAnswers(companyId: string, jobId: string): Promise<CardRowWithAnswers[]> {
     const rows = await this.applications
-      .select('id', 'stageId', 'status', 'submittedAt', 'email', 'phone', 'formVersionId', 'answers')
+      .select('id', 'stageId', 'status', 'submittedAt', 'email', 'phone', 'flags', 'formVersionId', 'answers')
       .where({ companyId, jobId })
       .include('candidate')
       .orderBy((application) => application.submittedAt.desc())
@@ -226,6 +229,7 @@ export class PipelineRepository {
       fields: row.formVersion.fields as FormFields,
       cvMode: row.formVersion.cvMode,
       answers: row.answers as Answers,
+      flags: row.flags as ScreeningFlag[],
       events: eventRows.map((event) => ({
         id: event.id,
         type: event.type,
