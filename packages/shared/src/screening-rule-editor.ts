@@ -5,7 +5,7 @@ import type { ScreeningCondition, ScreeningRule } from './screening-rules.js';
  * What the Settings tab's Screening rule editor needs besides pixels (.scratch/screening-rules, ticket
  * 06): which questions can have a rule, what a rule starts as, the operator wording, option toggling
  * and where the API's errors belong. Pure, so it is tested here (the web app has no test runner) and
- * ticket 07 extends the three tables below with number, date and text.
+ * the question types are all covered (ticket 07 added number, date and text).
  *
  * A condition describes the ACCEPTABLE answer and the rule fires when the answer falls outside it
  * (screening-rules.ts), so every label says when the rule fires, not what is accepted.
@@ -14,7 +14,7 @@ import type { ScreeningCondition, ScreeningRule } from './screening-rules.js';
 type ChoiceField = Extract<FormField, { type: 'single_select' | 'multi_select' }>;
 
 /** The question types the editor can set a condition for today. */
-export const SCREENABLE_TYPES = ['single_select', 'multi_select', 'yes_no'] as const;
+export const SCREENABLE_TYPES = ['single_select', 'multi_select', 'yes_no', 'number', 'date', 'short_text', 'long_text'] as const;
 export type ScreenableType = (typeof SCREENABLE_TYPES)[number];
 
 export function isScreenableType(type: string): type is ScreenableType {
@@ -29,7 +29,7 @@ export function screenableFields(fields: FormFields): FormField[] {
   return fields.filter((field) => isScreenableType(field.type));
 }
 
-/** The condition a new rule on this question starts with: nothing chosen yet, or accepting Yes. */
+/** The condition a new rule on this question starts with: nothing chosen yet, accepting Yes, at least 0, or a date after the day of applying. */
 export function defaultCondition(field: FormField): ScreeningCondition {
   switch (field.type) {
     case 'single_select':
@@ -38,8 +38,15 @@ export function defaultCondition(field: FormField): ScreeningCondition {
       return { type: 'multi_select', op: 'any_of', optionIds: [] };
     case 'yes_no':
       return { type: 'yes_no', answer: true };
+    case 'number':
+      return { type: 'number', op: 'min', value: 0 };
+    case 'date':
+      return { type: 'date', op: 'after', when: { kind: 'relative', days: 0 } };
+    case 'short_text':
+    case 'long_text':
+      return { type: field.type, op: 'any_of', words: [] };
     default:
-      throw new Error(`No Screening rule editor for ${field.type} questions yet.`);
+      throw new Error(`No Screening rule editor for ${field.type} questions.`);
   }
 }
 
@@ -77,6 +84,24 @@ export function conditionOps(type: ScreeningCondition['type']): { op: string; la
         { op: 'all_of', label: 'unless all of' },
         { op: 'none_of', label: 'if any of' },
       ];
+    case 'number':
+      return [
+        { op: 'min', label: 'unless it is at least' },
+        { op: 'max', label: 'unless it is at most' },
+        { op: 'range', label: 'unless it is between' },
+      ];
+    case 'date':
+      return [
+        { op: 'before', label: 'unless the date is before' },
+        { op: 'after', label: 'unless the date is after' },
+      ];
+    case 'short_text':
+    case 'long_text':
+      return [
+        { op: 'any_of', label: 'unless it contains at least one of' },
+        { op: 'all_of', label: 'unless it contains all of' },
+        { op: 'none_of', label: 'if it contains any of' },
+      ];
     default:
       return [];
   }
@@ -84,6 +109,18 @@ export function conditionOps(type: ScreeningCondition['type']): { op: string; la
 
 /** The condition with another operator, keeping the chosen options. Callers pass an op from `conditionOps`. */
 export function setConditionOp(condition: ScreeningCondition, op: string): ScreeningCondition {
+  if (condition.type === 'number') {
+    // The number shapes differ by operator: a limit has `value`, a range has `min` and `max`.
+    if (op === 'range') {
+      const from = condition.op === 'range' ? condition.min : condition.value;
+      const to = condition.op === 'range' ? condition.max : condition.value;
+      return { type: 'number', op: 'range', min: from, max: to };
+    }
+    if (op === 'min' || op === 'max') {
+      const value = condition.op === 'range' ? (op === 'min' ? condition.min : condition.max) : condition.value;
+      return { type: 'number', op, value };
+    }
+  }
   return { ...condition, op } as ScreeningCondition;
 }
 
