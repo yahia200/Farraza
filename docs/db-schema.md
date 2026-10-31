@@ -432,7 +432,7 @@ An array of at most 50 field objects (`formFieldsSchema` in `form-fields.ts`, ch
     "label": "Are you able to work on-site in Cairo?",
     "helpText": null,
     "required": true,
-    "config": { "rejectWhen": false }
+    "config": {}
   }
 ]
 ```
@@ -451,9 +451,9 @@ An array of at most 50 field objects (`formFieldsSchema` in `form-fields.ts`, ch
 |---|---|---|
 | `short_text` | `{ "maxLength": 200 }` (1–500) | string, trimmed, at most `maxLength` |
 | `long_text` | `{ "maxLength": 5000 }` (1–10000) | string, trimmed, at most `maxLength` |
-| `single_select` | `{ "options": [{ "id": "uuid", "label": "..." }], "rejectOptionIds": ["uuid"] }` | option id (string) |
+| `single_select` | `{ "options": [{ "id": "uuid", "label": "..." }] }` | option id (string) |
 | `multi_select` | `{ "options": [...], "maxSelections": 3 }` (`maxSelections` ≥ 1, or `null` for no limit) | array of distinct option ids |
-| `yes_no` | `{ "rejectWhen": false }` (`true`, `false`, or `null` for no knockout) | boolean |
+| `yes_no` | `{}` (no settings) | boolean |
 | `number` | `{ "min": 0, "max": 40, "integerOnly": true }` (`min` and `max`: finite numbers or `null` for no limit; `integerOnly`: boolean) | JSON number, finite, within `min`/`max`, a whole number when `integerOnly`. `0` is an answer. No auto-reject rules |
 | `date` | `{ "min": "2026-01-01", "max": null }` (`min` and `max`: ISO `YYYY-MM-DD` dates or `null`) | ISO `YYYY-MM-DD` string: a calendar date with no time or timezone, within `min`/`max` |
 | `url` | `{}` | string, trimmed, at most 2,048 characters, parsed with the platform `URL` and accepted only for `http:` or `https:` |
@@ -464,13 +464,12 @@ Rules across properties:
 
 - `options` has 2–50 entries. Option labels are trimmed, 1–100 characters.
 - Option ids are unique within a field. Options are referenced by `id`, not label, so relabelling an option does not break old answers.
-- Every id in `rejectOptionIds` must be one of the field's options. The list may be empty.
 - `maxSelections` cannot exceed the number of options.
 - `number`: `min` may not be above `max` (reported on `config.min`). `date`: `min` and `max` must be real ISO `YYYY-MM-DD` dates (`2026-02-30` and `2026-2-5` are refused) and `min` may not be after `max` (reported on `config.min`). `url` has no config. None of the three has auto-reject rules: extra rule properties are dropped by the schema, and Screening rules ignore them. They are leaf types, so they work inside a Repeating group through the same checks.
 - Dates are checked with the platform's `Temporal.PlainDate.from(value, { overflow: 'reject' })` plus a round trip to the same text (`packages/shared/src/dates.ts`). The shared package uses plain `Temporal` (typed through `"esnext.temporal"` in its `lib`); Node >= 26 supplies it on the server and the web app loads a polyfill. `0` counts as an answer when blank Entries are dropped.
 - A repeating group counts as one question toward the 50-question limit; its sub-questions do not count.
 - A group's sub-questions can't be `file` questions or other groups (`parseFormFields` reports it on the sub-question's `type`), and the group needs at least one.
-- A sub-question can't carry an auto-reject rule: `rejectOptionIds` must be empty and `rejectWhen` must be `null`. The properties stay in the shape so the sub-question goes through the same validation as a top-level question, and `parseFormFields` refuses a rule instead of ignoring it.
+- Questions carry no reject or flag rules (ADR-0005: Screening rules live on the Job). Form versions saved before that may still hold the two retired field-level reject properties; `parseFormFields` drops them (an unknown option id in one is no error) and `toPublicFields()` removes them from what applicants get.
 - Question keys are unique across the whole form, sub-questions included: a sub-question can't reuse a top-level key or another sub-question's key. Option ids, option rules and `maxSelections` inside a sub-question follow the same rules as above.
 
 **Preset keys.** A Preset key says what a question asks for and survives relabelling, so a future CV autofill can find a school or a job title wherever the recruiter put it. The catalog (`PRESET_KEY_TYPES` in `packages/shared/src/preset-keys.ts`) maps each key to the question type it requires:
@@ -488,7 +487,7 @@ Rules across properties:
 - `toPublicFields()` keeps `presetKey` on every question, sub-questions included; it is not private.
 - Relabelling a question does not clear its `presetKey` (accepted trade-off: autofill only pre-fills values the applicant reviews before sending).
 
-**Knockout rules** (`rejectOptionIds`, `rejectWhen`) are never sent to applicants. `toPublicFields()` removes them before the public endpoint returns a form.
+**Reject rules** are not part of a form (ADR-0005). The stored versions that still carry the retired ones never reach applicants: `toPublicFields()` rebuilds those configs without them.
 
 Name, email, and phone are not part of `fields`. They are fixed inputs on every form and are stored in `candidates`.
 
@@ -519,7 +518,7 @@ An object keyed by field key, checked with `parseAnswers()` in `answers.ts` agai
   - Fully blank Entries (every sub-answer empty) are dropped. A required group with no Entries left fails with "This question needs an answer."; an optional one is omitted from `answers`. An Entry with any answer must satisfy its sub-questions' own `required` flags.
   - More Entries than `maxEntries`, an answer that is not an array, an Entry that is not an object, and a key in an Entry that isn't a sub-question are rejected. `maxEntries` is checked against the Entries left after the blank ones are dropped, so a request with blank extras beyond the limit is not an error (the apply page's "Add another" stops at the limit, but the API does not count blank cards).
   - Errors from a group use the path `<groupKey>.<index>.<childKey>`, where `index` is the Entry's position in the submitted array (blank Entries still take up an index). Two kinds of group-answer error are not at that three-part path: an Entry that is not an object is reported at `<groupKey>.<index>`, and "too many Entries" (like "not an array" and a missing required group) at `<groupKey>` itself.
-  - Screening rules ignore groups, and `toPublicFields()` passes them through whole (their sub-questions have no auto-reject rules to strip).
+  - Screening rules ignore groups, and `toPublicFields()` passes them through whole.
 - **Known gap (size):** nothing caps the total size of `answers` beyond the request limits: the API's JSON body is limited to body-parser's default `100kb` (no override in `main.ts`) and a Server Action to 1MB. A form with several `long_text` questions answered at their limit (up to 10,000 characters each) can already be refused with a 413. Not handled yet.
 
 ### 4.2a `applications.flags`

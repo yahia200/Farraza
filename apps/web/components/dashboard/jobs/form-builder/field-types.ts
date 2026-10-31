@@ -64,11 +64,11 @@ export function newField(type: BuilderFieldType): FormField {
     case 'long_text':
       return { ...base, type, config: { maxLength: 5000 } };
     case 'single_select':
-      return { ...base, type, config: { options: [newOption('Option 1'), newOption('Option 2')], rejectOptionIds: [] } };
+      return { ...base, type, config: { options: [newOption('Option 1'), newOption('Option 2')] } };
     case 'multi_select':
       return { ...base, type, config: { options: [newOption('Option 1'), newOption('Option 2')], maxSelections: null } };
     case 'yes_no':
-      return { ...base, type, config: { rejectWhen: null } };
+      return { ...base, type, config: {} };
     case 'number':
       return { ...base, type, config: { min: null, max: null, integerOnly: false } };
     case 'date':

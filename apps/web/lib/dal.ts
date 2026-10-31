@@ -330,7 +330,7 @@ export interface HighlightedQuestion {
 /**
  * Only a Question's key, label and kind, from a form Question: for the published
  * form's Questions that the page hands to the client-side picker (so a Question's
- * config, auto-reject rules included, never reaches the browser). The board's own
+ * config never reaches the browser). The board's own
  * Highlighted questions already arrive as `{ key, label, kind }`; `getPipelineBoard`
  * copies those three fields.
  */

@@ -274,7 +274,6 @@ const level = (
       { id: JUNIOR, label: labels.junior },
       { id: SENIOR, label: labels.senior },
     ],
-    rejectOptionIds: [],
   },
 });
 const onSite = {
@@ -282,7 +281,7 @@ const onSite = {
   key: Q.onSite,
   type: 'yes_no',
   label: 'On site?',
-  config: { rejectWhen: null },
+  config: {},
 };
 const cover = {
   ...base,

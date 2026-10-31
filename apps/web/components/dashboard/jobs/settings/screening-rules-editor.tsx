@@ -32,6 +32,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Spinner } from '@/components/ui/spinner';
 import { toast } from '@/components/ui/toast';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { DateConditionEditor, NumberConditionEditor, WordsConditionEditor } from './condition-inputs';
 
 /**
  * The Screening rules editor on the Job's Settings tab (spec: .scratch/screening-rules/spec.md,
@@ -44,8 +45,8 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
  * as, operator wording, option toggling, error grouping) are in `@repo/shared`
  * (`screening-rule-editor.ts`, tested there).
  *
- * To support a new question type (ticket 07): add it to `SCREENABLE_TYPES` and `defaultCondition` in
- * shared, then add a case to `ConditionEditor` below.
+ * To support a new question type: add it to `SCREENABLE_TYPES` and `defaultCondition` in shared, then
+ * add a case to `ConditionEditor` below (the number, date and word inputs are in `condition-inputs.tsx`).
  *
  * Wording: a condition describes the ACCEPTABLE answer and the rule fires outside it, so each
  * operator is labelled by when the rule fires ("unless at least one of", "if any of").
@@ -197,7 +198,7 @@ export function ScreeningRulesEditor({
       </div>
       <p className="text-sm text-muted-foreground">
         {questions.length === 0
-          ? 'The published form has no choice or yes/no questions to set a rule on yet.'
+          ? 'The published form has no questions to set a rule on yet.'
           : atLimit
             ? `A job can have at most ${SCREENING_RULES_LIMIT} screening rules.`
             : 'Several rules can be about the same question.'}
@@ -400,6 +401,18 @@ function ConditionEditor({
         </ToggleGroupItem>
       </ToggleGroup>
     );
+  }
+
+  if (condition.type === 'number') {
+    return <NumberConditionEditor condition={condition} disabled={disabled} label={label} onChange={onChange} />;
+  }
+
+  if (condition.type === 'date') {
+    return <DateConditionEditor condition={condition} disabled={disabled} label={label} onChange={onChange} />;
+  }
+
+  if (condition.type === 'short_text' || condition.type === 'long_text') {
+    return <WordsConditionEditor condition={condition} disabled={disabled} label={label} onChange={onChange} />;
   }
 
   if ((condition.type === 'single_select' || condition.type === 'multi_select') && 'options' in field.config) {

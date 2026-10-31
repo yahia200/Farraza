@@ -45,7 +45,6 @@ const fields: FormFields = [
         { id: O.b, label: 'Go' },
         { id: O.c, label: 'Rust' },
       ],
-      rejectOptionIds: [],
     },
   },
   {
@@ -65,7 +64,7 @@ const fields: FormFields = [
   { ...base, key: K.start, label: 'Available from', type: 'date', config: { min: null, max: null } },
   { ...base, key: K.about, label: 'About you', type: 'short_text', config: { maxLength: 200 } },
   { ...base, key: K.bio, label: 'Bio', type: 'long_text', config: { maxLength: 2000 } },
-  { ...base, key: K.remote, label: 'Can work remotely', type: 'yes_no', config: { rejectWhen: null } },
+  { ...base, key: K.remote, label: 'Can work remotely', type: 'yes_no', config: {} },
   { ...base, key: K.skipped, label: 'Salary', type: 'number', config: { min: null, max: null, integerOnly: false } },
 ];
 

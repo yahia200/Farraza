@@ -68,7 +68,7 @@ const education: Preset = {
         {
           ...leafBase('education.degree', 'Degree', true),
           type: 'single_select',
-          config: { options: DEGREES.map(newOption), rejectOptionIds: [] },
+          config: { options: DEGREES.map(newOption) },
         },
         text('education.field_of_study', { label: 'Field of study', maxLength: 150 }),
         year('education.start_year', 'Start year', 1950, 2100),

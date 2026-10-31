@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { at, errorAt, FIELD_TYPES } from './field-types';
 import { FileConfigEditor } from './file-config-editor';
@@ -20,12 +19,6 @@ import { COLLAPSIBLE_PANEL_CLASS, QuestionBasics } from './question-basics';
 
 export type BuilderValues = { fields: FormFields; cvMode: CvMode };
 type Form = UseFormReturn<BuilderValues>;
-
-const REJECT_WHEN_ITEMS = [
-  { value: 'none', label: 'No auto-reject' },
-  { value: 'true', label: 'Reject if they answer Yes' },
-  { value: 'false', label: 'Reject if they answer No' },
-];
 
 /**
  * One question: a shadcn Collapsible card. The header summarises it and has
@@ -70,9 +63,6 @@ export function QuestionCard({
     setOpen(true);
   }
   const TypeIcon = FIELD_TYPES[field.type].icon;
-  const autoRejects =
-    (field.type === 'single_select' && field.config.rejectOptionIds.length > 0) ||
-    (field.type === 'yes_no' && field.config.rejectWhen !== null);
   const path = `fields.${index}`;
   const idPrefix = `question-${field.key}`;
   const editable = !readOnly && !disabled;
@@ -93,7 +83,6 @@ export function QuestionCard({
           <span className="truncate font-medium">{field.label || <span className="text-muted-foreground">Untitled question</span>}</span>
           <span className="sr-only">({FIELD_TYPES[field.type].label})</span>
           {field.required && <Badge variant="secondary">Required</Badge>}
-          {autoRejects && <Badge variant="outline">Auto-reject</Badge>}
           {field.type === 'repeating_group' && Number.isFinite(field.config.maxEntries) && (
             <Badge variant="outline" className="hidden sm:inline-flex">
               Up to {field.config.maxEntries} entries
@@ -156,20 +145,8 @@ export function QuestionCard({
                     idPrefix={idPrefix}
                     options={field.config.options}
                     onChange={(options) => input.onChange(options)}
-                    rejectIds={field.type === 'single_select' ? field.config.rejectOptionIds : undefined}
-                    onRejectChange={
-                      field.type === 'single_select'
-                        ? (ids) =>
-                            form.setValue(at(path, 'config.rejectOptionIds'), ids, {
-                              shouldDirty: true,
-                              shouldValidate: form.formState.isSubmitted,
-                            })
-                        : undefined
-                    }
                     errors={{
-                      list:
-                        errorAt(errors, `fields.${index}.config.options`) ??
-                        errorAt(errors, `fields.${index}.config.rejectOptionIds`),
+                      list: errorAt(errors, `fields.${index}.config.options`),
                       labels: field.config.options.map((_, i) => errorAt(errors, `fields.${index}.config.options.${i}.label`)),
                     }}
                     readOnly={readOnly}
@@ -237,39 +214,6 @@ export function QuestionCard({
                 questions={field.config.fields}
                 readOnly={readOnly}
                 disabled={disabled}
-              />
-            )}
-
-            {field.type === 'yes_no' && (
-              <Controller
-                name={at(path, 'config.rejectWhen')}
-                control={form.control}
-                render={({ field: input }) => {
-                  const value = input.value === null ? 'none' : String(input.value);
-                  return (
-                    <Field>
-                      <FieldLabel htmlFor={`${idPrefix}-reject`}>Auto-reject</FieldLabel>
-                      <Select
-                        items={REJECT_WHEN_ITEMS}
-                        value={value}
-                        onValueChange={(next) => input.onChange(next === 'none' ? null : next === 'true')}
-                        readOnly={readOnly}
-                        disabled={disabled}
-                      >
-                        <SelectTrigger id={`${idPrefix}-reject`} className="w-fit">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {REJECT_WHEN_ITEMS.map((item) => (
-                            <SelectItem key={item.value} value={item.value}>
-                              {item.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                  );
-                }}
               />
             )}
           </FieldGroup>

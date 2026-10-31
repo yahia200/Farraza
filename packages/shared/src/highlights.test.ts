@@ -39,9 +39,9 @@ const options = [
 const allTypes = [
   { ...base, key: KEYS.shortText, type: 'short_text', label: 'City', config: { maxLength: 100 } },
   { ...base, key: KEYS.longText, type: 'long_text', label: 'About you', config: { maxLength: 1000 } },
-  { ...base, key: KEYS.singleSelect, type: 'single_select', label: 'Level', config: { options, rejectOptionIds: [] } },
+  { ...base, key: KEYS.singleSelect, type: 'single_select', label: 'Level', config: { options } },
   { ...base, key: KEYS.multiSelect, type: 'multi_select', label: 'Skills', config: { options, maxSelections: null } },
-  { ...base, key: KEYS.yesNo, type: 'yes_no', label: 'On site?', config: { rejectWhen: null } },
+  { ...base, key: KEYS.yesNo, type: 'yes_no', label: 'On site?', config: {} },
   { ...base, key: KEYS.number, type: 'number', label: 'Years', config: { min: null, max: null, integerOnly: false } },
   { ...base, key: KEYS.date, type: 'date', label: 'Available from', config: { min: null, max: null } },
   { ...base, key: KEYS.url, type: 'url', label: 'Portfolio', config: {} },

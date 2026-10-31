@@ -15,7 +15,7 @@ const fields: FormFields = [
     label: 'Can you work on-site?',
     helpText: null,
     required: true,
-    config: { rejectWhen: false },
+    config: {},
   },
   {
     key: LEVEL,
@@ -28,7 +28,6 @@ const fields: FormFields = [
         { id: JUNIOR, label: 'Junior' },
         { id: SENIOR, label: 'Senior' },
       ],
-      rejectOptionIds: [JUNIOR],
     },
   },
   {
@@ -42,10 +41,20 @@ const fields: FormFields = [
 ];
 
 describe('toPublicFields', () => {
-  it('removes knockout rules', () => {
-    const text = JSON.stringify(toPublicFields(fields));
+  it('removes the retired reject rules a stored form version may still carry', () => {
+    // Saved before ADR-0005, and read by the API without parsing: so not valid FormFields any more.
+    const stored = [
+      { ...fields[0]!, config: { rejectWhen: false } },
+      { ...fields[1]!, config: { ...(fields[1]!.config as object), rejectOptionIds: [JUNIOR] } },
+    ] as unknown as FormFields;
+    const text = JSON.stringify(toPublicFields(stored));
     expect(text).not.toContain('rejectWhen');
     expect(text).not.toContain('rejectOptionIds');
+    expect(text).toContain('Senior');
+  });
+
+  it('sends a form that never had rules through unchanged', () => {
+    expect(toPublicFields(fields)).toEqual(fields);
   });
 
   it('keeps the options', () => {
@@ -79,7 +88,7 @@ describe('toPublicFields', () => {
               label: 'Still there?',
               helpText: null,
               required: false,
-              config: { rejectWhen: null },
+              config: {},
             },
             {
               key: JUNIOR,
@@ -234,7 +243,6 @@ describe('repeating groups', () => {
               { id: HIGH_SCHOOL, label: 'High school' },
               { id: BACHELORS, label: "Bachelor's" },
             ],
-            rejectOptionIds: [],
           },
         },
         {
@@ -243,7 +251,7 @@ describe('repeating groups', () => {
           label: 'Still studying?',
           helpText: null,
           required: false,
-          config: { rejectWhen: null },
+          config: {},
         },
         {
           key: SUBJECTS,
