@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { ScreeningRule } from '@repo/shared';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { DEFAULT_STAGES } from './job.js';
 import type { Job, JobStatus, JobWithStages, PublicLabel, Stage, StageKind } from './job.js';
@@ -88,6 +89,17 @@ export class JobsRepository {
     return row ? toJob(row) : null;
   }
 
+  /**
+   * Replaces the job's whole list of Screening rules in one statement. Returns null if the job is
+   * gone. Deliberately unconditional, like `replaceRatingCriteria` and unlike the other writes here
+   * (`.claude/rules/api.md`, "Concurrency"): the list is a setting, so two people saving at once is
+   * last-write-wins and no data is lost.
+   */
+  async replaceScreeningRules(id: string, rules: ScreeningRule[]): Promise<Job | null> {
+    const row = await this.jobs.where({ id }).update({ screeningRules: rules });
+    return row ? toJob(row) : null;
+  }
+
   async hasPublishedForm(jobId: string): Promise<boolean> {
     const row = await this.formVersions
       .where({ jobId })
@@ -128,6 +140,7 @@ function toJob(row: {
   updatedAt: Date;
   highlightedQuestionKeys: unknown;
   ratingCriteria: unknown;
+  screeningRules: unknown;
 }): Job {
   return {
     id: row.id,
@@ -143,6 +156,9 @@ function toJob(row: {
     highlightedQuestionKeys: row.highlightedQuestionKeys as string[],
     // Same reasoning: CHECKed to be a JSON array, and the service writes only catalog keys.
     ratingCriteria: row.ratingCriteria as string[],
+    // Same reasoning: CHECKed to be a JSON array, and the service writes only rules that
+    // `parseScreeningRules` accepted.
+    screeningRules: row.screeningRules as ScreeningRule[],
   };
 }
 

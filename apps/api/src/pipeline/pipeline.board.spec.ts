@@ -190,6 +190,7 @@ class FakeJobs implements Pick<PublicApi<JobsService>, 'get'> {
     updatedAt: new Date('2026-01-01T00:00:00Z'),
     highlightedQuestionKeys: [],
     ratingCriteria: [],
+    screeningRules: [],
     stages: [
       {
         id: 'stage-applied',

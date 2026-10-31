@@ -1,3 +1,4 @@
+import type { ScreeningRule } from '@repo/shared';
 export type JobStatus = 'draft' | 'open' | 'closed';
 export type StageKind = 'normal' | 'hired' | 'rejected';
 export type PublicLabel = 'received' | 'in_review' | 'interview' | 'offer' | 'closed';
@@ -30,6 +31,12 @@ export interface Job {
    * most `RATING_CRITERIA_LIMIT`), as last saved. Empty means the Job is rated on the overall alone.
    */
   ratingCriteria: string[];
+  /**
+   * The Job's Screening rules as last saved (`@repo/shared` `ScreeningRule`, at most
+   * `SCREENING_RULES_LIMIT`). Validated against the form when saved, so a rule can be stale once a
+   * newer form version is published.
+   */
+  screeningRules: ScreeningRule[];
 }
 
 export interface JobWithStages extends Job {

@@ -10,7 +10,12 @@ import {
   AuthorizationService,
 } from '@nestjs/authorization';
 import { Test } from '@nestjs/testing';
-import { parseFormFields, type FormFields } from '@repo/shared';
+import {
+  parseFormFields,
+  SCREENING_RULES_LIMIT,
+  type FormFields,
+  type ScreeningRule,
+} from '@repo/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { toValidationException } from '../common/validation-errors.js';
 import type { MemberRole, Membership } from '../companies/company.js';
@@ -20,6 +25,7 @@ import type { User } from '../users/user.js';
 import { DEFAULT_STAGES } from './job.js';
 import { saveHighlightedQuestionsSchema } from './dto/save-highlighted-questions.dto.js';
 import { saveRatingCriteriaSchema } from './dto/save-rating-criteria.dto.js';
+import { saveScreeningRulesSchema } from './dto/save-screening-rules.dto.js';
 import type { Job, JobWithStages } from './job.js';
 import { JobPolicy } from './job.policy.js';
 import type { JobsRepository } from './jobs.repository.js';
@@ -58,6 +64,7 @@ class InMemoryJobsRepository implements PublicApi<JobsRepository> {
       updatedAt: now,
       highlightedQuestionKeys: [],
       ratingCriteria: [],
+      screeningRules: [],
       stages: DEFAULT_STAGES.map((stage, index) => ({
         ...stage,
         id: `${id}-stage-${index}`,
@@ -121,6 +128,17 @@ class InMemoryJobsRepository implements PublicApi<JobsRepository> {
     const job = this.jobs.find((row) => row.job.id === id)?.job;
     if (!job) return null;
     job.ratingCriteria = [...keys];
+    return { ...job };
+  }
+
+  /** Replaces the whole list in one write (mirrors the real unconditional update). */
+  async replaceScreeningRules(
+    id: string,
+    rules: ScreeningRule[],
+  ): Promise<Job | null> {
+    const job = this.jobs.find((row) => row.job.id === id)?.job;
+    if (!job) return null;
+    job.screeningRules = structuredClone(rules);
     return { ...job };
   }
 
@@ -737,6 +755,229 @@ describe('JobsService', () => {
       await expect(
         validate({ keys: ['culture_fit', 'culture_fit'] }),
       ).rejects.toMatchObject({ response: { errors: [{ path: 'keys.1' }] } });
+    });
+  });
+
+  describe('saveScreeningRules', () => {
+    const LEVEL_SENIOR = '30000000-0000-4000-8000-000000000002';
+    const rule = (
+      n: number,
+      over: Partial<ScreeningRule> = {},
+    ): ScreeningRule => ({
+      id: `40000000-0000-4000-8000-${String(n).padStart(12, '0')}`,
+      questionKey: Q.years,
+      outcome: 'reject',
+      condition: { type: 'number', op: 'min', value: 5 },
+      ...over,
+    });
+    const withForm = (title = 'Backend Engineer') => {
+      const job = jobs.seedJob(company.id, title);
+      forms.seedPublished(job.id, publishedForm);
+      return job;
+    };
+
+    it('saves a manager’s rules and reports them on the Job', async () => {
+      const job = withForm();
+      const rules = [
+        rule(1),
+        rule(2, {
+          questionKey: Q.level,
+          outcome: 'flag',
+          condition: {
+            type: 'single_select',
+            op: 'in',
+            optionIds: [LEVEL_SENIOR],
+          },
+        }),
+      ];
+
+      const saved = await service.saveScreeningRules(
+        user,
+        membershipWithRole('recruiter'),
+        job.slug,
+        { rules },
+      );
+
+      expect(saved).toEqual({ rules });
+      expect(
+        (await service.get(membershipWithRole('interviewer'), job.slug))
+          .screeningRules,
+      ).toEqual(rules);
+    });
+
+    it('lets owners and admins save too', async () => {
+      const job = withForm();
+      await service.saveScreeningRules(user, membershipWithRole('owner'), job.slug, {
+        rules: [rule(1)],
+      });
+      await expect(
+        service.saveScreeningRules(user, membershipWithRole('admin'), job.slug, {
+          rules: [rule(2)],
+        }),
+      ).resolves.toEqual({ rules: [rule(2)] });
+    });
+
+    it('saves on a draft, an open and a closed Job', async () => {
+      const membership = membershipWithRole('owner');
+      const draft = withForm('Draft Job');
+      const open = withForm('Open Job');
+      const closed = withForm('Closed Job');
+      jobs.publishFormFor(open.id);
+      jobs.publishFormFor(closed.id);
+      await service.open(user, membership, open.slug);
+      await service.open(user, membership, closed.slug);
+      await service.close(user, membership, closed.slug);
+
+      for (const job of [draft, open, closed]) {
+        await expect(
+          service.saveScreeningRules(user, membership, job.slug, {
+            rules: [rule(1)],
+          }),
+        ).resolves.toEqual({ rules: [rule(1)] });
+      }
+      expect((await service.get(membership, closed.slug)).status).toBe('closed');
+    });
+
+    it('forbids an interviewer and leaves the list unchanged', async () => {
+      const job = withForm();
+
+      const attempt = service.saveScreeningRules(
+        user,
+        membershipWithRole('interviewer'),
+        job.slug,
+        { rules: [rule(1)] },
+      );
+
+      await expect(attempt).rejects.toBeInstanceOf(AuthorizationError);
+      await expect(attempt).rejects.toMatchObject({ reason: 'forbidden' });
+      expect(
+        (await service.get(membershipWithRole('owner'), job.slug)).screeningRules,
+      ).toEqual([]);
+    });
+
+    it('refuses rules the shared validator refuses, with a path per problem', async () => {
+      const job = withForm();
+      const membership = membershipWithRole('owner');
+
+      const attempt = service.saveScreeningRules(user, membership, job.slug, {
+        rules: [
+          rule(1),
+          rule(2, { questionKey: NOT_ON_FORM }),
+          rule(3, {
+            questionKey: Q.city,
+            condition: { type: 'number', op: 'min', value: 1 },
+          }),
+          rule(4, {
+            questionKey: Q.level,
+            condition: {
+              type: 'single_select',
+              op: 'in',
+              optionIds: ['30000000-0000-4000-8000-0000000000ff'],
+            },
+          }),
+        ],
+      });
+
+      await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+      await expect(attempt).rejects.toMatchObject({
+        response: {
+          message: expect.any(String),
+          errors: [
+            { path: expect.stringMatching(/^rules.1./), message: expect.any(String) },
+            { path: expect.stringMatching(/^rules.2./), message: expect.any(String) },
+            { path: expect.stringMatching(/^rules.3./), message: expect.any(String) },
+          ],
+        },
+      });
+      expect((await service.get(membership, job.slug)).screeningRules).toEqual([]);
+    });
+
+    it('refuses more rules than the cap', async () => {
+      const job = withForm();
+      const rules = Array.from({ length: SCREENING_RULES_LIMIT + 1 }, (_, n) =>
+        rule(n + 1),
+      );
+
+      await expect(
+        service.saveScreeningRules(user, membershipWithRole('owner'), job.slug, {
+          rules,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('accepts only an empty list on a Job with no published form', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+      const membership = membershipWithRole('owner');
+
+      await expect(
+        service.saveScreeningRules(user, membership, job.slug, { rules: [] }),
+      ).resolves.toEqual({ rules: [] });
+
+      const attempt = service.saveScreeningRules(user, membership, job.slug, {
+        rules: [rule(1)],
+      });
+      await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+      await expect(attempt).rejects.toMatchObject({
+        response: { errors: [{ path: 'rules.0.questionKey' }] },
+      });
+    });
+
+    it('replaces the previous list on every save, and an empty list clears it', async () => {
+      const job = withForm();
+      const membership = membershipWithRole('owner');
+      await service.saveScreeningRules(user, membership, job.slug, {
+        rules: [rule(1), rule(2)],
+      });
+
+      await service.saveScreeningRules(user, membership, job.slug, {
+        rules: [rule(3)],
+      });
+      expect((await service.get(membership, job.slug)).screeningRules).toEqual([
+        rule(3),
+      ]);
+
+      await expect(
+        service.saveScreeningRules(user, membership, job.slug, { rules: [] }),
+      ).resolves.toEqual({ rules: [] });
+      expect((await service.get(membership, job.slug)).screeningRules).toEqual([]);
+    });
+
+    it('does not find a job that belongs to another company', async () => {
+      const job = jobs.seedJob('another-company', 'Backend Engineer');
+
+      await expect(
+        service.saveScreeningRules(user, membershipWithRole('owner'), job.slug, {
+          rules: [],
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('reads as an empty list on a Job that never had rules saved', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+
+      expect(
+        (await service.get(membershipWithRole('owner'), job.slug)).screeningRules,
+      ).toEqual([]);
+    });
+  });
+
+  // The array and cap check is the route's body schema, run by the global pipe; item validation is
+  // the service's (`parseScreeningRules`). Only the pipe's 400 shape is checked here.
+  describe('the save screening rules request body', () => {
+    const pipe = new StandardSchemaValidationPipe({
+      exceptionFactory: toValidationException,
+    });
+    const validate = (body: unknown) =>
+      pipe.transform(body, { type: 'body', schema: saveScreeningRulesSchema });
+
+    it('passes a list through and refuses a non-array or an over-cap list', async () => {
+      await expect(validate({ rules: [] })).resolves.toEqual({ rules: [] });
+      await expect(validate({ rules: 'x' })).rejects.toMatchObject({
+        response: { errors: [{ path: 'rules' }] },
+      });
+      await expect(
+        validate({ rules: new Array(SCREENING_RULES_LIMIT + 1).fill({}) }),
+      ).rejects.toMatchObject({ response: { errors: [{ path: 'rules' }] } });
     });
   });
 

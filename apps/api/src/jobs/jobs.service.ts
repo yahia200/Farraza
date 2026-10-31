@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { AuthorizationService } from '@nestjs/authorization';
-import { checkHighlightKeys } from '@repo/shared';
+import { checkHighlightKeys, parseScreeningRules, type ScreeningRule } from '@repo/shared';
 import { randomBytes } from 'node:crypto';
 import { slugify } from '../common/slugify.js';
 import type { Membership } from '../companies/company.js';
@@ -9,6 +9,7 @@ import { FormsRepository } from '../forms/forms.repository.js';
 import type { CreateJobDto } from './dto/create-job.dto.js';
 import type { SaveHighlightedQuestionsDto } from './dto/save-highlighted-questions.dto.js';
 import type { SaveRatingCriteriaDto } from './dto/save-rating-criteria.dto.js';
+import type { SaveScreeningRulesDto } from './dto/save-screening-rules.dto.js';
 import type { UpdateJobDto } from './dto/update-job.dto.js';
 import type { Job, JobWithStages } from './job.js';
 import { JobPolicy } from './job.policy.js';
@@ -123,6 +124,40 @@ export class JobsService {
       throw new NotFoundException();
     }
     return { keys: saved.ratingCriteria };
+  }
+
+  /**
+   * Replaces the Job's Screening rules. Any Job status is allowed. The body schema only checked that
+   * `rules` is an array within the cap; each rule is validated here against the latest published
+   * form (`parseScreeningRules`). A Job with no published form has no questions, so only an empty
+   * list passes: every rule's question is unknown, which is a 400 (not the 409 Highlighted questions
+   * answers), because clearing the list must keep working.
+   */
+  async saveScreeningRules(
+    user: User,
+    membership: Membership,
+    jobSlug: string,
+    dto: SaveScreeningRulesDto,
+  ): Promise<{ rules: ScreeningRule[] }> {
+    await this.authorization.authorize(JobPolicy, 'update', user, membership);
+
+    const job = await this.get(membership, jobSlug);
+    const form = await this.forms.findLatestPublished(job.id);
+    const checked = parseScreeningRules(dto.rules, form?.fields ?? []);
+    if (!checked.ok) {
+      throw new BadRequestException({
+        message: 'Some screening rules can’t be saved.',
+        // The shared check reports `<index>.<path>` relative to the list, while the validation
+        // pipe's errors are `rules`; prefix so every 400 on this route is a path into the body.
+        errors: checked.errors.map((error) => ({ ...error, path: `rules.${error.path}` })),
+      });
+    }
+
+    const saved = await this.jobs.replaceScreeningRules(job.id, checked.rules);
+    if (!saved) {
+      throw new NotFoundException();
+    }
+    return { rules: saved.screeningRules };
   }
 
   private async availableSlug(companyId: string, title: string): Promise<string> {
