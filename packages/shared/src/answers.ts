@@ -248,32 +248,3 @@ export function parseAnswers(fields: readonly PublicFormField[], input: unknown)
 
   return errors.length > 0 ? { ok: false, errors } : { ok: true, answers };
 }
-
-export interface KnockoutHit {
-  fieldKey: string;
-  fieldLabel: string;
-}
-
-/** The first knockout rule the answers trigger, or null. Server-side only. */
-export function findKnockout(fields: FormFields, answers: Answers): KnockoutHit | null {
-  for (const field of fields) {
-    const answer = answers[field.key];
-
-    if (
-      field.type === 'yes_no' &&
-      field.config.rejectWhen !== null &&
-      answer === field.config.rejectWhen
-    ) {
-      return { fieldKey: field.key, fieldLabel: field.label };
-    }
-
-    if (
-      field.type === 'single_select' &&
-      typeof answer === 'string' &&
-      field.config.rejectOptionIds.includes(answer)
-    ) {
-      return { fieldKey: field.key, fieldLabel: field.label };
-    }
-  }
-  return null;
-}
