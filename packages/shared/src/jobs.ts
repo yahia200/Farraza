@@ -3,6 +3,7 @@ import { cvModeSchema } from './cv-mode.js';
 import { MAX_FIELDS } from './form-fields.js';
 import { highlightedQuestionKeysSchema } from './highlights.js';
 import { ratingCriteriaKeysSchema } from './rating-criteria.js';
+import { screeningRulesSchema } from './screening-rules.js';
 
 /** Request bodies for the API's /companies/:companySlug/jobs endpoints. */
 
@@ -49,6 +50,14 @@ export type SaveHighlightedQuestionsInput = z.infer<typeof saveHighlightedQuesti
  */
 export const saveRatingCriteriaSchema = z.strictObject({ keys: ratingCriteriaKeysSchema });
 export type SaveRatingCriteriaInput = z.infer<typeof saveRatingCriteriaSchema>;
+
+/**
+ * Saving a Job's Screening rules (PUT .../jobs/:jobSlug/screening-rules): the whole new list. Like
+ * `saveFormSchema`, the items are left unchecked here (only the cap is): the service validates them
+ * against the Job's current form with `parseScreeningRules()`, which reports every issue.
+ */
+export const saveScreeningRulesSchema = z.strictObject({ rules: screeningRulesSchema });
+export type SaveScreeningRulesInput = z.infer<typeof saveScreeningRulesSchema>;
 
 /**
  * Response for the public company listing (GET /api/public/:companySlug): a
