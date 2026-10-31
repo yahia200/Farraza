@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findKnockout, isBlankAnswer, isPlainObject, parseAnswers, toPublicFields } from './answers.js';
+import { isBlankAnswer, isPlainObject, parseAnswers, toPublicFields } from './answers.js';
 import { parseFormFields, type FormFields } from './form-fields.js';
 
 const ONSITE = '3f1c9a52-6f0e-4b7a-9a43-1d2c8e5b7f10';
@@ -405,25 +405,6 @@ describe('repeating groups', () => {
       type: 'repeating_group',
       config: { maxEntries: 3, fields: [{ key: SCHOOL }, { key: DEGREE }, { key: CURRENT }, { key: SUBJECTS }] },
     });
-  });
-
-  it('never triggers an auto-reject', () => {
-    const answers = { [GROUP]: [{ [SCHOOL]: 'AUC', [DEGREE]: HIGH_SCHOOL, [CURRENT]: false }] };
-    expect(findKnockout(form(), answers)).toBeNull();
-  });
-});
-
-describe('findKnockout', () => {
-  it('finds a yes/no knockout', () => {
-    expect(findKnockout(fields, { [ONSITE]: false, [LEVEL]: SENIOR })?.fieldKey).toBe(ONSITE);
-  });
-
-  it('finds a select knockout', () => {
-    expect(findKnockout(fields, { [ONSITE]: true, [LEVEL]: JUNIOR })?.fieldKey).toBe(LEVEL);
-  });
-
-  it('returns null when nothing triggers', () => {
-    expect(findKnockout(fields, { [ONSITE]: true, [LEVEL]: SENIOR })).toBeNull();
   });
 });
 

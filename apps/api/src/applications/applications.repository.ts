@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { FilePurpose, FormFields } from '@repo/shared';
+import type { FilePurpose, FormFields, ScreeningRule } from '@repo/shared';
 import { isUniqueViolation } from '../common/db-errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
@@ -147,6 +147,7 @@ export class ApplicationsRepository {
         fields: form.fields as FormFields,
         cvMode: form.cvMode,
       },
+      screeningRules: job.screeningRules as ScreeningRule[],
       firstStageId: first.id,
       rejectedStageId: rejected.id,
     };

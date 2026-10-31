@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findKnockout, parseAnswers, toPublicFields } from './answers.js';
+import { parseAnswers, toPublicFields } from './answers.js';
 import { parseFormFields, type FormFields } from './form-fields.js';
 
 /*
@@ -354,11 +354,5 @@ describe('number, date and URL questions and the rest of the form', () => {
     ];
     const fields = formOf(...questions);
     expect(toPublicFields(fields)).toEqual(fields);
-  });
-
-  it('never triggers an auto-reject', () => {
-    const fields = formOf(numberQuestion(), dateQuestion(), urlQuestion());
-    const answers = { [NUMBER]: 0, [DATE]: '2026-01-01', [URL_KEY]: 'https://example.com' };
-    expect(findKnockout(fields, answers)).toBeNull();
   });
 });

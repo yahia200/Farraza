@@ -10,15 +10,15 @@
 
 **Blocked by:** 02.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] A rule that fires with outcome reject sends the Application to Rejected, with `applied` and `auto_rejected` events and reasons in the event data
-- [ ] A yes/no rule and a single-select in-set / not-in-set rule behave as the old field rules did
-- [ ] A skipped optional question never fires a rule
-- [ ] No rules, or no fired rule, places the Application as before
-- [ ] Editing a rule afterwards leaves past Applications unchanged
-- [ ] No public route returns rules or reasons (tested)
-- [ ] `findKnockout` is gone and nothing references it
-- [ ] Service specs in the `applications.service.spec.ts` style cover every case
-- [ ] `.claude/rules/api.md` updated
-- [ ] `pnpm lint`, `pnpm check-types`, `pnpm --filter @repo/shared test` and `pnpm --filter api test` pass
+- [x] A rule that fires with outcome reject sends the Application to Rejected, with `applied` and `auto_rejected` events and reasons in the event data
+- [x] A yes/no rule and a single-select in-set / not-in-set rule behave as the old field rules did
+- [x] A skipped optional question never fires a rule
+- [x] No rules, or no fired rule, places the Application as before
+- [x] Editing a rule afterwards leaves past Applications unchanged
+- [x] No public route returns rules or reasons (tested)
+- [x] `findKnockout` is gone and nothing references it
+- [x] Service specs in the `applications.service.spec.ts` style cover every case
+- [x] `.claude/rules/api.md` updated
+- [x] `pnpm lint`, `pnpm check-types`, `pnpm --filter @repo/shared test` and `pnpm --filter api test` pass

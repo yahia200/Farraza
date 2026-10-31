@@ -12,7 +12,7 @@ import {
   checkAttachmentFile,
   checkCvFile,
   fileFormatPhrase,
-  findKnockout,
+  evaluateScreeningRules,
   isMediaContentType,
   matchAllowedType,
   parseAnswers,
@@ -184,28 +184,37 @@ export class ApplicationsService {
     const wanted = wantedFiles(found, dto, parsed.answers);
     const files = await this.verifyFiles(found, wanted);
 
-    const knockout = findKnockout(found.form.fields, parsed.answers);
+    // Only a reject acts for now; a fired flag is left alone (ticket 05). The day is taken in UTC:
+    // the server does not know the applicant's time zone.
+    // Docs: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Temporal/Now/plainDateISO
+    const rejections = evaluateScreeningRules(
+      found.screeningRules,
+      found.form.fields,
+      parsed.answers,
+      Temporal.Now.plainDateISO('UTC'),
+    ).filter((fired) => fired.outcome === 'reject');
+    const rejected = rejections.length > 0;
     const source = dto.source ?? null;
 
     const result = await this.applications.submit({
       companyId: found.company.id,
       jobId: found.job.id,
       formVersionId: found.form.id,
-      stageId: knockout ? found.rejectedStageId : found.firstStageId,
-      status: knockout ? 'rejected' : 'active',
+      stageId: rejected ? found.rejectedStageId : found.firstStageId,
+      status: rejected ? 'rejected' : 'active',
       candidate: { email: dto.email, name: dto.name.trim(), phone: dto.phone.trim() },
       answers: parsed.answers,
       files,
       source,
       events: [
         { type: 'applied', fromStageId: null, toStageId: found.firstStageId, data: { source } },
-        ...(knockout
+        ...(rejected
           ? [
               {
                 type: 'auto_rejected' as const,
                 fromStageId: found.firstStageId,
                 toStageId: found.rejectedStageId,
-                data: { fieldKey: knockout.fieldKey, fieldLabel: knockout.fieldLabel },
+                data: { rules: rejections },
               },
             ]
           : []),
