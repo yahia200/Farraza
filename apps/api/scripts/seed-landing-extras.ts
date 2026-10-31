@@ -65,7 +65,6 @@ const FIELDS = [
         { id: REACT.mid, label: '2 to 4 years' },
         { id: REACT.senior, label: '5 years or more' },
       ],
-      rejectOptionIds: [REACT.junior],
     },
   },
   {
@@ -74,7 +73,7 @@ const FIELDS = [
     label: 'Can you overlap at least 4 hours a day with Cairo time (UTC+2)?',
     helpText: null,
     required: true,
-    config: { rejectWhen: false },
+    config: {},
   },
   {
     key: Q.shipped,

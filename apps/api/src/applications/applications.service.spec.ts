@@ -1104,7 +1104,7 @@ describe('ApplicationsService', () => {
               label: 'Can you work weekends?',
               helpText: null,
               required: true,
-              config: { rejectWhen: null },
+              config: {},
             },
             fields[0]!,
           ],
@@ -1698,7 +1698,7 @@ describe('ApplicationsService', () => {
     const RULE_YEARS = 'b3333333-3333-4333-8333-333333333333';
 
     const fields = [
-      { key: WEEKENDS, type: 'yes_no', label: 'Can you work weekends?', helpText: null, required: true, config: { rejectWhen: null } },
+      { key: WEEKENDS, type: 'yes_no', label: 'Can you work weekends?', helpText: null, required: true, config: {} },
       {
         key: LEVEL,
         type: 'single_select',
@@ -1710,7 +1710,6 @@ describe('ApplicationsService', () => {
             { id: JUNIOR, label: 'Junior' },
             { id: SENIOR, label: 'Senior' },
           ],
-          rejectOptionIds: [],
         },
       },
       {
@@ -1857,16 +1856,24 @@ describe('ApplicationsService', () => {
       expect((rejected.data as unknown as { rules: unknown[] }).rules).toHaveLength(1);
     });
 
-    it('no longer acts on the field-level reject setting', async () => {
+    it('accepts an Application on a stored form that still has the retired reject settings, and never serves them', async () => {
+      // Saved before ADR-0005: the API reads stored versions without parsing them.
       const old = fields.map((field) =>
-        field.key === WEEKENDS ? { ...field, config: { rejectWhen: false } } : field,
-      ) as FormFields;
+        field.key === WEEKENDS
+          ? { ...field, config: { rejectWhen: false } }
+          : field.key === LEVEL
+            ? { ...field, config: { ...(field.config as object), rejectOptionIds: [JUNIOR] } }
+            : field,
+      ) as unknown as FormFields;
       repository.seedJob({ slug: 'old', cvMode: 'off', fields: old });
+
+      const page = await service.getPublicJob('acme', 'old');
+      expect(JSON.stringify(page)).not.toMatch(/rejectWhen|rejectOptionIds/);
 
       await service.submit(
         'acme',
         'old',
-        applicant({ answers: { [WEEKENDS]: false, [LEVEL]: SENIOR } as never }),
+        applicant({ answers: { [WEEKENDS]: false, [LEVEL]: JUNIOR } as never }),
       );
 
       expect(repository.applications[0]).toMatchObject({ status: 'active', stageId: 'stage-applied' });

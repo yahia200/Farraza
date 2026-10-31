@@ -239,7 +239,6 @@ const publishedForm = formOf([
         { id: '30000000-0000-4000-8000-000000000001', label: 'Junior' },
         { id: '30000000-0000-4000-8000-000000000002', label: 'Senior' },
       ],
-      rejectOptionIds: [],
     },
   },
   {
@@ -247,7 +246,7 @@ const publishedForm = formOf([
     key: Q.yesNo,
     type: 'yes_no',
     label: 'On site?',
-    config: { rejectWhen: null },
+    config: {},
   },
   {
     ...base,

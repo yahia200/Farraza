@@ -218,7 +218,6 @@ describe('FormsService', () => {
       required: true,
       config: {
         options: options.map(([id, l]) => ({ id, label: l })),
-        rejectOptionIds: [],
       },
     });
     const yearsRule: ScreeningRule = {
