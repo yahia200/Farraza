@@ -31,7 +31,7 @@ export interface PublicJob {
    * mints one per chosen file.
    */
   cvMode: CvMode;
-  /** Knockout rules already removed by the API (toPublicFields). */
+  /** Retired reject settings of old form versions already removed by the API (toPublicFields). */
   fields: PublicFormField[];
 }
 
