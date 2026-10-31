@@ -72,6 +72,7 @@ class InMemoryPipelineRepository implements Pick<
       candidate: { name: row.id, email: `${row.id}@example.com`, phone: '+201000000000' },
       formVersionId: 'version-1',
       answers: {},
+      flags: [],
       ...row,
     });
   }
@@ -84,12 +85,13 @@ class InMemoryPipelineRepository implements Pick<
 
   async findCards(companyId: string, jobId: string): Promise<CardRow[]> {
     return this.ofJob(companyId, jobId).map(
-      ({ id, stageId, status, submittedAt, candidate }) => ({
+      ({ id, stageId, status, submittedAt, candidate, flags }) => ({
         id,
         stageId,
         status,
         submittedAt,
         candidate,
+        flags,
       }),
     );
   }
@@ -103,6 +105,7 @@ class InMemoryPipelineRepository implements Pick<
         status,
         submittedAt,
         candidate,
+        flags,
         formVersionId,
         answers,
       }) => ({
@@ -111,6 +114,7 @@ class InMemoryPipelineRepository implements Pick<
         status,
         submittedAt,
         candidate,
+        flags,
         formVersionId,
         answers,
       }),
@@ -626,6 +630,35 @@ describe('the pipeline board', () => {
       const [card] = await cardsOf();
 
       expect(card!.highlights[Q.cover]).toEqual({ type: 'text', value: `${'a'.repeat(200)}…` });
+    });
+  });
+
+  describe('the flags on each card', () => {
+    const flag = {
+      ruleId: 'rule-1',
+      questionKey: 'q-1',
+      questionLabel: 'Years of experience',
+      reason: 'Years of experience was 2, minimum 5',
+    };
+
+    it('carries the stored flags, and [] for an Application with none', async () => {
+      repository.seedApplication({ id: 'mona', flags: [flag] });
+      repository.seedApplication({ id: 'omar' });
+
+      const cards = await cardsOf();
+
+      expect(cards.find((c) => c.id === 'mona')?.flags).toEqual([flag]);
+      expect(cards.find((c) => c.id === 'omar')?.flags).toEqual([]);
+    });
+
+    it('carries them with Highlighted questions too, and to an interviewer', async () => {
+      publish('version-1', formOf([city]));
+      highlight(Q.city);
+      repository.seedApplication({ id: 'mona', flags: [flag] });
+
+      const cards = await cardsOf('interviewer');
+
+      expect(cards[0]?.flags).toEqual([flag]);
     });
   });
 

@@ -34,7 +34,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'a3c3a3de3ba675e44f78efb075bb2db24484878b25bd319b82f27c12901014de'>;
+  StorageHashBase<'54b6ede8c672dbbefa22a331b79fd5bf11fb52bd267882ab525d920a2bc41ceb'>;
 export type ExecutionHash =
   ExecutionHashBase<'6c72d2e21cac19476b009440c451b74d3f8aaae32e374ce19a06cc2a66cb6742'>;
 export type ProfileHash =
@@ -255,6 +255,7 @@ export type FieldOutputTypes = {
       readonly candidateId: CodecTypes['pg/uuid@1']['output'];
       readonly companyId: CodecTypes['pg/uuid@1']['output'];
       readonly email: CodecTypes['pg/text@1']['output'];
+      readonly flags: CodecTypes['pg/jsonb@1']['output'];
       readonly formVersionId: CodecTypes['pg/uuid@1']['output'];
       readonly id: CodecTypes['pg/uuid@1']['output'];
       readonly jobId: CodecTypes['pg/uuid@1']['output'];
@@ -283,7 +284,8 @@ export type FieldOutputTypes = {
         | 'hired'
         | 'withdrawn'
         | 'note_added'
-        | 'rated';
+        | 'rated'
+        | 'flagged';
     };
     readonly Candidate: {
       readonly companyId: CodecTypes['pg/uuid@1']['output'];
@@ -468,6 +470,7 @@ export type FieldInputTypes = {
       readonly candidateId: CodecTypes['pg/uuid@1']['input'];
       readonly companyId: CodecTypes['pg/uuid@1']['input'];
       readonly email: CodecTypes['pg/text@1']['input'];
+      readonly flags: CodecTypes['pg/jsonb@1']['input'];
       readonly formVersionId: CodecTypes['pg/uuid@1']['input'];
       readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly jobId: CodecTypes['pg/uuid@1']['input'];
@@ -496,7 +499,8 @@ export type FieldInputTypes = {
         | 'hired'
         | 'withdrawn'
         | 'note_added'
-        | 'rated';
+        | 'rated'
+        | 'flagged';
     };
     readonly Candidate: {
       readonly companyId: CodecTypes['pg/uuid@1']['input'];
@@ -693,13 +697,15 @@ export type StorageColumnTypes = {
         | 'hired'
         | 'withdrawn'
         | 'note_added'
-        | 'rated';
+        | 'rated'
+        | 'flagged';
     };
     readonly applications: {
       readonly answers: CodecTypes['pg/jsonb@1']['output'];
       readonly candidate_id: CodecTypes['pg/uuid@1']['output'];
       readonly company_id: CodecTypes['pg/uuid@1']['output'];
       readonly email: CodecTypes['pg/text@1']['output'];
+      readonly flags: CodecTypes['pg/jsonb@1']['output'];
       readonly form_version_id: CodecTypes['pg/uuid@1']['output'];
       readonly id: CodecTypes['pg/uuid@1']['output'];
       readonly job_id: CodecTypes['pg/uuid@1']['output'];
@@ -906,13 +912,15 @@ export type StorageColumnInputTypes = {
         | 'hired'
         | 'withdrawn'
         | 'note_added'
-        | 'rated';
+        | 'rated'
+        | 'flagged';
     };
     readonly applications: {
       readonly answers: CodecTypes['pg/jsonb@1']['input'];
       readonly candidate_id: CodecTypes['pg/uuid@1']['input'];
       readonly company_id: CodecTypes['pg/uuid@1']['input'];
       readonly email: CodecTypes['pg/text@1']['input'];
+      readonly flags: CodecTypes['pg/jsonb@1']['input'];
       readonly form_version_id: CodecTypes['pg/uuid@1']['input'];
       readonly id: CodecTypes['pg/uuid@1']['input'];
       readonly job_id: CodecTypes['pg/uuid@1']['input'];
@@ -1107,6 +1115,7 @@ export namespace Models {
     candidateId: CodecTypes['pg/uuid@1']['output'];
     companyId: CodecTypes['pg/uuid@1']['output'];
     email: CodecTypes['pg/text@1']['output'];
+    flags: CodecTypes['pg/jsonb@1']['output'];
     formVersionId: CodecTypes['pg/uuid@1']['output'];
     id: CodecTypes['pg/uuid@1']['output'];
     jobId: CodecTypes['pg/uuid@1']['output'];
@@ -1141,7 +1150,8 @@ export namespace Models {
       | 'hired'
       | 'withdrawn'
       | 'note_added'
-      | 'rated';
+      | 'rated'
+      | 'flagged';
     application: public_Application;
     readonly [RelationKeys]?: 'application';
   };
@@ -1524,6 +1534,15 @@ type ContractBase = Omit<
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
                   readonly nullable: false;
+                };
+                readonly flags: {
+                  readonly nativeType: 'jsonb';
+                  readonly codecId: 'pg/jsonb@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/jsonb@1', readonly []>;
+                  };
                 };
                 readonly form_version_id: {
                   readonly nativeType: 'uuid';
@@ -3181,6 +3200,7 @@ type ContractBase = Omit<
                 'withdrawn',
                 'note_added',
                 'rated',
+                'flagged',
               ];
             };
             readonly ApplicationStatus: {
@@ -3311,6 +3331,10 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
+              readonly flags: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
+              };
               readonly formVersionId: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
@@ -3428,6 +3452,7 @@ type ContractBase = Omit<
                 readonly candidateId: { readonly column: 'candidate_id' };
                 readonly companyId: { readonly column: 'company_id' };
                 readonly email: { readonly column: 'email' };
+                readonly flags: { readonly column: 'flags' };
                 readonly formVersionId: { readonly column: 'form_version_id' };
                 readonly id: { readonly column: 'id' };
                 readonly jobId: { readonly column: 'job_id' };
@@ -4817,6 +4842,7 @@ type ContractBase = Omit<
               { readonly name: 'Withdrawn'; readonly value: 'withdrawn' },
               { readonly name: 'NoteAdded'; readonly value: 'note_added' },
               { readonly name: 'Rated'; readonly value: 'rated' },
+              { readonly name: 'Flagged'; readonly value: 'flagged' },
             ];
           };
           readonly ApplicationStatus: {

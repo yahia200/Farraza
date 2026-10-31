@@ -211,7 +211,14 @@ export interface FiredRule {
   reason: string;
 }
 
-const WORD_CHAR = String.raw`[\p{L}\p{N}_]`;
+/**
+ * A fired rule with the flag outcome, as stored in `applications.flags` and carried by the `flagged`
+ * event: a `FiredRule` without `outcome` (the column holds flags only). Reasons are text, so later
+ * edits to the rule never rewrite them. Members only; never returned by a public route.
+ */
+export type ScreeningFlag = Pick<FiredRule, 'ruleId' | 'questionKey' | 'questionLabel' | 'reason'>;
+
+const WORD_CHAR =String.raw`[\p{L}\p{N}_]`;
 
 /**
  * Whether `text` contains `word` as a whole word or phrase, ignoring case. The rule's text is

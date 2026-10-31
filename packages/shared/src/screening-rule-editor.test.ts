@@ -35,15 +35,18 @@ const tools = {
   type: 'multi_select',
   config: { options, maxSelections: null },
 };
+const years = { ...base, key: id(5), label: 'Years', type: 'number', config: {} };
+const start = { ...base, key: id(6), label: 'Start date', type: 'date', config: {} };
+const role = { ...base, key: id(7), label: 'Role', type: 'short_text', config: {} };
 const remote = { ...base, key: K.remote, label: 'Remote?', type: 'yes_no', config: {} };
 
 // The editor only reads key, label, type and options, so the fixtures skip the rest of the config schema.
 const asField = (f: unknown) => f as FormFields[number];
-const fields = [bio, stack, tools, remote].map(asField) as FormFields;
+const fields = [bio, stack, tools, remote, years, start, role].map(asField) as FormFields;
 
 describe('screenableFields', () => {
-  it('lists the choice and yes/no questions in form order and skips the rest', () => {
-    expect(screenableFields(fields).map((f) => f.label)).toEqual(['Stack', 'Tools', 'Remote?']);
+  it('lists every question type a rule can be about in form order', () => {
+    expect(screenableFields(fields).map((f) => f.label)).toEqual(['Bio', 'Stack', 'Tools', 'Remote?', 'Years', 'Start date', 'Role']);
   });
 });
 
@@ -60,6 +63,25 @@ describe('newRule', () => {
 
   it('starts a yes/no question accepting Yes', () => {
     expect(newRule(asField(remote), id(902)).condition).toEqual({ type: 'yes_no', answer: true });
+  });
+});
+
+describe('newRule for number, date and text', () => {
+  it('starts a number question needing at least 0', () => {
+    expect(newRule(asField(years), id(910)).condition).toEqual({ type: 'number', op: 'min', value: 0 });
+  });
+
+  it('starts a date question needing a date after the day of applying', () => {
+    expect(newRule(asField(start), id(911)).condition).toEqual({
+      type: 'date',
+      op: 'after',
+      when: { kind: 'relative', days: 0 },
+    });
+  });
+
+  it('starts a text question with no words', () => {
+    expect(newRule(asField(role), id(912)).condition).toEqual({ type: 'short_text', op: 'any_of', words: [] });
+    expect(newRule(asField(bio), id(913)).condition).toEqual({ type: 'long_text', op: 'any_of', words: [] });
   });
 });
 
@@ -108,6 +130,25 @@ describe('conditionOps', () => {
     ]);
     expect(conditionOps('yes_no')).toEqual([]);
   });
+
+  it('words number, date and text operators the same way', () => {
+    expect(conditionOps('number')).toEqual([
+      { op: 'min', label: 'unless it is at least' },
+      { op: 'max', label: 'unless it is at most' },
+      { op: 'range', label: 'unless it is between' },
+    ]);
+    expect(conditionOps('date')).toEqual([
+      { op: 'before', label: 'unless the date is before' },
+      { op: 'after', label: 'unless the date is after' },
+    ]);
+    const text = [
+      { op: 'any_of', label: 'unless it contains at least one of' },
+      { op: 'all_of', label: 'unless it contains all of' },
+      { op: 'none_of', label: 'if it contains any of' },
+    ];
+    expect(conditionOps('short_text')).toEqual(text);
+    expect(conditionOps('long_text')).toEqual(text);
+  });
 });
 
 describe('setConditionOp', () => {
@@ -116,6 +157,31 @@ describe('setConditionOp', () => {
       type: 'multi_select',
       op: 'none_of',
       optionIds: [O.a],
+    });
+  });
+});
+
+describe('setConditionOp for numbers', () => {
+  it('keeps the value between minimum and maximum', () => {
+    expect(setConditionOp({ type: 'number', op: 'min', value: 5 }, 'max')).toEqual({ type: 'number', op: 'max', value: 5 });
+  });
+
+  it('turns a single limit into a range starting and ending there, and a range back into its lower bound', () => {
+    expect(setConditionOp({ type: 'number', op: 'min', value: 5 }, 'range')).toEqual({
+      type: 'number',
+      op: 'range',
+      min: 5,
+      max: 5,
+    });
+    expect(setConditionOp({ type: 'number', op: 'range', min: 2, max: 9 }, 'max')).toEqual({
+      type: 'number',
+      op: 'max',
+      value: 9,
+    });
+    expect(setConditionOp({ type: 'number', op: 'range', min: 2, max: 9 }, 'min')).toEqual({
+      type: 'number',
+      op: 'min',
+      value: 2,
     });
   });
 });

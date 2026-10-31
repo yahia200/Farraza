@@ -1686,7 +1686,7 @@ describe('ApplicationsService', () => {
   });
 
   // Screening rules (.scratch/screening-rules/spec.md, ticket 04): the Job's rules decide the stage at
-  // submit. Only a reject acts here; a flag is ticket 05's.
+  // submit; a reject moves the Application, a flag marks it (ticket 05).
   describe('submit: Screening rules', () => {
     const WEEKENDS = 'e5555555-5555-4555-8555-555555555555';
     const LEVEL = 'e6666666-6666-4666-8666-666666666666';
@@ -1838,22 +1838,75 @@ describe('ApplicationsService', () => {
       expect(repository.applications[0]).toMatchObject({ status: 'active', stageId: 'stage-applied' });
     });
 
-    it('ignores a flag outcome: nothing is rejected, stored or recorded', async () => {
+    it('flag only: leaves the Application where it started, with the flag stored and a flagged event', async () => {
       seed([{ ...weekendsRule, outcome: 'flag' }]);
 
       await submit({ [WEEKENDS]: false });
 
-      expect(repository.applications[0]).toMatchObject({ status: 'active', stageId: 'stage-applied' });
-      expect(repository.applications[0]!.events.map((event) => event.type)).toEqual(['applied']);
+      const flag = {
+        ruleId: RULE_WEEKENDS,
+        questionKey: WEEKENDS,
+        questionLabel: 'Can you work weekends?',
+        reason: 'Can you work weekends? was No, expected Yes',
+      };
+      expect(repository.applications[0]).toMatchObject({
+        status: 'active',
+        stageId: 'stage-applied',
+        flags: [flag],
+        events: [
+          { type: 'applied' },
+          { type: 'flagged', fromStageId: null, toStageId: 'stage-applied', data: { rules: [flag] } },
+        ],
+      });
     });
 
-    it('rejects on the reject rule and leaves out a flag that fired beside it', async () => {
+    it('reject plus flag: rejected, with auto_rejected carrying only the reject and flagged the flag', async () => {
       seed([{ ...yearsRule, outcome: 'flag' }, weekendsRule]);
 
       await submit({ [WEEKENDS]: false, [YEARS]: 1 });
 
-      const rejected = repository.applications[0]!.events[1]!;
-      expect((rejected.data as unknown as { rules: unknown[] }).rules).toHaveLength(1);
+      const application = repository.applications[0]!;
+      expect(application).toMatchObject({ status: 'rejected', stageId: 'stage-rejected' });
+      expect(application.events.map((event) => event.type)).toEqual(['applied', 'auto_rejected', 'flagged']);
+      const [, rejected, flagged] = application.events;
+      expect((rejected!.data as { rules: Array<{ ruleId: string }> }).rules.map((r) => r.ruleId)).toEqual([
+        RULE_WEEKENDS,
+      ]);
+      expect(flagged).toMatchObject({
+        fromStageId: null,
+        toStageId: 'stage-rejected',
+        data: { rules: [{ ruleId: RULE_YEARS, reason: 'Years of experience was 1, minimum 5' }] },
+      });
+      expect(application.flags.map((flag) => flag.ruleId)).toEqual([RULE_YEARS]);
+    });
+
+    it('stores flags as [] and writes no flagged event when no rule fires', async () => {
+      seed([{ ...weekendsRule, outcome: 'flag' }]);
+
+      await submit({ [WEEKENDS]: true });
+
+      expect(repository.applications[0]!.flags).toEqual([]);
+      expect(repository.applications[0]!.events.map((event) => event.type)).toEqual(['applied']);
+    });
+
+    it('stores [] flags for a reject-only outcome', async () => {
+      seed([weekendsRule]);
+
+      await submit({ [WEEKENDS]: false });
+
+      expect(repository.applications[0]!.flags).toEqual([]);
+      expect(repository.applications[0]!.events.map((event) => event.type)).toEqual(['applied', 'auto_rejected']);
+    });
+
+    it('lists every flag that fired, in rule order', async () => {
+      seed([
+        { ...weekendsRule, outcome: 'flag' },
+        { ...yearsRule, outcome: 'flag' },
+      ]);
+
+      await submit({ [WEEKENDS]: false, [YEARS]: 2 });
+
+      expect(repository.applications[0]!.flags.map((flag) => flag.ruleId)).toEqual([RULE_WEEKENDS, RULE_YEARS]);
     });
 
     it('accepts an Application on a stored form that still has the retired reject settings, and never serves them', async () => {
@@ -1889,18 +1942,33 @@ describe('ApplicationsService', () => {
       expect(repository.applications[0]).toEqual(before);
     });
 
-    it('returns no rules or reasons from any public route', async () => {
-      seed([weekendsRule, levelRule]);
+    it('keeps the stored flags when the rules are edited or deleted afterwards', async () => {
+      const job = seed([{ ...weekendsRule, outcome: 'flag' }]);
+      await submit({ [WEEKENDS]: false });
+      const before = structuredClone(repository.applications[0]!.flags);
+
+      job.screeningRules = [{ ...weekendsRule, outcome: 'flag', condition: { type: 'yes_no', answer: false } }];
+      expect(repository.applications[0]!.flags).toEqual(before);
+      job.screeningRules = [];
+
+      expect(repository.applications[0]!.flags).toEqual(before);
+      expect(before).toHaveLength(1);
+    });
+
+    it('returns no rules, reasons or flags from any public route', async () => {
+      seed([weekendsRule, levelRule, { ...yearsRule, outcome: 'flag' }]);
 
       const payloads = [
         await service.getPublicJob('acme', 'screened'),
         await service.listCompanyJobs('acme'),
         await service.getCompanyBranding('acme'),
-        await submit({ [WEEKENDS]: false }),
+        await submit({ [WEEKENDS]: false, [YEARS]: 1 }),
       ];
 
       for (const payload of payloads) {
-        expect(JSON.stringify(payload)).not.toMatch(/screeningRules|reason|expected Yes|ruleId|outcome/);
+        expect(JSON.stringify(payload)).not.toMatch(
+          /screeningRules|reason|expected Yes|ruleId|outcome|flags|flagged|minimum 5/,
+        );
       }
     });
   });

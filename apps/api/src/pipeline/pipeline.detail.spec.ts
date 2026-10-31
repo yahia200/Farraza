@@ -6,6 +6,7 @@ import type { FormsRepository } from '../forms/forms.repository.js';
 import type { JobWithStages } from '../jobs/job.js';
 import type { JobsService } from '../jobs/jobs.service.js';
 import type { StorageService } from '../storage/storage.service.js';
+import type { ScreeningFlag } from '@repo/shared';
 import type { ApplicationDetailRow, RatingRow } from './pipeline.js';
 import type { PipelineRepository } from './pipeline.repository.js';
 import { PipelineService } from './pipeline.service.js';
@@ -25,13 +26,13 @@ interface StoredRating extends RatingRow {
 }
 
 class InMemoryPipelineRepository implements Pick<PublicApi<PipelineRepository>, 'findDetail'> {
-  private readonly applications: { id: string; companyId: string; jobId: string }[] = [];
+  private readonly applications: { id: string; companyId: string; jobId: string; flags: ScreeningFlag[] }[] = [];
   private readonly ratings: StoredRating[] = [];
   /** How many times `findDetail` ran: the detail must not cost a query per Rating. */
   detailReads = 0;
 
-  seedApplication(row: { id: string; companyId?: string; jobId?: string }): void {
-    this.applications.push({ companyId: 'company-1', jobId: 'job-1', ...row });
+  seedApplication(row: { id: string; companyId?: string; jobId?: string; flags?: ScreeningFlag[] }): void {
+    this.applications.push({ companyId: 'company-1', jobId: 'job-1', flags: [], ...row });
   }
 
   seedRating(row: Partial<StoredRating> & { applicationId: string }): void {
@@ -71,6 +72,7 @@ class InMemoryPipelineRepository implements Pick<PublicApi<PipelineRepository>, 
       fields: [],
       cvMode: 'off',
       answers: {},
+      flags: found.flags,
       events: [],
       notes: [],
       ratings,
@@ -225,6 +227,26 @@ describe('PipelineService.detail: Ratings and their summary', () => {
     await detail(member('company-1', 'recruiter'));
 
     expect(repository.detailReads).toBe(1);
+  });
+
+  describe('flags', () => {
+    const flag: ScreeningFlag = {
+      ruleId: 'rule-1',
+      questionKey: 'q-1',
+      questionLabel: 'Years of experience',
+      reason: 'Years of experience was 2, minimum 5',
+    };
+
+    it('carries the stored flags with their reasons, to an interviewer too', async () => {
+      repository.seedApplication({ id: 'app-flagged', flags: [flag] });
+
+      expect((await detail(member('company-1', 'interviewer'), 'app-flagged')).flags).toEqual([flag]);
+      expect((await detail(member('company-1', 'owner'), 'app-flagged')).flags).toEqual([flag]);
+    });
+
+    it('carries [] for an Application with none', async () => {
+      expect((await detail(member('company-1', 'recruiter'))).flags).toEqual([]);
+    });
   });
 
   describe('another tenant or Job', () => {
