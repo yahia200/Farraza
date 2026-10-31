@@ -27,15 +27,15 @@ const options = [
 ];
 
 const bio = { ...base, key: K.bio, label: 'Bio', type: 'long_text', config: { maxLength: null } };
-const stack = { ...base, key: K.stack, label: 'Stack', type: 'single_select', config: { options, rejectOptionIds: [] } };
+const stack = { ...base, key: K.stack, label: 'Stack', type: 'single_select', config: { options } };
 const tools = {
   ...base,
   key: K.tools,
   label: 'Tools',
   type: 'multi_select',
-  config: { options, rejectOptionIds: [], maxSelections: null },
+  config: { options, maxSelections: null },
 };
-const remote = { ...base, key: K.remote, label: 'Remote?', type: 'yes_no', config: { rejectWhen: null } };
+const remote = { ...base, key: K.remote, label: 'Remote?', type: 'yes_no', config: {} };
 
 // The editor only reads key, label, type and options, so the fixtures skip the rest of the config schema.
 const asField = (f: unknown) => f as FormFields[number];
@@ -85,7 +85,7 @@ describe('retargetRule', () => {
   });
 
   it('keeps the operator but drops the options when moving to another question of the same type', () => {
-    const other = asField({ ...stack, key: id(77), config: { options: [{ id: O.b, label: 'B' }], rejectOptionIds: [] } });
+    const other = asField({ ...stack, key: id(77), config: { options: [{ id: O.b, label: 'B' }] } });
     expect(retargetRule(rule, other)).toEqual({
       id: id(900),
       questionKey: id(77),

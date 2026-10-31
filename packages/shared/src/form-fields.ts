@@ -74,8 +74,6 @@ const singleSelect = z.object({
   type: z.literal('single_select'),
   config: z.object({
     options: optionsSchema,
-    /** Choosing one of these rejects the application automatically. */
-    rejectOptionIds: z.array(z.uuid({ error: RELOAD })),
   }),
 });
 
@@ -95,10 +93,7 @@ const multiSelect = z.object({
 const yesNo = z.object({
   ...base,
   type: z.literal('yes_no'),
-  config: z.object({
-    /** The answer that rejects the application, or null for no knockout. */
-    rejectWhen: z.boolean().nullable(),
-  }),
+  config: z.object({}),
 });
 
 const file = z.object({
@@ -237,17 +232,6 @@ function checkLeafRules(field: LeafFormField, path: Path, ctx: z.RefinementCtx) 
     ctx.addIssue({ code: 'custom', message: RELOAD, path: [...path, 'config', 'options'] });
   }
 
-  if (field.type === 'single_select') {
-    const unknown = field.config.rejectOptionIds.some((id) => !optionIds.has(id));
-    if (unknown) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'An auto-reject rule points to an option that no longer exists. Update the rule.',
-        path: [...path, 'config', 'rejectOptionIds'],
-      });
-    }
-  }
-
   if (
     field.type === 'multi_select' &&
     field.config.maxSelections !== null &&
@@ -260,8 +244,6 @@ function checkLeafRules(field: LeafFormField, path: Path, ctx: z.RefinementCtx) 
     });
   }
 }
-
-const NO_RULES_IN_GROUPS = "Auto-reject rules aren't available inside a group.";
 
 /**
  * Checks a question's Preset key against the catalog and a scope. The scope is
@@ -321,20 +303,6 @@ export const formFieldsSchema = z
           const childPath = [index, 'config', 'fields', childIndex];
           claimKey(child.key, [...childPath, 'key']);
           checkPresetKey(child, childPath, groupPresetKeys, ctx);
-          if (child.type === 'single_select' && child.config.rejectOptionIds.length > 0) {
-            ctx.addIssue({
-              code: 'custom',
-              message: NO_RULES_IN_GROUPS,
-              path: [...childPath, 'config', 'rejectOptionIds'],
-            });
-          }
-          if (child.type === 'yes_no' && child.config.rejectWhen !== null) {
-            ctx.addIssue({
-              code: 'custom',
-              message: NO_RULES_IN_GROUPS,
-              path: [...childPath, 'config', 'rejectWhen'],
-            });
-          }
           checkLeafRules(child, childPath, ctx);
         });
         return;

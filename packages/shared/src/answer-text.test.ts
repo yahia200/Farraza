@@ -20,11 +20,11 @@ const options = [
 
 const shortText: LeafFormField = { ...base, type: 'short_text', config: { maxLength: 500 } };
 const longText: LeafFormField = { ...base, type: 'long_text', config: { maxLength: 10000 } };
-const yesNo: LeafFormField = { ...base, type: 'yes_no', config: { rejectWhen: null } };
+const yesNo: LeafFormField = { ...base, type: 'yes_no', config: {} };
 const number: LeafFormField = { ...base, type: 'number', config: { min: null, max: null, integerOnly: false } };
 const date: LeafFormField = { ...base, type: 'date', config: { min: null, max: null } };
 const url: LeafFormField = { ...base, type: 'url', config: {} };
-const singleSelect: LeafFormField = { ...base, type: 'single_select', config: { options, rejectOptionIds: [] } };
+const singleSelect: LeafFormField = { ...base, type: 'single_select', config: { options } };
 const multiSelect: LeafFormField = { ...base, type: 'multi_select', config: { options, maxSelections: null } };
 
 describe('formatAnswerText', () => {

@@ -54,7 +54,6 @@ const degreeQuestion = {
       { id: HIGH_SCHOOL, label: 'High school' },
       { id: BACHELORS, label: "Bachelor's" },
     ],
-    rejectOptionIds: [],
   },
 };
 
@@ -74,6 +73,48 @@ const group = (
 describe('parseFormFields', () => {
   it('accepts a valid form', () => {
     expect(parseFormFields([shortText])).toMatchObject({ ok: true });
+  });
+
+  describe('retired reject rules (ADR-0005)', () => {
+    const legacyYesNo = {
+      key: ABOUT,
+      type: 'yes_no',
+      label: 'Can you work weekends?',
+      helpText: null,
+      required: true,
+      config: { rejectWhen: false },
+    };
+
+    it('loads a stored question that still has a rule, and does not keep the rule', () => {
+      const legacySelect = {
+        ...degreeQuestion,
+        config: { ...degreeQuestion.config, rejectOptionIds: [HIGH_SCHOOL] },
+      };
+      const result = parseFormFields([legacyYesNo, legacySelect]);
+      expect(result).toMatchObject({ ok: true });
+      const text = result.ok ? JSON.stringify(result.fields) : '';
+      expect(text).not.toContain('rejectWhen');
+      expect(text).not.toContain('rejectOptionIds');
+      expect(text).toContain("Bachelor's");
+    });
+
+    it('strips a rule from a sub-question too, even one pointing at a removed option', () => {
+      const gone = '99999999-9999-4999-8999-999999999999';
+      const result = parseFormFields([
+        group([
+          { ...degreeQuestion, config: { ...degreeQuestion.config, rejectOptionIds: [gone] } },
+          { ...legacyYesNo, key: SCHOOL },
+        ]),
+      ]);
+      expect(result).toMatchObject({ ok: true });
+      const text = result.ok ? JSON.stringify(result.fields) : '';
+      expect(text).not.toContain('reject');
+    });
+
+    it('accepts a new question with no rule properties', () => {
+      const noRule = { ...legacyYesNo, config: {} };
+      expect(parseFormFields([noRule])).toMatchObject({ ok: true });
+    });
   });
 
   describe('file questions (Attachments)', () => {
@@ -218,45 +259,6 @@ describe('parseFormFields', () => {
       });
     });
 
-    it('refuses an auto-reject rule on a single-choice sub-question', () => {
-      const withRule = {
-        ...degreeQuestion,
-        config: { ...degreeQuestion.config, rejectOptionIds: [HIGH_SCHOOL] },
-      };
-      expect(parseFormFields([group([schoolQuestion, withRule])])).toEqual({
-        ok: false,
-        errors: [
-          {
-            path: '0.config.fields.1.config.rejectOptionIds',
-            message: "Auto-reject rules aren't available inside a group.",
-          },
-        ],
-      });
-    });
-
-    it('refuses an auto-reject rule on a yes/no sub-question, but not the absence of one', () => {
-      const yesNo = (rejectWhen: boolean | null) => ({
-        key: SCHOOL,
-        type: 'yes_no',
-        label: 'Did you graduate?',
-        helpText: null,
-        required: false,
-        config: { rejectWhen },
-      });
-      expect(parseFormFields([group([yesNo(null)])])).toMatchObject({ ok: true });
-      for (const rejectWhen of [true, false]) {
-        expect(parseFormFields([group([yesNo(rejectWhen)])])).toEqual({
-          ok: false,
-          errors: [
-            {
-              path: '0.config.fields.0.config.rejectWhen',
-              message: "Auto-reject rules aren't available inside a group.",
-            },
-          ],
-        });
-      }
-    });
-
     it('refuses two sub-questions with the same key', () => {
       expect(parseFormFields([group([schoolQuestion, { ...degreeQuestion, key: SCHOOL }])])).toMatchObject({
         ok: false,
@@ -378,7 +380,7 @@ describe('parseFormFields', () => {
         label: 'Did you graduate?',
         helpText: null,
         required: false,
-        config: { rejectWhen: null },
+        config: {},
       };
       // A school key on a yes/no, and the group key on a short text.
       expect(parseFormFields([{ ...yesNo, presetKey: 'education.school' }])).toEqual({

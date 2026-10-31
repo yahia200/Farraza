@@ -13,18 +13,17 @@ export type Entry = Answers;
 /** Answers keyed by field key. Unanswered optional fields are absent. */
 export type Answers = Record<string, AnswerValue>;
 
-type SingleSelectField = Extract<FormField, { type: 'single_select' }>;
-type YesNoField = Extract<FormField, { type: 'yes_no' }>;
+/** A field as applicants may see it. Since ADR-0005 a field carries no hidden settings, so it is the field itself. */
+export type PublicFormField = FormField;
 
-/** A field as applicants may see it: the same, minus knockout rules. */
-export type PublicFormField =
-  | Exclude<FormField, SingleSelectField | YesNoField>
-  | (Omit<SingleSelectField, 'config'> & {
-      config: Omit<SingleSelectField['config'], 'rejectOptionIds'>;
-    })
-  | (Omit<YesNoField, 'config'> & { config: Record<string, unknown> });
-
-/** Removes everything an applicant must not learn about the form. */
+/**
+ * Removes everything an applicant must not learn about the form.
+ *
+ * Form versions saved before ADR-0005 can still hold the retired `rejectWhen` / `rejectOptionIds`
+ * in a question's `config`. The API reads stored versions without parsing them, so this is the
+ * last line of defence: it rebuilds those two configs without the rule properties. Delete it,
+ * and the matching tests, once no such version is left.
+ */
 export function toPublicFields(fields: FormFields): PublicFormField[] {
   return fields.map((field): PublicFormField => {
     if (field.type === 'single_select') {

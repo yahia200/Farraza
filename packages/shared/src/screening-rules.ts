@@ -9,8 +9,7 @@ import { RELOAD_MESSAGE } from './messages.js';
  * manager sets on a Job to reject or flag an Application from one answer.
  *
  * A condition states what an ACCEPTABLE answer looks like ("minimum 5", "in this set"); the rule
- * fires when the answer falls outside it. The field level `rejectWhen` / `rejectOptionIds`
- * no longer act (`findKnockout` is gone); their config is removed in ticket 08.
+ * fires when the answer falls outside it. Rules live on the Job, never in a form field's config.
  *
  * Pure and server-or-browser safe. Like dates.ts it uses the platform's `Temporal`, never a polyfill.
  */
