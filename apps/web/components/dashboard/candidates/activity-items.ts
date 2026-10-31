@@ -3,6 +3,7 @@ import {
   RATING_CRITERIA,
   RATING_MAX,
   buildActivityTimeline,
+  screeningDisplay,
   type ActivityEntry,
   type ActivityEvent,
   type ActivityNote,
@@ -64,6 +65,10 @@ function describeEvent({ type, data, actorId }: ActivityEntry, raters: readonly 
       return label
         ? `Rejected automatically: their answer to “${label}” matched a rule`
         : 'Rejected automatically';
+    }
+    case 'flagged': {
+      const count = screeningDisplay([{ type: 'flagged', data }], []).flagged.length;
+      return count > 0 ? `Flagged by ${count} screening ${count === 1 ? 'rule' : 'rules'}` : 'Flagged';
     }
     case 'stage_changed':
       return `Moved ${fromTo(data)}`;

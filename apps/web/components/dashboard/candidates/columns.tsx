@@ -9,6 +9,7 @@ import type { HighlightedQuestion } from '@/lib/dal';
 import { AverageRatingLabel } from './average-rating-label';
 import { ContactActions } from './contact-actions';
 import type { CandidateRow, CandidatesTableFeatures } from './data-table-features';
+import { FlagMarker } from './flag-marker';
 import { HighlightAnswer } from './highlight-answer';
 
 const columnHelper = createColumnHelper<CandidatesTableFeatures, CandidateRow>();
@@ -28,6 +29,7 @@ const candidateColumn = columnHelper.accessor((row) => row.candidate.name, {
         {row.original.candidate.name}
       </Link>
       <span className="truncate text-xs text-muted-foreground">{row.original.candidate.email}</span>
+      <FlagMarker flags={row.original.flags} className="mt-1" />
     </div>
   ),
 });

@@ -11,6 +11,7 @@ import { ApplicationStatusBadge } from "./application-status-badge";
 import { AverageRatingLabel } from "./average-rating-label";
 import { candidatesHref } from "./candidates-href";
 import { ContactActions } from "./contact-actions";
+import { FlagMarker } from "./flag-marker";
 import { HighlightAnswer } from "./highlight-answer";
 import {
   MoveToStageSelect,
@@ -156,6 +157,12 @@ export function CandidateCard({
         phone={card.candidate.phone}
         className="absolute right-2 top-2"
       />
+      {/* A sibling of the link too: a button inside it would be nested interactive content. */}
+      {card.flags.length > 0 && (
+        <div className="px-3 pb-2">
+          <FlagMarker flags={card.flags} />
+        </div>
+      )}
       <div className="flex items-center gap-2 px-3 pb-3">
         {canMove && (
           <MoveToStageSelect

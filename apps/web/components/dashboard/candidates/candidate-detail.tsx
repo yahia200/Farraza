@@ -1,6 +1,6 @@
-import type { StageKind } from '@repo/shared';
+import { flagMarkerLabel, screeningDisplay, type ShownRule, type StageKind } from '@repo/shared';
 import { unstable_rethrow } from 'next/navigation';
-import { BanIcon } from 'lucide-react';
+import { BanIcon, FlagIcon } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -61,6 +61,8 @@ export async function CandidateDetail({
 
   const { candidate, stage, fields, cvMode, answers, autoRejectedBy } = application;
   const cv = files?.find((file) => file.purpose === 'cv');
+  // Stored reasons (text), so a renamed question or an edited rule never changes what is shown.
+  const screening = screeningDisplay(application.events, application.flags);
 
   return (
     <>
@@ -93,9 +95,29 @@ export async function CandidateDetail({
             <BanIcon />
             <AlertTitle>Rejected automatically</AlertTitle>
             <AlertDescription>
-              {autoRejectedBy.questionLabels.length > 0
-                ? `Their answer to “${autoRejectedBy.questionLabels.join('”, “')}” matched an auto-reject rule.`
-                : 'Their answers matched an auto-reject rule.'}
+              {screening.rejected.length > 0 ? (
+                <ul className="flex list-disc flex-col gap-1 pl-4">
+                  {screening.rejected.map((rule, index) => (
+                    <ScreeningReason key={rule.ruleId ?? index} rule={rule} />
+                  ))}
+                </ul>
+              ) : (
+                'Their answers matched an auto-reject rule.'
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {screening.flagged.length > 0 && (
+          <Alert variant="warning">
+            <FlagIcon />
+            <AlertTitle>{flagMarkerLabel(screening.flagged.length)}</AlertTitle>
+            <AlertDescription>
+              <ul className="flex list-disc flex-col gap-1 pl-4">
+                {screening.flagged.map((rule, index) => (
+                  <ScreeningReason key={rule.ruleId ?? index} rule={rule} />
+                ))}
+              </ul>
             </AlertDescription>
           </Alert>
         )}
@@ -204,6 +226,11 @@ export async function CandidateDetail({
       </div>
     </>
   );
+}
+
+/** One fired rule: its stored reason, or (old events carry none) the question it was about. */
+function ScreeningReason({ rule }: { rule: ShownRule }) {
+  return <li>{rule.reason ?? `Their answer to “${rule.questionLabel}” matched a rule.`}</li>;
 }
 
 /** Fixed sizes only: no Math.random() in anything prerendered. */
