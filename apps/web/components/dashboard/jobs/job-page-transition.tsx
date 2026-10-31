@@ -1,7 +1,7 @@
 import { ViewTransition } from 'react';
 
 /**
- * Gives a job section (Overview, Application form, Candidates) the tab panels'
+ * Gives a job section (Overview, Application form, Candidates, Settings) the tab panels'
  * enter/exit fade. It goes in each page.tsx, not the layout: a layout persists
  * across navigations, so enter and exit would never fire there
  * (02-guides/view-transitions.md, Step 3). The animation itself is the

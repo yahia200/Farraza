@@ -9,11 +9,14 @@ import {
   saveHighlightedQuestionsSchema,
   saveRatingCriteriaSchema,
   updateJobSchema,
+  groupRuleErrors,
   type CreateJobInput,
+  type RuleErrors,
+  type ScreeningRule,
   type UpdateJobInput,
 } from '@repo/shared';
 import type { ActionFailure } from '@/lib/action-failure';
-import { apiFetch, failureFromResponse } from '@/lib/api';
+import { apiFetch, failureFromResponse, readApiError } from '@/lib/api';
 import { expireCompanyJobs, expirePublicJob } from '@/lib/public-jobs';
 
 /**
@@ -169,8 +172,8 @@ export type SaveRatingCriteriaResult = ActionFailure<never> & { keys?: string[] 
  * with the whole new list (apps/api/src/jobs). The picker on the candidates
  * page calls it on every tick, so it returns failures rather than throwing.
  * It revalidates the candidates page, which re-reads the job (the saved keys),
- * so the picker and the sheet's Criteria rows follow without a reload.
- * Applicants never see Criteria, so the public job is left alone.
+ * so the sheet's Criteria rows follow without a reload, and the Settings page, where the Criteria
+ * are chosen. Applicants never see Criteria, so the public job is left alone.
  */
 export async function saveRatingCriteria(
   companySlug: string,
@@ -183,6 +186,7 @@ export async function saveRatingCriteria(
   }
 
   const candidatesPath = `/dashboard/${companySlug}/jobs/${jobSlug}/candidates`;
+  const settingsPath = `/dashboard/${companySlug}/jobs/${jobSlug}/settings`;
   const response = await apiFetch(`${jobsPath(companySlug, jobSlug)}/rating-criteria`, {
     method: 'PUT',
     body: JSON.stringify(parsed.data),
@@ -198,11 +202,64 @@ export async function saveRatingCriteria(
     });
     if (response.status === 400) {
       revalidatePath(candidatesPath);
+      revalidatePath(settingsPath);
     }
     return failure;
   }
 
   const saved = (await response.json()) as { keys: string[] };
   revalidatePath(candidatesPath);
+  revalidatePath(settingsPath);
   return { keys: saved.keys };
+}
+
+export type SaveScreeningRulesResult = ActionFailure<never> & {
+  /** The API's refusals, by rule index (`groupRuleErrors`). Present with a 400 that names rules. */
+  ruleErrors?: Record<number, RuleErrors>;
+  rules?: ScreeningRule[];
+};
+
+/**
+ * Saves the Job's Screening rules, calling PUT .../jobs/:jobSlug/screening-rules with the whole new
+ * list (apps/api/src/jobs: one replace-all, last write wins). The body is not re-validated here: the
+ * rules are checked against the published form, which only the API reads, and its 400 comes back as
+ * field errors per rule (`rules.<index>.<path>`), which the editor shows on the right rule. Returns
+ * failures rather than throwing. Revalidates the Settings page, which re-reads the job, and the
+ * candidates page, which will show flags. Applicants never see rules, so the public job is left alone.
+ */
+export async function saveScreeningRules(
+  companySlug: string,
+  jobSlug: string,
+  rules: ScreeningRule[],
+): Promise<SaveScreeningRulesResult> {
+  const response = await apiFetch(`${jobsPath(companySlug, jobSlug)}/screening-rules`, {
+    method: 'PUT',
+    body: JSON.stringify({ rules }),
+  });
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  const settingsPath = `/dashboard/${companySlug}/jobs/${jobSlug}/settings`;
+  if (!response.ok) {
+    if (response.status === 400) {
+      const body = await readApiError(response);
+      const { byRule, form } = groupRuleErrors(body.errors ?? []);
+      // The form was probably published or changed under an open page: refresh what the editor offers.
+      revalidatePath(settingsPath);
+      const message = Array.isArray(body.message) ? body.message.join(' ') : body.message;
+      return {
+        ruleErrors: byRule,
+        formError: form[0] ?? (Object.keys(byRule).length > 0 ? undefined : message),
+      };
+    }
+    return failureFromResponse(response, [], {
+      ...NO_PERMISSION,
+      404: () => ({ formError: 'This job no longer exists. Reload the page.' }),
+    });
+  }
+
+  const saved = (await response.json()) as { rules: ScreeningRule[] };
+  revalidatePath(settingsPath);
+  revalidatePath(`/dashboard/${companySlug}/jobs/${jobSlug}/candidates`);
+  return { rules: saved.rules };
 }
