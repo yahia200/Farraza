@@ -8,6 +8,7 @@ import {
   type ActivityNote,
   type RatingValues,
 } from '@repo/shared';
+import { autoRejectedByOf } from '@/lib/dal';
 import { formatDateTime } from '@/lib/format';
 
 /**
@@ -58,7 +59,8 @@ function describeEvent({ type, data, actorId }: ActivityEntry, raters: readonly 
       return source ? `Applied via ${source}` : 'Applied';
     }
     case 'auto_rejected': {
-      const label = stringField(data, 'fieldLabel');
+      // New events carry `{ rules: [...] }`, older ones `{ fieldLabel }`.
+      const label = autoRejectedByOf(data).questionLabels.join(', ');
       return label
         ? `Rejected automatically: their answer to “${label}” matched a rule`
         : 'Rejected automatically';

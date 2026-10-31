@@ -93,7 +93,9 @@ export async function CandidateDetail({
             <BanIcon />
             <AlertTitle>Rejected automatically</AlertTitle>
             <AlertDescription>
-              Their answer to &ldquo;{autoRejectedBy.fieldLabel}&rdquo; matched an auto-reject rule.
+              {autoRejectedBy.questionLabels.length > 0
+                ? `Their answer to “${autoRejectedBy.questionLabels.join('”, “')}” matched an auto-reject rule.`
+                : 'Their answers matched an auto-reject rule.'}
             </AlertDescription>
           </Alert>
         )}
@@ -154,7 +156,7 @@ export async function CandidateDetail({
                   <div key={field.key} className="flex flex-col gap-1">
                     <dt className="flex flex-wrap items-center gap-2 font-medium">
                       {field.label}
-                      {autoRejectedBy?.fieldKey === field.key && <Badge variant="destructive">Auto-reject</Badge>}
+                      {autoRejectedBy?.questionKeys.includes(field.key) && <Badge variant="destructive">Auto-reject</Badge>}
                     </dt>
                     <dd className="text-muted-foreground">
                       {field.type === 'file' ? (
