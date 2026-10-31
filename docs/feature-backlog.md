@@ -77,3 +77,20 @@ Let users protect their account with a time-based one-time password from an auth
 - Sign-in: after the password (or Google) step, ask for the 6-digit code.
 - Manage: disable 2FA, regenerate recovery codes.
 - Note: `PrismaMfaStore` already exists in `apps/api/src/auth/` (wired in `auth.module.ts`), so check what the auth package already provides before designing anything new.
+
+### Sign-in limits per email
+
+Limit failed sign-ins per account, not only per visitor. Sign-in and sign-up already have per-visitor limits (`@Throttle` in `apps/api/src/auth/auth.controller.ts`: 10 sign-ins and 5 sign-ups per 10 minutes). That does not stop an attacker who guesses one account's password from many addresses (security review finding M-4).
+
+- A second tracker keyed on the normalized email, or a failure counter in the database. `TrustedClientThrottlerGuard` (`apps/api/src/common/trusted-client-throttler.guard.ts`) overrides `getTracker`; read "Customization" and "Proxies" in `apps/api/node_modules/@nestjs/throttler/README.md` first.
+- Don't hard-lock the account: anyone could lock a victim out by failing on purpose. Use a growing delay (backoff) or a challenge instead.
+- Only worth building if credential stuffing shows up in practice.
+
+### Cap concurrent password hashing
+
+Bound how many password hashes run at once, so a burst of sign-in attempts from many addresses cannot exhaust memory or the thread pool (security review finding M-5). Each hash uses about 128 MiB (scrypt `logN: 17`) and runs on the libuv thread pool; an unknown email still pays for a full dummy hash, by design, so the response time does not reveal which accounts exist.
+
+- Idea: at most 2 hashes at once, and extra requests get `503` with `Retry-After` instead of queuing. Read how `@nestjs/authentication` lets the app replace the `PasswordHasher` it builds from its `password` option before choosing where the cap goes (`apps/api/node_modules/@nestjs/authentication/dist/services/password-hasher.service.d.ts`).
+- **Check first whether this is needed at all for a small team's app.** The per-visitor limits on sign-in and sign-up already bound each address. Weigh the cost of a distributed burst (rare for a small private tool) against the extra code and the chance of turning away real sign-ins.
+- **Before lowering the hash cost:** `logN: 17` is the library's stated OWASP minimum (N=2^17, r=8, p=1). OWASP's Password Storage Cheat Sheet lists other scrypt settings that trade memory for CPU; read it before weakening anything (not yet verified). The security review's "logN 15 is fine" claim contradicts the library comment.
+- Also check the memory size of the API's Cloud Run service (not in the repo): four concurrent hashes are about 512 MiB before Node itself.
