@@ -5,6 +5,9 @@ import {
   SCREENING_RULES_LIMIT,
   SCREENING_WORDS_LIMIT,
   SCREENING_WORD_MAX_LENGTH,
+  MAX_RELATIVE_DAYS,
+  isDuplicateScreeningWord,
+  normaliseScreeningWord,
   evaluateScreeningRules,
   parseScreeningRules,
   type ScreeningRule,
@@ -420,5 +423,30 @@ describe('evaluateScreeningRules', () => {
       const b = rule(K.years, { type: 'number', op: 'min', value: 9 }, 'reject');
       expect(fired([a, b], { [K.years]: 1 })).toHaveLength(2);
     });
+  });
+});
+
+describe('screening word helpers', () => {
+  it('normalises a word by trimming it, as the schema does', () => {
+    expect(normaliseScreeningWord('  SQL ')).toBe('SQL');
+  });
+
+  it('treats a word as a duplicate ignoring case and surrounding spaces', () => {
+    expect(isDuplicateScreeningWord(['SQL', 'Python'], ' sql ')).toBe(true);
+    expect(isDuplicateScreeningWord(['SQL'], 'python')).toBe(false);
+  });
+
+  it('exports the relative-days limit the schema enforces', () => {
+    const fields = [
+      { key: id(2), type: 'date', label: 'D', required: false, config: { min: null, max: null } },
+    ] as unknown as FormFields;
+    const rule = (days: number) => ({
+      id: id(1),
+      questionKey: id(2),
+      outcome: 'flag',
+      condition: { type: 'date', op: 'before', when: { kind: 'relative', days } },
+    });
+    expect(parseScreeningRules([rule(MAX_RELATIVE_DAYS)], fields).ok).toBe(true);
+    expect(parseScreeningRules([rule(MAX_RELATIVE_DAYS + 1)], fields).ok).toBe(false);
   });
 });

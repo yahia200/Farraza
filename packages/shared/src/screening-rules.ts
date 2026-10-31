@@ -21,7 +21,7 @@ export const SCREENING_WORDS_LIMIT = 20;
 export const SCREENING_WORD_MAX_LENGTH = 60;
 
 /** A relative date may reach this many days either side of the submission date (about ten years). */
-const MAX_RELATIVE_DAYS = 3650;
+export const MAX_RELATIVE_DAYS = 3650;
 
 const outcomeSchema = z.enum(['reject', 'flag'], { error: RELOAD_MESSAGE });
 export type ScreeningOutcome = z.infer<typeof outcomeSchema>;
@@ -30,6 +30,15 @@ const optionIds = z
   .array(z.uuid({ error: RELOAD_MESSAGE }), { error: RELOAD_MESSAGE })
   .min(1, { error: 'Choose at least one option.' })
   .max(50, { error: 'Choose at most 50 options.' });
+
+/** A word as stored: surrounding spaces removed (the schema below trims the same way). */
+export const normaliseScreeningWord = (word: string): string => word.trim();
+
+/** Whether `word` is already in `words`, ignoring case and surrounding spaces. The editor refuses a repeat. */
+export function isDuplicateScreeningWord(words: readonly string[], word: string): boolean {
+  const wanted = normaliseScreeningWord(word).toLowerCase();
+  return words.some((existing) => normaliseScreeningWord(existing).toLowerCase() === wanted);
+}
 
 const words = z
   .array(
