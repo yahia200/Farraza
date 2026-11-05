@@ -1,9 +1,9 @@
-import { BriefcaseBusinessIcon, GraduationCapIcon, type LucideIcon } from 'lucide-react';
+import { BriefcaseBusinessIcon, CodeXmlIcon, GlobeIcon, GraduationCapIcon, LinkIcon, MapPinIcon, type LucideIcon } from 'lucide-react';
 import type { FormField, LeafFormField, PresetKey } from '@repo/shared';
 import { newOption } from './field-types';
 
 /**
- * A Preset: a ready-made question (for now always a repeating group) that the "Add question" menu
+ * A Preset: a ready-made question (a repeating group, or a single question) that the "Add question" menu
  * inserts as a copy (ADR-0004). The shared package only holds the catalog of Preset keys; the
  * definitions (labels, help text, limits, options, defaults) live here, next to `newField`.
  *
@@ -98,5 +98,24 @@ const experience: Preset = {
   }),
 };
 
+/** A single-question contact Preset (CV autofill ticket 03): optional, so a missing link never blocks an applicant. */
+const contactUrl = (presetKey: PresetKey, menuLabel: string, label: string, icon: LucideIcon, helpText: string): Preset => ({
+  presetKey,
+  menuLabel,
+  icon,
+  build: () => ({ ...leafBase(presetKey, label, false, helpText), type: 'url', config: {} }),
+});
+
+const linkedin = contactUrl('contact.linkedin_url', 'LinkedIn', 'LinkedIn profile', LinkIcon, 'The link to your LinkedIn profile');
+const portfolio = contactUrl('contact.portfolio_url', 'Portfolio', 'Portfolio or website', GlobeIcon, 'A link to your portfolio or personal website');
+const github = contactUrl('contact.github_url', 'GitHub', 'GitHub profile', CodeXmlIcon, 'The link to your GitHub profile');
+
+const location: Preset = {
+  presetKey: 'contact.location',
+  menuLabel: 'Location',
+  icon: MapPinIcon,
+  build: () => text('contact.location', { label: 'Where are you based?', maxLength: 100, helpText: 'City and country' }),
+};
+
 /** The Presets the "Add question" menu offers, in menu order. */
-export const PRESETS: Preset[] = [education, experience];
+export const PRESETS: Preset[] = [education, experience, linkedin, github, portfolio, location];

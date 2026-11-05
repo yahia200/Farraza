@@ -18,6 +18,11 @@ describe('the Preset key catalog', () => {
     ['experience.start_date', 'date'],
     ['experience.end_date', 'date'],
     ['experience.description', 'long_text'],
+    // Contact Presets (CV autofill ticket 03): one single-question Preset each.
+    ['contact.linkedin_url', 'url'],
+    ['contact.portfolio_url', 'url'],
+    ['contact.location', 'short_text'],
+    ['contact.github_url', 'url'],
   ] as const;
 
   it.each(shipped)('still maps %s to %s', (key, type) => {
