@@ -4,7 +4,7 @@ import type { CvSuggestions } from './cv-contacts.js';
 /**
  * Which values in the apply form are still untouched CV suggestions (spec
  * `.scratch/cv-autofill/spec.md`, "Web"; glossary **Autofill**). Pure, so it is tested without a
- * browser; the apply form keeps one `CvAutofillState` in component state and calls these.
+ * browser; the apply form keeps one `CvAutofillState` in a `useRef` and calls these.
  *
  * A value is identified by its **form path**: `name`, `email`, `phone`, or `answers.<question key>`
  * (a later slice adds the Entries of a repeating group under the same idea). Every function takes a

@@ -21,13 +21,18 @@ import {
 import { readCvText } from "@/lib/cv-reader";
 import { emptyEntry, entriesOf, type AnswerInput, type ApplyValues, type EntryInput, type GroupField } from "./apply-values";
 
+/** The repeating group whose form path is `path` (`answers.<key>`), or undefined if it is not one. */
+function groupAt(fields: readonly PublicFormField[], path: string): GroupField | undefined {
+  const field = fields.find((candidate) => `answers.${candidate.key}` === path);
+  return field?.type === "repeating_group" ? (field as GroupField) : undefined;
+}
+
 /**
  * CV autofill for the apply form (ADR-0006, spec `.scratch/cv-autofill/spec.md`, "Web").
  *
  * This hook is the one place that joins the three pieces: the reader (`lib/cv-reader.ts`), the
  * shared extractor, and the "untouched suggestion" state (`CvAutofillState` in
- * `@repo/shared/src/cv-autofill.ts`, tested there). Later slices extend the same three seams: more
- * extractors in `fillFrom`, more paths in the state, replace/remove in `pick`.
+ * `@repo/shared/src/cv-autofill.ts`, tested there).
  *
  * What it promises the form:
  * - Reading starts at `pick(file)`, runs beside the upload, and is never awaited by anything.
@@ -77,15 +82,15 @@ export function useCvAutofill(
 
       // Education / Experience cards (ADR-0004): only into a group with no answered card, read now.
       const groups = applyGroupSuggestions(state.current, suggestedGroups(suggestions), (path) => {
-        const group = fields.find((field) => `answers.${field.key}` === path);
-        if (group?.type !== "repeating_group") return undefined;
+        const group = groupAt(fields, path);
+        if (!group) return undefined;
         return {
           cards: cardsAt(path),
           maxEntries: group.config.maxEntries,
         };
       });
       for (const [path, entries] of Object.entries(groups.fill)) {
-        const group = fields.find((field) => `answers.${field.key}` === path) as GroupField;
+        const group = groupAt(fields, path) as GroupField;
         // A suggested Entry is partial; the sub-questions it lacks start blank like a new card.
         const cards: EntryInput[] = entries.map((entry) => ({ ...emptyEntry(group), ...entry }) as EntryInput);
         form.setValue(path as never, cards as never, { shouldDirty: true });
@@ -104,8 +109,8 @@ export function useCvAutofill(
     }
     // Untouched suggested cards go; edited ones stay. A required group keeps one blank card.
     for (const [path, entries] of Object.entries(result.remove)) {
-      const group = fields.find((field) => `answers.${field.key}` === path);
-      if (group?.type !== "repeating_group") continue;
+      const group = groupAt(fields, path);
+      if (!group) continue;
       const left = removeSuggestedCards(cardsAt(path), entries);
       const cards = left.length === 0 && group.required ? [emptyEntry(group)] : left;
       form.setValue(path as never, cards as never, { shouldDirty: true });
@@ -143,8 +148,6 @@ export function useCvAutofill(
     setFilled(autofillCount(next));
   }, []);
 
-  /** Undo on the notice: clears only the untouched suggestions. */
-  const undo = clearSuggestions;
-
-  return { cvText, filled, pick, touch, undo };
+  // `undo` (the notice's button) is `clearSuggestions`: it clears only the untouched suggestions.
+  return { cvText, filled, pick, touch, undo: clearSuggestions };
 }
