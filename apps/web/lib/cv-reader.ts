@@ -51,7 +51,11 @@ async function readDocx(data: ArrayBuffer): Promise<string> {
   const imported = await import("mammoth");
   const mammoth = imported.default ?? imported;
   const { value } = await mammoth.extractRawText({ arrayBuffer: data });
-  return value;
+  // Raw text puts a blank line between every paragraph (and two around an empty one), but the
+  // extractors read a blank line as the gap between entries. Halve each run of line breaks so a
+  // Word paragraph is one line and an empty paragraph is one blank line (checked with mammoth 1.x
+  // on a hand-made DOCX).
+  return value.replace(/\n\n/g, "\n");
 }
 
 /**
