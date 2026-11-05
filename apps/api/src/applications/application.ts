@@ -1,6 +1,8 @@
 import type {
   Answers,
   CvMode,
+  CvSuggestions,
+  CvTextStatus,
   FilePurpose,
   FormFields,
   ScreeningFlag,
@@ -79,6 +81,20 @@ export type SubmitResult =
   | 'duplicate'
   | { status: 'file_conflict'; fileId: string };
 
+/**
+ * The CV text row written with the Application (ADR-0006, `docs/db-schema.md` §3.22). Built by the
+ * service: the status is resolved and the text cut by the shared rules, and `result` is the shared
+ * extractor's output for `text`, never anything the client sent. No route ever reads it back.
+ */
+export interface NewCvText {
+  /** The CV's `files` row, which this row lives and dies with. */
+  fileId: string;
+  status: CvTextStatus;
+  text: string;
+  result: CvSuggestions;
+  extractorVersion: number;
+}
+
 export interface NewApplication {
   companyId: string;
   jobId: string;
@@ -90,6 +106,8 @@ export interface NewApplication {
   /** The flag-outcome rules that fired, stored on the Application (`applications.flags`); `[]` for none. */
   flags: ScreeningFlag[];
   files: FileToAttach[];
+  /** Saved in the same transaction; null when the Application has no CV. */
+  cvText: NewCvText | null;
   source: string | null;
   events: Array<{
     type: 'applied' | 'auto_rejected' | 'flagged';

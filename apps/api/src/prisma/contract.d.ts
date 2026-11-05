@@ -34,7 +34,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'54b6ede8c672dbbefa22a331b79fd5bf11fb52bd267882ab525d920a2bc41ceb'>;
+  StorageHashBase<'2ffa0e27fd66e9bf8db34eec35a4f98f67c8fd355f584fba85c84a38cb0fbb0d'>;
 export type ExecutionHash =
   ExecutionHashBase<'6c72d2e21cac19476b009440c451b74d3f8aaae32e374ce19a06cc2a66cb6742'>;
 export type ProfileHash =
@@ -305,6 +305,17 @@ export type FieldOutputTypes = {
       readonly slug: CodecTypes['pg/text@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz-date@1']['output'];
     };
+    readonly CvText: {
+      readonly companyId: CodecTypes['pg/uuid@1']['output'];
+      readonly createdAt: CodecTypes['pg/timestamptz-date@1']['output'];
+      readonly extractorVersion: CodecTypes['pg/int4@1']['output'];
+      readonly fileId: CodecTypes['pg/uuid@1']['output'];
+      readonly id: CodecTypes['pg/uuid@1']['output'];
+      readonly jobId: CodecTypes['pg/uuid@1']['output'];
+      readonly result: CodecTypes['pg/jsonb@1']['output'];
+      readonly status: 'readable' | 'unreadable' | 'failed';
+      readonly text: CodecTypes['pg/text@1']['output'];
+    };
     readonly EmailToken: {
       readonly createdAt: CodecTypes['pg/timestamptz-date@1']['output'];
       readonly email: CodecTypes['pg/text@1']['output'];
@@ -519,6 +530,17 @@ export type FieldInputTypes = {
       readonly name: CodecTypes['pg/text@1']['input'];
       readonly slug: CodecTypes['pg/text@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-date@1']['input'];
+    };
+    readonly CvText: {
+      readonly companyId: CodecTypes['pg/uuid@1']['input'];
+      readonly createdAt: CodecTypes['pg/timestamptz-date@1']['input'];
+      readonly extractorVersion: CodecTypes['pg/int4@1']['input'];
+      readonly fileId: CodecTypes['pg/uuid@1']['input'];
+      readonly id: CodecTypes['pg/uuid@1']['input'];
+      readonly jobId: CodecTypes['pg/uuid@1']['input'];
+      readonly result: CodecTypes['pg/jsonb@1']['input'];
+      readonly status: 'readable' | 'unreadable' | 'failed';
+      readonly text: CodecTypes['pg/text@1']['input'];
     };
     readonly EmailToken: {
       readonly createdAt: CodecTypes['pg/timestamptz-date@1']['input'];
@@ -735,6 +757,17 @@ export type StorageColumnTypes = {
       readonly slug: CodecTypes['pg/text@1']['output'];
       readonly updated_at: CodecTypes['pg/timestamptz-date@1']['output'];
     };
+    readonly cv_texts: {
+      readonly company_id: CodecTypes['pg/uuid@1']['output'];
+      readonly created_at: CodecTypes['pg/timestamptz-date@1']['output'];
+      readonly extractor_version: CodecTypes['pg/int4@1']['output'];
+      readonly file_id: CodecTypes['pg/uuid@1']['output'];
+      readonly id: CodecTypes['pg/uuid@1']['output'];
+      readonly job_id: CodecTypes['pg/uuid@1']['output'];
+      readonly result: CodecTypes['pg/jsonb@1']['output'];
+      readonly status: 'readable' | 'unreadable' | 'failed';
+      readonly text: CodecTypes['pg/text@1']['output'];
+    };
     readonly email_tokens: {
       readonly created_at: CodecTypes['pg/timestamptz-date@1']['output'];
       readonly email: CodecTypes['pg/text@1']['output'];
@@ -949,6 +982,17 @@ export type StorageColumnInputTypes = {
       readonly name: CodecTypes['pg/text@1']['input'];
       readonly slug: CodecTypes['pg/text@1']['input'];
       readonly updated_at: CodecTypes['pg/timestamptz-date@1']['input'];
+    };
+    readonly cv_texts: {
+      readonly company_id: CodecTypes['pg/uuid@1']['input'];
+      readonly created_at: CodecTypes['pg/timestamptz-date@1']['input'];
+      readonly extractor_version: CodecTypes['pg/int4@1']['input'];
+      readonly file_id: CodecTypes['pg/uuid@1']['input'];
+      readonly id: CodecTypes['pg/uuid@1']['input'];
+      readonly job_id: CodecTypes['pg/uuid@1']['input'];
+      readonly result: CodecTypes['pg/jsonb@1']['input'];
+      readonly status: 'readable' | 'unreadable' | 'failed';
+      readonly text: CodecTypes['pg/text@1']['input'];
     };
     readonly email_tokens: {
       readonly created_at: CodecTypes['pg/timestamptz-date@1']['input'];
@@ -1177,6 +1221,21 @@ export namespace Models {
     memberships: public_Membership[];
     readonly [RelationKeys]?: 'memberships';
   };
+  export type public_CvText = {
+    companyId: CodecTypes['pg/uuid@1']['output'];
+    createdAt: CodecTypes['pg/timestamptz-date@1']['output'];
+    extractorVersion: CodecTypes['pg/int4@1']['output'];
+    fileId: CodecTypes['pg/uuid@1']['output'];
+    id: CodecTypes['pg/uuid@1']['output'];
+    jobId: CodecTypes['pg/uuid@1']['output'];
+    result: CodecTypes['pg/jsonb@1']['output'];
+    status: 'readable' | 'unreadable' | 'failed';
+    text: CodecTypes['pg/text@1']['output'];
+    company: public_Company;
+    file: public_File;
+    job: public_Job;
+    readonly [RelationKeys]?: 'company' | 'file' | 'job';
+  };
   export type public_EmailToken = {
     createdAt: CodecTypes['pg/timestamptz-date@1']['output'];
     email: CodecTypes['pg/text@1']['output'];
@@ -1383,6 +1442,7 @@ export declare const models: {
     ApplicationEvent: Models.public_ApplicationEvent;
     Candidate: Models.public_Candidate;
     Company: Models.public_Company;
+    CvText: Models.public_CvText;
     EmailToken: Models.public_EmailToken;
     File: Models.public_File;
     FormVersion: Models.public_FormVersion;
@@ -1826,6 +1886,118 @@ type ContractBase = Omit<
               uniques: readonly [{ readonly columns: readonly ['slug'] }];
               indexes: readonly [];
               foreignKeys: readonly [];
+            };
+            readonly cv_texts: {
+              columns: {
+                readonly company_id: {
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
+                  readonly nullable: false;
+                };
+                readonly created_at: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+                readonly extractor_version: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
+                readonly file_id: {
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
+                  readonly nullable: false;
+                };
+                readonly id: {
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'function';
+                    readonly expression: 'gen_random_uuid()';
+                  };
+                };
+                readonly job_id: {
+                  readonly nativeType: 'uuid';
+                  readonly codecId: 'pg/uuid@1';
+                  readonly nullable: false;
+                };
+                readonly result: {
+                  readonly nativeType: 'jsonb';
+                  readonly codecId: 'pg/jsonb@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/jsonb@1', {}>;
+                  };
+                };
+                readonly status: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly text: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [{ readonly columns: readonly ['file_id'] }];
+              indexes: readonly [
+                {
+                  readonly name: 'cv_texts_company_id_idx_1303a718';
+                  readonly prefix: 'cv_texts_company_id_idx';
+                  readonly columns: readonly ['company_id'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'cv_texts_job_id_idx_58a5bbdd';
+                  readonly prefix: 'cv_texts_job_id_idx';
+                  readonly columns: readonly ['job_id'];
+                  readonly unique: false;
+                },
+              ];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'cv_texts';
+                    readonly columns: readonly ['company_id'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'companies';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'cv_texts';
+                    readonly columns: readonly ['job_id'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'jobs';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'cv_texts';
+                    readonly columns: readonly ['file_id'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'files';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
             };
             readonly email_tokens: {
               columns: {
@@ -3211,6 +3383,10 @@ type ContractBase = Omit<
               readonly kind: 'valueSet';
               readonly values: readonly ['off', 'optional', 'required'];
             };
+            readonly CvTextStatus: {
+              readonly kind: 'valueSet';
+              readonly values: readonly ['readable', 'unreadable', 'failed'];
+            };
             readonly EmailTokenPurpose: {
               readonly kind: 'valueSet';
               readonly values: readonly ['email-verification', 'password-reset'];
@@ -3267,6 +3443,7 @@ type ContractBase = Omit<
       readonly model: 'Candidate';
     };
     readonly companies: { readonly namespace: 'public' & NamespaceId; readonly model: 'Company' };
+    readonly cv_texts: { readonly namespace: 'public' & NamespaceId; readonly model: 'CvText' };
     readonly email_tokens: {
       readonly namespace: 'public' & NamespaceId;
       readonly model: 'EmailToken';
@@ -3664,6 +3841,96 @@ type ContractBase = Omit<
                 readonly name: { readonly column: 'name' };
                 readonly slug: { readonly column: 'slug' };
                 readonly updatedAt: { readonly column: 'updated_at' };
+              };
+            };
+          };
+          readonly CvText: {
+            readonly fields: {
+              readonly companyId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                };
+              };
+              readonly extractorVersion: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly fileId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
+              };
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
+              };
+              readonly jobId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/uuid@1' };
+              };
+              readonly result: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/jsonb@1' };
+              };
+              readonly status: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly text: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+            };
+            readonly relations: {
+              readonly company: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Company';
+                };
+                readonly cardinality: 'N:1';
+                readonly nullable: false;
+                readonly on: {
+                  readonly localFields: readonly ['companyId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+              readonly file: {
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'File' };
+                readonly cardinality: 'N:1';
+                readonly nullable: false;
+                readonly on: {
+                  readonly localFields: readonly ['fileId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+              readonly job: {
+                readonly to: { readonly namespace: 'public' & NamespaceId; readonly model: 'Job' };
+                readonly cardinality: 'N:1';
+                readonly nullable: false;
+                readonly on: {
+                  readonly localFields: readonly ['jobId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'cv_texts';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly companyId: { readonly column: 'company_id' };
+                readonly createdAt: { readonly column: 'created_at' };
+                readonly extractorVersion: { readonly column: 'extractor_version' };
+                readonly fileId: { readonly column: 'file_id' };
+                readonly id: { readonly column: 'id' };
+                readonly jobId: { readonly column: 'job_id' };
+                readonly result: { readonly column: 'result' };
+                readonly status: { readonly column: 'status' };
+                readonly text: { readonly column: 'text' };
               };
             };
           };
@@ -4860,6 +5127,14 @@ type ContractBase = Omit<
               { readonly name: 'Off'; readonly value: 'off' },
               { readonly name: 'Optional'; readonly value: 'optional' },
               { readonly name: 'Required'; readonly value: 'required' },
+            ];
+          };
+          readonly CvTextStatus: {
+            readonly codecId: 'pg/text@1';
+            readonly members: readonly [
+              { readonly name: 'Readable'; readonly value: 'readable' },
+              { readonly name: 'Unreadable'; readonly value: 'unreadable' },
+              { readonly name: 'Failed'; readonly value: 'failed' },
             ];
           };
           readonly EmailTokenPurpose: {

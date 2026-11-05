@@ -8,7 +8,11 @@ import {
 } from '@nestjs/common';
 import {
   CV_CONTENT_TYPES,
+  CV_EXTRACTOR_VERSION,
   allowedContentTypes,
+  extractContactSuggestions,
+  normalizeCvText,
+  resolveCvTextStatus,
   checkAttachmentFile,
   checkCvFile,
   fileFormatPhrase,
@@ -25,7 +29,7 @@ import {
 } from '@repo/shared';
 import { SNIFF_BYTES, sniffFileType } from '../storage/file-sniff.js';
 import { StorageService } from '../storage/storage.service.js';
-import type { FileToAttach, FileToVerify, OpenJob } from './application.js';
+import type { FileToAttach, FileToVerify, NewCvText, OpenJob } from './application.js';
 import { ApplicationsRepository } from './applications.repository.js';
 import type { CreateUploadDto } from './dto/create-upload.dto.js';
 import type { SubmitApplicationDto } from './dto/submit-application.dto.js';
@@ -214,6 +218,7 @@ export class ApplicationsService {
       answers: parsed.answers,
       flags,
       files,
+      cvText: this.buildCvText(found, files, dto),
       source,
       events: [
         { type: 'applied', fromStageId: null, toStageId: found.firstStageId, data: { source } },
@@ -240,6 +245,28 @@ export class ApplicationsService {
       throw fileConflict(wanted.find((file) => file.id === result.fileId));
     }
     return { received: true };
+  }
+
+  /**
+   * The CV text row to save with the Application (ADR-0006), or null when it has no CV. A CV
+   * form that is `off` never reaches here with a CV (refused above), so "has a CV" is enough.
+   * No `cvText` sent means the browser could not read the CV: a `failed` row with empty text, so
+   * "not read" differs from "no CV". The DTO's schema already cut the text and resolved the status;
+   * both are resolved again here so the stored row never depends on that. The result is always
+   * the shared extractor's output for the stored text and this Application's own form version.
+   */
+  private buildCvText(found: OpenJob, files: FileToAttach[], dto: SubmitApplicationDto): NewCvText | null {
+    const cv = files.find((file) => file.purpose === 'cv');
+    if (!cv) return null;
+    const sent = dto.cvText ?? { text: '', status: 'failed' as const };
+    const text = normalizeCvText(sent.text);
+    return {
+      fileId: cv.id,
+      status: resolveCvTextStatus(text, sent.status),
+      text,
+      result: extractContactSuggestions(text, found.form.fields),
+      extractorVersion: CV_EXTRACTOR_VERSION,
+    };
   }
 
   /**

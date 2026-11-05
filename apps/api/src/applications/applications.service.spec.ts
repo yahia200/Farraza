@@ -5,7 +5,10 @@ import {
 } from '@nestjs/common';
 import {
   CV_DOCX_TYPE,
+  CV_EXTRACTOR_VERSION,
   CV_PDF_TYPE,
+  CV_TEXT_CAP,
+  extractContactSuggestions,
   type CvMode,
   type FormFields,
   type ScreeningRule,
@@ -41,6 +44,7 @@ import type {
   CompanyOpenJobs,
   FileToVerify,
   NewApplication,
+  NewCvText,
   NewPendingFile,
   OpenJob,
   SubmitResult,
@@ -69,6 +73,8 @@ class InMemoryApplicationsRepository implements PublicApi<ApplicationsRepository
   private readonly applied = new Set<string>();
   private nextApplicationId = 1;
   readonly applications: NewApplication[] = [];
+  /** The `cv_texts` table: one row per CV file, written with the Application. */
+  readonly cvTexts: NewCvText[] = [];
   /** Every company a job was seeded for, with its public branding — so the listing knows it exists. */
   private readonly companies = new Map<string, OpenJob['company']>();
   /** One row per seeded job (open or not), for the public listing: like the `jobs` table's rows. */
@@ -274,6 +280,8 @@ class InMemoryApplicationsRepository implements PublicApi<ApplicationsRepository
     }
     this.applied.add(person);
     this.applications.push(input);
+    // Same transaction as the Application: only reached when nothing above refused the submit.
+    if (input.cvText) this.cvTexts.push(input.cvText);
     return 'created';
   }
 }
@@ -1969,6 +1977,170 @@ describe('ApplicationsService', () => {
         expect(JSON.stringify(payload)).not.toMatch(
           /screeningRules|reason|expected Yes|ruleId|outcome|flags|flagged|minimum 5/,
         );
+      }
+    });
+  });
+
+  // CV text (ADR-0006, ticket 04): saved with the Application, derived on the server, never read back.
+  // The cv_texts table's CASCADE and UNIQUE rules are checked against a real database by hand.
+  describe('CV text', () => {
+    const linkedinKey = '5d1f6b8e-0a4c-4c0e-9a57-0d2f7a3b9e11';
+    const linkedinQuestion = {
+      key: linkedinKey,
+      type: 'url',
+      label: 'Profile',
+      helpText: null,
+      required: false,
+      presetKey: 'contact.linkedin_url',
+      config: {},
+    } as FormFields[number];
+    const cv = [
+      'Sara Hassan',
+      'sara.hassan@example.com | +20 100 123 4567 | linkedin.com/in/sara-hassan',
+      'Backend engineer with several years of experience building and running services.',
+      'Led a small team and shipped features used by thousands of people every week.',
+    ].join('\n');
+
+    async function submitWithCv(
+      cvText?: SubmitApplicationDto['cvText'],
+      overrides: Partial<SubmitApplicationDto> = {},
+    ) {
+      const fileId = await uploadCv(samplePdf());
+      await service.submit(
+        'acme',
+        'backend',
+        applicant({ cvFileId: fileId, ...(cvText ? { cvText } : {}), ...overrides }),
+      );
+      return fileId;
+    }
+
+    it('stores one row with the status, text and extractor version, and still creates the Application', async () => {
+      repository.seedJob({ slug: 'backend', cvMode: 'optional' });
+
+      const fileId = await submitWithCv({ text: cv, status: 'readable' });
+
+      expect(repository.applications).toHaveLength(1);
+      expect(repository.cvTexts).toHaveLength(1);
+      expect(repository.cvTexts[0]).toMatchObject({
+        fileId,
+        status: 'readable',
+        text: cv,
+        extractorVersion: CV_EXTRACTOR_VERSION,
+      });
+    });
+
+    it("derives the result with the shared extractor from the stored text and the form version's fields", async () => {
+      repository.seedJob({ slug: 'backend', cvMode: 'optional', fields: [linkedinQuestion] });
+
+      await submitWithCv({ text: cv, status: 'readable' });
+
+      const expected = extractContactSuggestions(cv, [linkedinQuestion]);
+      expect(expected.answers[linkedinKey]).toBeDefined();
+      expect(repository.cvTexts[0]?.result).toEqual(expected);
+    });
+
+    it('stores a failed row with empty text when the browser sent no text', async () => {
+      repository.seedJob({ slug: 'backend', cvMode: 'optional' });
+
+      await submitWithCv();
+
+      expect(repository.applications).toHaveLength(1);
+      expect(repository.cvTexts).toMatchObject([{ status: 'failed', text: '', result: { answers: {} } }]);
+    });
+
+    it('keeps a failed claim, and recomputes readable versus unreadable from the text', async () => {
+      repository.seedJob({ slug: 'backend', cvMode: 'optional' });
+
+      await submitWithCv({ text: '', status: 'failed' });
+      await submitWithCv({ text: 'too short to be a CV', status: 'readable' }, {
+        email: 'b@example.com',
+        phone: '+201001234568',
+      });
+
+      expect(repository.cvTexts.map((row) => row.status)).toEqual(['failed', 'unreadable']);
+    });
+
+    it('cuts oversize text at the cap without failing the submit', async () => {
+      repository.seedJob({ slug: 'backend', cvMode: 'optional' });
+
+      await submitWithCv({ text: 'a'.repeat(CV_TEXT_CAP + 500), status: 'readable' });
+
+      expect(repository.applications).toHaveLength(1);
+      expect(repository.cvTexts[0]?.text).toHaveLength(CV_TEXT_CAP);
+      expect(repository.cvTexts[0]?.status).toBe('readable');
+    });
+
+    it('stores nothing when there is no CV, even if a text was sent', async () => {
+      repository.seedJob({ slug: 'backend', cvMode: 'optional' });
+
+      await service.submit('acme', 'backend', applicant({ cvText: { text: cv, status: 'readable' } }));
+
+      expect(repository.applications).toHaveLength(1);
+      expect(repository.cvTexts).toEqual([]);
+    });
+
+    it('ignores the text when the form takes no CV', async () => {
+      repository.seedJob({ slug: 'backend', cvMode: 'off' });
+
+      await service.submit('acme', 'backend', applicant({ cvText: { text: cv, status: 'readable' } }));
+
+      expect(repository.applications).toHaveLength(1);
+      expect(repository.cvTexts).toEqual([]);
+    });
+
+    it('leaves no row when the submit is refused, and a retry stores one', async () => {
+      repository.seedJob({ slug: 'backend', cvMode: 'optional' });
+      await service.submit('acme', 'backend', applicant());
+      const fileId = await uploadCv(samplePdf());
+      const body = applicant({ cvFileId: fileId, cvText: { text: cv, status: 'readable' } });
+
+      await expect(service.submit('acme', 'backend', body)).rejects.toBeInstanceOf(ConflictException);
+      expect(repository.cvTexts).toEqual([]);
+
+      await service.submit('acme', 'backend', { ...body, email: 'grace@example.com', phone: '+201001234568' });
+      expect(repository.cvTexts).toHaveLength(1);
+    });
+
+    it('leaves no row when the answers are invalid or the file is refused', async () => {
+      repository.seedJob({ slug: 'backend', cvMode: 'optional' });
+      const fileId = await uploadCv(samplePdf());
+      const cvText = { text: cv, status: 'readable' } as const;
+
+      await expect(
+        service.submit('acme', 'backend', applicant({ cvFileId: fileId, cvText, answers: { nope: 'x' } })),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(
+        service.submit(
+          'acme',
+          'backend',
+          applicant({ cvFileId: '11111111-1111-4111-8111-111111111111', cvText }),
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+
+      expect(repository.cvTexts).toEqual([]);
+    });
+  });
+
+  // CV text is internal (spec: "visible to no Member"). The public routes build their payloads field
+  // by field; this pins that neither the text nor what was derived from it is in any of them.
+  describe('no CV text reaches the public routes', () => {
+    it('carries neither the text nor the derived result in any public payload', async () => {
+      repository.seedJob({ slug: 'backend', cvMode: 'optional' });
+      const marker = 'Zyxwvut Marker Person writes about quokkas '.repeat(5);
+      const fileId = await uploadCv(samplePdf());
+
+      const payloads = [
+        await service.submit('acme', 'backend', applicant({ cvFileId: fileId, cvText: { text: marker, status: 'readable' } })),
+        await service.getPublicJob('acme', 'backend'),
+        await service.listCompanyJobs('acme'),
+        await service.getCompanyBranding('acme'),
+      ];
+
+      expect(repository.cvTexts).toHaveLength(1);
+      for (const payload of payloads) {
+        const json = JSON.stringify(payload);
+        expect(json).not.toContain('Zyxwvut');
+        expect(json).not.toMatch(/cvText|cv_text|extractor|"result"/i);
       }
     });
   });

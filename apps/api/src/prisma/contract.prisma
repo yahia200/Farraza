@@ -327,6 +327,37 @@ model File {
   @@map("files")
 }
 
+enum CvTextStatus {
+  Readable   = "readable"
+  Unreadable = "unreadable"
+  Failed     = "failed"
+}
+
+/// The text the applicant's browser read from their CV, with what the server derived from it (ADR-0006). One row per CV file, written with the Application. Never returned by any route.
+model CvText {
+  id               Uuid              @id @default(sql`gen_random_uuid()`)
+  companyId        Uuid              @map("company_id")
+  jobId            Uuid              @map("job_id")
+  fileId           Uuid              @unique @map("file_id")
+  status           CvTextStatus
+  /// Cut at CV_TEXT_CAP. Empty for `failed` ("not read") and short for `unreadable`.
+  text             String
+  /// The shared extractor's output for `text` and the Application's form version (CvSuggestions). Computed on the server, never taken from the client.
+  result           Jsonb             @default(json`{}`)
+  /// CV_EXTRACTOR_VERSION when `result` was computed, so improved heuristics can re-run over old text.
+  extractorVersion Int               @map("extractor_version")
+  createdAt        TimestamptzJsDate @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  job     Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  file    File    @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@check(expression: "jsonb_typeof(result) = 'object'", name: "cv_texts_result_object")
+  @@index([companyId])
+  @@index([jobId])
+  @@map("cv_texts")
+}
+
 enum SessionMfa {
   Pending  = "pending"
   Verified = "verified"

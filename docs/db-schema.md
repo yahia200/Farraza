@@ -31,6 +31,7 @@ Sections 1–7 describe what is built. Section 8 lists designed tables and const
 | `CvMode` | `form_versions.cv_mode` | `off`, `optional`, `required` |
 | `FilePurpose` | `files.purpose` | `cv`, `answer` |
 | `FileStatus` | `files.status` | `pending`, `uploaded` |
+| `CvTextStatus` | `cv_texts.status` | `readable`, `unreadable`, `failed` |
 | `SessionMfa` | `sessions.mfa` | `pending`, `verified` |
 | `EmailTokenPurpose` | `email_tokens.purpose` | `email-verification`, `password-reset` (hyphenated: these are the auth library's `EmailTokenPurpose` values) |
 
@@ -289,7 +290,7 @@ An applicant's uploaded files: the CV, and the answers to file questions. A row 
 - INDEX (`application_id`), INDEX (`company_id`), INDEX (`job_id`), and INDEX (`status`, `created_at`) for cleaning up uploads that were never finished or never attached
 - `size_bytes` uses the contract type `BigIntNumber`, so it is an `int8` column that the ORM reads as a plain `number` (file sizes are far below 2^53). Use `BigInt` instead if a value could ever exceed that.
 - Deleting a row does not delete the object in storage. The application must delete the object as well.
-- Nothing parsing-specific is stored. A later parse table would reference the CV's row.
+- Nothing parsing-specific is stored on this table. What was read from a CV lives in `cv_texts` (§3.22), which references the CV's row.
 
 ### 3.13 `identities` (model `Identity`)
 A sign-in identity from an OIDC provider (Google) linked to a `users` row. Accounts are linked by (`provider`, `subject`), never by email: an email can change, a subject doesn't.
@@ -416,6 +417,26 @@ Failed second-factor attempts, counted inside the lockout window.
 
 - INDEX (`user_id`, `at`) for counting a user's recent failures; INDEX (`at`) for the global prune; INDEX (`user_id`) (Prisma adds one for every FK).
 - Recording a failure deletes every user's failures older than the window, so the table stays bounded even for users who never return.
+
+### 3.22 `cv_texts` (model `CvText`)
+The text the applicant's browser read from their CV, and what the server derived from it (ADR-0006, glossary **CV text**). One row per CV file, written in the Application's transaction. **Never read by any route**: no Member, detail, board, list or public payload carries `text` or `result`. Enum: `CvTextStatus` (§2).
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK, DEFAULT `gen_random_uuid()` |
+| `company_id` | `companyId` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
+| `job_id` | `jobId` | `uuid` | NOT NULL, FK → `jobs.id` ON DELETE CASCADE |
+| `file_id` | `fileId` | `uuid` | NOT NULL, UNIQUE, FK → `files.id` ON DELETE CASCADE (the CV's row) |
+| `status` | `status` | `text` (`CvTextStatus`) | NOT NULL |
+| `text` | `text` | `text` | NOT NULL (cut at `CV_TEXT_CAP`, 50,000 characters; empty for `failed`) |
+| `result` | `result` | `jsonb` | NOT NULL, DEFAULT `'{}'` (`CvSuggestions` from `extractContactSuggestions`, shape in `packages/shared/src/cv-contacts.ts`) |
+| `extractor_version` | `extractorVersion` | `integer` | NOT NULL (`CV_EXTRACTOR_VERSION` when `result` was computed) |
+| `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+
+- UNIQUE (`file_id`): one row per CV file. CHECK `cv_texts_result_object`: `jsonb_typeof(result) = 'object'`. The `status` CHECK comes from the enum, like every enum column.
+- INDEX (`company_id`), INDEX (`job_id`) (Prisma adds one for every FK; `file_id` has the UNIQUE).
+- Deleted with its CV file (and so with the Application, company or job that removes the file). There is no update: a row is written once.
+- Only a CV file gets a row. A submit with a CV and no text sent writes a `failed` row with empty text, so "not read" differs from "no CV" (no row).
 
 ## 4. JSONB shapes
 
@@ -552,9 +573,9 @@ An object from a Criterion key (the catalog `RATING_CRITERIA` in `packages/share
 
 These are the relations declared in `contract.prisma`. Columns marked "no FK" above are not relations.
 
-- A `company` has many `memberships`, `jobs`, `stages`, `form_versions`, `candidates`, `applications`, and `files`.
+- A `company` has many `memberships`, `jobs`, `stages`, `form_versions`, `candidates`, `applications`, `files`, and `cv_texts`.
 - A `user` has many `memberships`, `sessions`, `identities`, `email_tokens`, `refresh_tokens`, one `mfa_totp`, and many `mfa_recovery_codes` and `mfa_failures`, and is referenced by `jobs.created_by`, `notes.author_id`, `ratings.user_id` and `oidc_states.link_user_id`.
-- A `job` has many `form_versions`, `stages`, `applications`, and `files`.
+- A `job` has many `form_versions`, `stages`, `applications`, `files`, and `cv_texts`.
 - A `candidate` has many `applications`.
 - An `application` belongs to one `job`, one `candidate`, one `form_version`, and one `stage`, and has many `application_events`, `notes`, `ratings`, and `files`.
 
@@ -586,6 +607,7 @@ The database cannot check these, so the services must:
 - `form_versions.cv_mode` is saved together with `fields`, and publishing keeps it. A published version's `cv_mode` is never changed.
 - A `files` row is attached to an application (and becomes `uploaded`) only if it belongs to the same job, matches the purpose and field key, is still unattached and `pending`, and is attached in the same transaction that creates the application. A CV id is accepted only when the form version's `cv_mode` is not `off`, and is required when it is `required`. `file` answers in `applications.answers` must reference such a row. (`ApplicationsRepository.submit` does the conditional attach inside its transaction for the CV and for every file answer: a `file` answer is attached with `purpose = 'answer'` and `field_key` = the question's key, so a file uploaded for another question, another job, or as the CV cannot be used. A refused attach fails the submit with a 409 whose `errors` point at the file's step: `cvFileId` for the CV, the question key for an Attachment. Create-upload checks the declared type and size against the question's `config`; the submit-time check (below) allows only the bytes of the question's kinds.)
 - Before the transaction, each referenced file is checked against the bucket (§9, "Submit-time check"): the object must exist, have exactly `size_bytes`, and its leading bytes must be an allowed format. A file that fails is deleted from the bucket and its row removed, and the submit fails with a 400 whose `errors` point at the question (`cvFileId` for the CV). Duplicate-application and validation failures happen before or after this step without touching files, so those files stay `pending` and a retry with the same ids works. The attach then stores the sniffed type in `mime_type`.
+- A `cv_texts` row is written by `ApplicationsRepository.submit` in the same transaction as the Application and the attach, after the attach (so a refused file rolls it back), and only when the Application has a CV. `ApplicationsService.buildCvText` builds it: the text is cut by `normalizeCvText`, the status recomputed by `resolveCvTextStatus` (only `failed` is believed from the client; no `cvText` sent means `failed` with empty text), and `result` is `extractContactSuggestions(text, <the form version's fields>)` with `extractor_version = CV_EXTRACTOR_VERSION`, never anything the client sent. A `cvText` sent when the form's `cv_mode` is `off` or no CV was sent is ignored. A text never fails a submit. No route reads the table back; keep it out of every payload (`applications.service.spec.ts`, "no CV text reaches the public routes").
 - Creating an upload (`POST /api/public/:company/:job/uploads`) is allowed only for an open job, and validates the declared name, type and size against the published form version (for the CV: PDF or DOCX, up to 5 MB, and `cv_mode` not `off`; for an answer: the file question named by `fieldKey` must be on that version, and the type must be one of its `kinds` and the size within its `maxSizeMb`) before any row or URL exists.
 - A job can be opened only if it has a published form version. Opening and closing are conditional on the current `status`.
 - On every stage move, `applications.status` follows the target stage's kind (`normal` → `active`, `hired` → `hired`, `rejected` → `rejected`). It is updated in the same transaction as `stage_id`, together with an `application_events` row. The update is conditional on the application still being in its source stage, so concurrent moves get a 409 instead of overwriting each other.
@@ -653,7 +675,7 @@ It also adds `candidates.account_id uuid NULL` (FK → `candidate_accounts.id` O
 
 - **Invitations** (inviting teammates by email): add with the team feature. For now, members are added directly by email.
 - **Emails sent to candidates:** adds `email_sent` (`{ "template": "application_received" }`) to `ApplicationEventType`, and uses `applications.rejection_notified_at`.
-- **Structured question types:** `number`, `date` and `url` are built in the shared package (§4.1); the web builder, apply page and candidate sheet support them, and the Education and Experience Presets use them for their years and dates (§4.1). Structured education and work history are built (§4.1: the `repeating_group` type and the Education and Experience Presets), and timed answers exist as video and audio Attachments (§9). Not built: CV parsing and autofill (which would read each question's `presetKey`), recruiter-saved Presets.
+- **Structured question types:** `number`, `date` and `url` are built in the shared package (§4.1); the web builder, apply page and candidate sheet support them, and the Education and Experience Presets use them for their years and dates (§4.1). Structured education and work history are built (§4.1: the `repeating_group` type and the Education and Experience Presets), and timed answers exist as video and audio Attachments (§9). CV text is stored (`cv_texts`, §3.22); the browser reader and autofill (which reads each question's `presetKey`) are not built yet. Not built: recruiter-saved Presets.
 - **Server-side video processing:** video and audio Attachments already exist (§3.12, §9). What is not built is anything the server does to the media itself (transcoding, thumbnails), which would need extra columns on `files`.
 - **Billing and plans.**
 

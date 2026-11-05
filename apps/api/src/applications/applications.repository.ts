@@ -267,6 +267,21 @@ export class ApplicationsRepository {
             });
           if (!attached) throw new FileConflict(file.id);
         }
+
+        // After the attach, so a refused file rolls this back too. Nothing reads this table back
+        // (ADR-0006); the UNIQUE (file_id) is the second line of defence behind the attach above.
+        if (input.cvText) {
+          await tx.orm.public.CvText.create({
+            companyId: input.companyId,
+            jobId: input.jobId,
+            fileId: input.cvText.fileId,
+            status: input.cvText.status,
+            text: input.cvText.text,
+            // A spread: an interface (CvSuggestions) has no index signature, so it is not a JsonValue.
+            result: { ...input.cvText.result },
+            extractorVersion: input.cvText.extractorVersion,
+          });
+        }
       });
       return 'created';
     } catch (error) {

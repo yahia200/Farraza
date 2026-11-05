@@ -20,6 +20,10 @@
       "model": "Company",
       "namespace": "public"
     },
+    "cv_texts": {
+      "model": "CvText",
+      "namespace": "public"
+    },
     "email_tokens": {
       "model": "EmailToken",
       "namespace": "public"
@@ -169,6 +173,23 @@
               {
                 "name": "Required",
                 "value": "required"
+              }
+            ]
+          },
+          "CvTextStatus": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "Readable",
+                "value": "readable"
+              },
+              {
+                "name": "Unreadable",
+                "value": "unreadable"
+              },
+              {
+                "name": "Failed",
+                "value": "failed"
               }
             ]
           },
@@ -871,6 +892,162 @@
               },
               "namespaceId": "public",
               "table": "companies"
+            }
+          },
+          "CvText": {
+            "fields": {
+              "companyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              },
+              "extractorVersion": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "fileId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "jobId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "result": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/jsonb@1",
+                  "kind": "scalar"
+                }
+              },
+              "status": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "CvTextStatus",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "text": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "company": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "companyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Company",
+                  "namespace": "public"
+                }
+              },
+              "file": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "fileId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "File",
+                  "namespace": "public"
+                }
+              },
+              "job": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "jobId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Job",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "companyId": {
+                  "column": "company_id"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "extractorVersion": {
+                  "column": "extractor_version"
+                },
+                "fileId": {
+                  "column": "file_id"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "jobId": {
+                  "column": "job_id"
+                },
+                "result": {
+                  "column": "result"
+                },
+                "status": {
+                  "column": "status"
+                },
+                "text": {
+                  "column": "text"
+                }
+              },
+              "namespaceId": "public",
+              "table": "cv_texts"
             }
           },
           "EmailToken": {
@@ -3336,6 +3513,168 @@
                 }
               ]
             },
+            "cv_texts": {
+              "checks": [
+                {
+                  "expression": "jsonb_typeof(result) = 'object'",
+                  "name": "cv_texts_result_object_16cb1523",
+                  "prefix": "cv_texts_result_object"
+                },
+                {
+                  "expression": "\"status\" IN ('readable', 'unreadable', 'failed')",
+                  "name": "cv_texts_status_check_808c79ed",
+                  "prefix": "cv_texts_status_check"
+                }
+              ],
+              "columns": {
+                "company_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "created_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "extractor_version": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "file_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "default": {
+                    "expression": "gen_random_uuid()",
+                    "kind": "function"
+                  },
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "job_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "result": {
+                  "codecId": "pg/jsonb@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": {}
+                  },
+                  "nativeType": "jsonb",
+                  "nullable": false
+                },
+                "status": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "CvTextStatus",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "text": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "company_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "cv_texts"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "companies"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "job_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "cv_texts"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "jobs"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "file_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "cv_texts"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "files"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "company_id"
+                  ],
+                  "name": "cv_texts_company_id_idx_1303a718",
+                  "prefix": "cv_texts_company_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "job_id"
+                  ],
+                  "name": "cv_texts_job_id_idx_58a5bbdd",
+                  "prefix": "cv_texts_job_id_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "file_id"
+                  ]
+                }
+              ]
+            },
             "email_tokens": {
               "checks": [
                 {
@@ -5258,6 +5597,14 @@
                 "required"
               ]
             },
+            "CvTextStatus": {
+              "kind": "valueSet",
+              "values": [
+                "readable",
+                "unreadable",
+                "failed"
+              ]
+            },
             "EmailTokenPurpose": {
               "kind": "valueSet",
               "values": [
@@ -5327,7 +5674,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "54b6ede8c672dbbefa22a331b79fd5bf11fb52bd267882ab525d920a2bc41ceb"
+    "storageHash": "2ffa0e27fd66e9bf8db34eec35a4f98f67c8fd355f584fba85c84a38cb0fbb0d"
   },
   "execution": {
     "executionHash": "6c72d2e21cac19476b009440c451b74d3f8aaae32e374ce19a06cc2a66cb6742",
