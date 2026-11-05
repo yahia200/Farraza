@@ -7,14 +7,18 @@ export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   closed: 'Closed',
 };
 
-// TODO(human): choose a badge variant for each job status, and update the doc comment below to say why.
 const VARIANTS = {
   draft: 'secondary',
   open: 'default',
   closed: 'destructive',
 } as const satisfies Record<JobStatus, BadgeVariant>;
 
-/** Open stands out; drafts and closed jobs are quieter. */
+/**
+ * Open is the solid brand badge, because it is the one state that is live and
+ * taking applications. Draft is the grey `secondary` badge: not public yet, so
+ * it should not draw the eye. Closed is `destructive`: the job has stopped
+ * accepting applications, which is the state a manager most needs to notice.
+ */
 export function JobStatusBadge({ status }: { status: JobStatus }) {
   return <Badge variant={VARIANTS[status]}>{JOB_STATUS_LABELS[status]}</Badge>;
 }

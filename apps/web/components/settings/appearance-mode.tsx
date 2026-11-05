@@ -35,7 +35,7 @@ const MODES = [
  * `value` is `string[]` and `onValueChange` hands back the full pressed set,
  * with no single-select mode in @base-ui/react 1.8. So the active theme is
  * passed as a one-item array, and the change handler has to collapse the set
- * back to a single theme (see TODO(human) below).
+ * back to a single theme (see `handleValueChange` below).
  */
 export function AppearanceMode() {
   const { theme, setTheme } = useTheme();
@@ -51,13 +51,10 @@ export function AppearanceMode() {
     return <Skeleton className="h-9 w-72" />;
   }
 
-  // TODO(human): turn the new pressed set into a single setTheme(...) call.
-  // `next` is every value currently pressed in the group. Decide what the
-  // theme should become and call setTheme, keeping these in mind:
-  //   - this is a single-choice control: exactly one theme should end up set;
-  //   - `next` can contain the value that was just added alongside the old one;
-  //   - clicking the active item can leave `next` empty — a user shouldn't be
-  //     able to end up with no theme selected.
+  // `next` is every value pressed after the click. Picking another item gives
+  // the old theme plus the new one, so the new one is the value that differs
+  // from the current theme. Pressing the active item gives `[]`, which finds
+  // nothing, so the theme stays and one option always remains selected.
   function handleValueChange(next: string[]) {
     const newTheme = next.find((value) => value !== theme);
     if (newTheme) {
