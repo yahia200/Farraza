@@ -19,7 +19,7 @@ import {
   type PublicFormField,
 } from "@repo/shared";
 import { readCvText } from "@/lib/cv-reader";
-import { emptyEntry, entriesOf, type ApplyValues, type EntryInput, type GroupField } from "./apply-values";
+import { emptyEntry, entriesOf, type AnswerInput, type ApplyValues, type EntryInput, type GroupField } from "./apply-values";
 
 /**
  * CV autofill for the apply form (ADR-0006, spec `.scratch/cv-autofill/spec.md`, "Web").
@@ -56,6 +56,12 @@ export function useCvAutofill(
     };
   }, []);
 
+  /** The cards a group holds in the form right now (`getValues` with a runtime path is untyped). */
+  const cardsAt = useCallback(
+    (path: string) => entriesOf(form.getValues(path as never) as unknown as AnswerInput),
+    [form],
+  );
+
   const fillFrom = useCallback(
     (text: string) => {
       const suggestions = extractContactSuggestions(text, fields);
@@ -74,27 +80,51 @@ export function useCvAutofill(
         const group = fields.find((field) => `answers.${field.key}` === path);
         if (group?.type !== "repeating_group") return undefined;
         return {
-          cards: entriesOf(form.getValues(path as never)),
+          cards: cardsAt(path),
           maxEntries: group.config.maxEntries,
         };
       });
       for (const [path, entries] of Object.entries(groups.fill)) {
         const group = fields.find((field) => `answers.${field.key}` === path) as GroupField;
         // A suggested Entry is partial; the sub-questions it lacks start blank like a new card.
-        const cards: EntryInput[] = entries.map((entry) => ({ ...emptyEntry(group), ...entry }));
+        const cards: EntryInput[] = entries.map((entry) => ({ ...emptyEntry(group), ...entry }) as EntryInput);
         form.setValue(path as never, cards as never, { shouldDirty: true });
       }
       state.current = groups.state;
       setFilled(autofillCount(state.current));
     },
-    [fields, form],
+    [fields, form, cardsAt],
   );
 
-  /** A CV was picked (a File) or removed (null). */
+  /** Clears the untouched suggestions from the form (not what the applicant changed). */
+  const clearSuggestions = useCallback(() => {
+    const result = undoAutofill(state.current);
+    for (const path of result.clear) {
+      form.setValue(path as never, "" as never, { shouldDirty: true });
+    }
+    // Untouched suggested cards go; edited ones stay. A required group keeps one blank card.
+    for (const [path, entries] of Object.entries(result.remove)) {
+      const group = fields.find((field) => `answers.${field.key}` === path);
+      if (group?.type !== "repeating_group") continue;
+      const left = removeSuggestedCards(cardsAt(path), entries);
+      const cards = left.length === 0 && group.required ? [emptyEntry(group)] : left;
+      form.setValue(path as never, cards as never, { shouldDirty: true });
+    }
+    state.current = result.state;
+    setFilled(0);
+  }, [fields, form, cardsAt]);
+
+  /**
+   * A CV was picked (a File) or removed (null). Either way the suggestions of the previous CV are
+   * cleared first (ticket 09), so none outlives it, a failed read of the new CV leaves no stale
+   * notice, and removing is just "replace with nothing". Edited values are not suggestions any
+   * more, so they stay. The new read then fills what is empty, including what was just cleared.
+   */
   const pick = useCallback(
     (file: File | null) => {
       const mine = ++generation.current;
       setCvText(null);
+      clearSuggestions();
       if (!file) return;
       void readCvText(file).then((result) => {
         if (!mounted.current || mine !== generation.current) return;
@@ -102,7 +132,7 @@ export function useCvAutofill(
         if (result.status === "readable") fillFrom(result.text);
       });
     },
-    [fillFrom],
+    [fillFrom, clearSuggestions],
   );
 
   /** The applicant changed this value (a group: `value` is its new cards): it is theirs now. */
@@ -114,22 +144,7 @@ export function useCvAutofill(
   }, []);
 
   /** Undo on the notice: clears only the untouched suggestions. */
-  const undo = useCallback(() => {
-    const result = undoAutofill(state.current);
-    for (const path of result.clear) {
-      form.setValue(path as never, "" as never, { shouldDirty: true });
-    }
-    // Untouched suggested cards go; edited ones stay. A required group keeps one blank card.
-    for (const [path, entries] of Object.entries(result.remove)) {
-      const group = fields.find((field) => `answers.${field.key}` === path);
-      if (group?.type !== "repeating_group") continue;
-      const left = removeSuggestedCards(entriesOf(form.getValues(path as never)), entries);
-      const cards = left.length === 0 && group.required ? [emptyEntry(group)] : left;
-      form.setValue(path as never, cards as never, { shouldDirty: true });
-    }
-    state.current = result.state;
-    setFilled(0);
-  }, [fields, form]);
+  const undo = clearSuggestions;
 
   return { cvText, filled, pick, touch, undo };
 }
