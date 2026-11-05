@@ -140,6 +140,15 @@ function GroupCards({
     next: entries.length,
     added: null as number | null,
   }));
+  // Cards can also change from outside (CV autofill adds or removes cards): keep one id per card.
+  // Setting state while rendering is React's way to derive state from props (react.dev, "You Might
+  // Not Need an Effect": adjusting state when a prop changes).
+  if (cards.ids.length !== entries.length) {
+    const ids = cards.ids.slice(0, entries.length);
+    let next = cards.next;
+    while (ids.length < entries.length) ids.push(next++);
+    setCards({ ids, next, added: cards.added });
+  }
   const list = useRef<HTMLDivElement>(null);
   const atLimit = entries.length >= field.config.maxEntries;
 

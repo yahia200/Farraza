@@ -4,17 +4,22 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import {
   EMPTY_AUTOFILL,
+  applyGroupSuggestions,
   applySuggestions,
+  autofillCount,
   extractContactSuggestions,
   isBlankAnswer,
+  removeSuggestedCards,
+  suggestedGroups,
   suggestedValues,
   touchAutofill,
+  touchGroup,
   undoAutofill,
   type CvText,
   type PublicFormField,
 } from "@repo/shared";
 import { readCvText } from "@/lib/cv-reader";
-import type { ApplyValues } from "./apply-values";
+import { emptyEntry, entriesOf, type ApplyValues, type EntryInput, type GroupField } from "./apply-values";
 
 /**
  * CV autofill for the apply form (ADR-0006, spec `.scratch/cv-autofill/spec.md`, "Web").
@@ -53,7 +58,8 @@ export function useCvAutofill(
 
   const fillFrom = useCallback(
     (text: string) => {
-      const suggested = suggestedValues(extractContactSuggestions(text, fields));
+      const suggestions = extractContactSuggestions(text, fields);
+      const suggested = suggestedValues(suggestions);
       const result = applySuggestions(state.current, suggested, (path) =>
         // Read the form now: the applicant may have typed while the CV was being read.
         isBlankAnswer(form.getValues(path as never)),
@@ -62,7 +68,24 @@ export function useCvAutofill(
         form.setValue(path as never, value as never, { shouldDirty: true });
       }
       state.current = result.state;
-      setFilled(Object.keys(state.current.untouched).length);
+
+      // Education / Experience cards (ADR-0004): only into a group with no answered card, read now.
+      const groups = applyGroupSuggestions(state.current, suggestedGroups(suggestions), (path) => {
+        const group = fields.find((field) => `answers.${field.key}` === path);
+        if (group?.type !== "repeating_group") return undefined;
+        return {
+          cards: entriesOf(form.getValues(path as never)),
+          maxEntries: group.config.maxEntries,
+        };
+      });
+      for (const [path, entries] of Object.entries(groups.fill)) {
+        const group = fields.find((field) => `answers.${field.key}` === path) as GroupField;
+        // A suggested Entry is partial; the sub-questions it lacks start blank like a new card.
+        const cards: EntryInput[] = entries.map((entry) => ({ ...emptyEntry(group), ...entry }));
+        form.setValue(path as never, cards as never, { shouldDirty: true });
+      }
+      state.current = groups.state;
+      setFilled(autofillCount(state.current));
     },
     [fields, form],
   );
@@ -82,12 +105,12 @@ export function useCvAutofill(
     [fillFrom],
   );
 
-  /** The applicant changed this value: it is theirs now. */
-  const touch = useCallback((path: string) => {
-    const next = touchAutofill(state.current, path);
+  /** The applicant changed this value (a group: `value` is its new cards): it is theirs now. */
+  const touch = useCallback((path: string, value?: unknown) => {
+    const next = touchGroup(touchAutofill(state.current, path), path, entriesOf(value as never));
     if (next === state.current) return;
     state.current = next;
-    setFilled(Object.keys(next.untouched).length);
+    setFilled(autofillCount(next));
   }, []);
 
   /** Undo on the notice: clears only the untouched suggestions. */
@@ -96,9 +119,17 @@ export function useCvAutofill(
     for (const path of result.clear) {
       form.setValue(path as never, "" as never, { shouldDirty: true });
     }
+    // Untouched suggested cards go; edited ones stay. A required group keeps one blank card.
+    for (const [path, entries] of Object.entries(result.remove)) {
+      const group = fields.find((field) => `answers.${field.key}` === path);
+      if (group?.type !== "repeating_group") continue;
+      const left = removeSuggestedCards(entriesOf(form.getValues(path as never)), entries);
+      const cards = left.length === 0 && group.required ? [emptyEntry(group)] : left;
+      form.setValue(path as never, cards as never, { shouldDirty: true });
+    }
     state.current = result.state;
     setFilled(0);
-  }, [form]);
+  }, [fields, form]);
 
   return { cvText, filled, pick, touch, undo };
 }

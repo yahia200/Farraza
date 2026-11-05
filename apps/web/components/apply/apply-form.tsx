@@ -228,7 +228,7 @@ export function ApplyForm({
   /** Every answer goes through here, so a step showing an error re-checks as it's fixed. */
   function answer(path: Path<ApplyValues>, value: AnswerInput) {
     // The applicant's own change: that value is no longer an untouched CV suggestion.
-    autofill.touch(path);
+    autofill.touch(path, value);
     form.setValue(path, value, { shouldDirty: true });
     const answers = form.getValues("answers");
     setLockedOptions(
