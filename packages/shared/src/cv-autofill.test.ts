@@ -6,6 +6,9 @@ import {
   touchAutofill,
   undoAutofill,
 } from './cv-autofill.js';
+import { extractContactSuggestions } from './cv-contacts.js';
+import type { FormField } from './form-fields.js';
+import type { PresetKey } from './preset-keys.js';
 
 const KEY = '3f2b8c1e-0000-4000-8000-000000000001';
 
@@ -70,6 +73,61 @@ describe('empty input', () => {
 
   it('undo with nothing suggested clears nothing', () => {
     expect(undoAutofill(EMPTY_AUTOFILL).clear).toEqual([]);
+  });
+});
+
+// Ticket 06: the extractor's Preset-keyed answers flow through the same state as the contact values.
+describe('Preset-keyed answers through the autofill state', () => {
+  const CV = `Sara Hassan
+Cairo, Egypt | sara.hassan@example.com
+linkedin.com/in/sara-hassan | github.com/sarah-codes | https://sara.dev
+`;
+  function question(presetKey: PresetKey | null, type: 'url' | 'short_text', label: string): FormField {
+    return {
+      key: crypto.randomUUID(),
+      type,
+      label,
+      helpText: null,
+      required: false,
+      presetKey,
+      config: type === 'short_text' ? { maxLength: 100 } : {},
+    } as FormField;
+  }
+  const linkedin = question('contact.linkedin_url', 'url', 'Find us online');
+  const github = question('contact.github_url', 'url', 'GitHub');
+  const portfolio = question('contact.portfolio_url', 'url', 'Portfolio');
+  const location = question('contact.location', 'short_text', 'Location');
+  const handBuilt = question(null, 'url', 'LinkedIn');
+  const fields = [location, handBuilt, linkedin, portfolio, github];
+  const path = (f: FormField) => `answers.${f.key}`;
+
+  it('fills the four contact Presets, relabelled and reordered, and leaves a hand-built Question alone', () => {
+    const suggested = suggestedValues(extractContactSuggestions(CV, fields));
+    const { fill } = applySuggestions(EMPTY_AUTOFILL, suggested, () => true);
+    expect(fill[path(linkedin)]).toBe('https://www.linkedin.com/in/sara-hassan');
+    expect(fill[path(github)]).toBe('https://github.com/sarah-codes');
+    expect(fill[path(portfolio)]).toBe('https://sara.dev');
+    expect(fill[path(location)]).toBe('Cairo, Egypt');
+    expect(path(handBuilt) in fill).toBe(false);
+  });
+
+  it('does not overwrite a Preset answer the applicant already has', () => {
+    const suggested = suggestedValues(extractContactSuggestions(CV, fields));
+    const { fill } = applySuggestions(EMPTY_AUTOFILL, suggested, (p) => p !== path(github));
+    expect(path(github) in fill).toBe(false);
+    expect(path(linkedin) in fill).toBe(true);
+  });
+
+  it('omits a suggestion its Question would refuse, so it is never applied', () => {
+    const tight = { ...location, config: { maxLength: 5 } } as FormField;
+    expect(Object.keys(suggestedValues(extractContactSuggestions(CV, [tight])))).toEqual(["name", "email"]);
+  });
+
+  it('tracks them as untouched: an edited one survives Undo, the rest are cleared', () => {
+    const suggested = suggestedValues(extractContactSuggestions(CV, fields));
+    const { state } = applySuggestions(EMPTY_AUTOFILL, suggested, () => true);
+    const undone = undoAutofill(touchAutofill(state, path(portfolio)));
+    expect(undone.clear.sort()).toEqual([path(linkedin), path(github), path(location), "email", "name"].sort());
   });
 });
 
