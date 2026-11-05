@@ -67,11 +67,27 @@ export function useCvAutofill(
     [fields, form],
   );
 
-  /** A CV was picked (a File) or removed (null). */
+  /** Clears the untouched suggestions from the form (not what the applicant changed). */
+  const clearSuggestions = useCallback(() => {
+    const result = undoAutofill(state.current);
+    for (const path of result.clear) {
+      form.setValue(path as never, "" as never, { shouldDirty: true });
+    }
+    state.current = result.state;
+    setFilled(0);
+  }, [form]);
+
+  /**
+   * A CV was picked (a File) or removed (null). Either way the suggestions of the previous CV are
+   * cleared first (ticket 09), so none outlives it, a failed read of the new CV leaves no stale
+   * notice, and removing is just "replace with nothing". Edited values are not suggestions any
+   * more, so they stay. The new read then fills what is empty, including what was just cleared.
+   */
   const pick = useCallback(
     (file: File | null) => {
       const mine = ++generation.current;
       setCvText(null);
+      clearSuggestions();
       if (!file) return;
       void readCvText(file).then((result) => {
         if (!mounted.current || mine !== generation.current) return;
@@ -79,7 +95,7 @@ export function useCvAutofill(
         if (result.status === "readable") fillFrom(result.text);
       });
     },
-    [fillFrom],
+    [fillFrom, clearSuggestions],
   );
 
   /** The applicant changed this value: it is theirs now. */
@@ -91,14 +107,7 @@ export function useCvAutofill(
   }, []);
 
   /** Undo on the notice: clears only the untouched suggestions. */
-  const undo = useCallback(() => {
-    const result = undoAutofill(state.current);
-    for (const path of result.clear) {
-      form.setValue(path as never, "" as never, { shouldDirty: true });
-    }
-    state.current = result.state;
-    setFilled(0);
-  }, [form]);
+  const undo = clearSuggestions;
 
   return { cvText, filled, pick, touch, undo };
 }

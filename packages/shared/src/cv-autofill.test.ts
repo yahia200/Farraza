@@ -81,3 +81,22 @@ describe('undoAutofill', () => {
     expect(result.state).toEqual(EMPTY_AUTOFILL);
   });
 });
+
+describe('replacing or removing the CV', () => {
+  const first = { name: 'Sara Hassan', email: 'sara@example.com' };
+
+  it('clears the first CV suggestions, keeps edits, and the second CV fills only what is empty', () => {
+    const filled = applySuggestions(EMPTY_AUTOFILL, first, () => true).state;
+    // The applicant edits the name, so it is theirs; the email is still a suggestion.
+    const cleared = undoAutofill(touchAutofill(filled, 'name'));
+    expect(cleared.clear).toEqual(['email']);
+    const second = applySuggestions(cleared.state, { name: 'Omar Ali', phone: '+201001234567' }, (path) => path !== 'name');
+    expect(second.fill).toEqual({ phone: '+201001234567' });
+    expect(second.state.untouched).toEqual({ phone: '+201001234567' });
+  });
+
+  it('removing (clearing with no new read) leaves no suggestions', () => {
+    const filled = applySuggestions(EMPTY_AUTOFILL, first, () => true).state;
+    expect(undoAutofill(filled).state.untouched).toEqual({});
+  });
+});
