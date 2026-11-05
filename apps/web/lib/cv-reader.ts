@@ -32,7 +32,13 @@ const MAX_PDF_PAGES = 30;
 /** unpdf's advice for untrusted PDFs (README, "Process Untrusted PDFs"): about 16 megapixels. */
 const MAX_IMAGE_PIXELS = 16_777_216;
 
-const FAILED: CvText = { text: "", status: "failed" };
+/** How long Send waits for a read that has not finished before it sends the CV as `failed`. */
+export const CV_SUBMIT_WAIT_MS = 5_000;
+
+/** What a read that failed, or was given up on, reports: no text, status `failed`. */
+export const CV_READ_FAILED: CvText = { text: "", status: "failed" };
+
+const FAILED = CV_READ_FAILED;
 
 async function readPdf(data: ArrayBuffer): Promise<string> {
   const { extractText, getDocumentProxy } = await import("unpdf");

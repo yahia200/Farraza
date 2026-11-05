@@ -18,7 +18,7 @@ import {
   type CvText,
   type PublicFormField,
 } from "@repo/shared";
-import { readCvText } from "@/lib/cv-reader";
+import { CV_READ_FAILED, CV_SUBMIT_WAIT_MS, readCvText } from "@/lib/cv-reader";
 import { emptyEntry, entriesOf, type AnswerInput, type ApplyValues, type EntryInput, type GroupField } from "./apply-values";
 
 /** The repeating group whose form path is `path` (`answers.<key>`), or undefined if it is not one. */
@@ -35,7 +35,8 @@ function groupAt(fields: readonly PublicFormField[], path: string): GroupField |
  * `@repo/shared/src/cv-autofill.ts`, tested there).
  *
  * What it promises the form:
- * - Reading starts at `pick(file)`, runs beside the upload, and is never awaited by anything.
+ * - Reading starts at `pick(file)` and runs beside the upload. Only the submit waits for it, for at
+ *   most 5 s (`cvTextForSubmit`); Next and Skip never do.
  * - Suggestions only go into values that are empty at the moment reading finishes.
  * - `touch(path)` must be called for every change the applicant makes, so that value stops being a
  *   suggestion. (Autofill itself writes with `form.setValue` directly, not through `touch`.)
@@ -53,6 +54,9 @@ export function useCvAutofill(
   // Counts picks, so a read that finishes after a newer pick (or a removal) is ignored.
   const generation = useRef(0);
   const mounted = useRef(true);
+  // The current CV's read while it runs, and its result once it has finished (for `cvTextForSubmit`).
+  const inFlight = useRef<Promise<CvText> | null>(null);
+  const settled = useRef<CvText | null>(null);
 
   useEffect(() => {
     mounted.current = true;
@@ -129,15 +133,45 @@ export function useCvAutofill(
     (file: File | null) => {
       const mine = ++generation.current;
       setCvText(null);
+      settled.current = null;
+      inFlight.current = null;
       clearSuggestions();
       if (!file) return;
-      void readCvText(file).then((result) => {
+      const read = readCvText(file);
+      inFlight.current = read;
+      void read.then((result) => {
         if (!mounted.current || mine !== generation.current) return;
+        settled.current = result;
+        inFlight.current = null;
         setCvText(result);
         if (result.status === "readable") fillFrom(result.text);
       });
     },
     [fillFrom, clearSuggestions],
+  );
+
+  /**
+   * The CV text to send with the submit. Waits for a read still in progress for at most
+   * `timeoutMs` (5 s by default); if it has not finished by then the CV goes as `failed` with no
+   * text, so "not read" stays distinct from "no CV". `null` when no CV was picked. Reads the refs,
+   * not the render's state, so it sees a read that finished while the applicant pressed Send.
+   */
+  const cvTextForSubmit = useCallback(
+    async (timeoutMs: number = CV_SUBMIT_WAIT_MS): Promise<CvText | null> => {
+      if (settled.current) return settled.current;
+      const read = inFlight.current;
+      if (!read) return null;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<CvText>((resolve) => {
+        timer = setTimeout(() => resolve(CV_READ_FAILED), timeoutMs);
+      });
+      try {
+        return await Promise.race([read, timeout]);
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+    [],
   );
 
   /** The applicant changed this value (a group: `value` is its new cards): it is theirs now. */
@@ -149,5 +183,5 @@ export function useCvAutofill(
   }, []);
 
   // `undo` (the notice's button) is `clearSuggestions`: it clears only the untouched suggestions.
-  return { cvText, filled, pick, touch, undo: clearSuggestions };
+  return { cvText, cvTextForSubmit, filled, pick, touch, undo: clearSuggestions };
 }

@@ -80,7 +80,7 @@ The apply form reads the CV in the applicant's own browser the moment it is pick
 
 **Web**
 
-- A **reader module**: given the picked file, loads the PDF reader (`unpdf`) or DOCX reader (`mammoth`, raw text from an array buffer) only then, extracts text with a time limit, and returns text and a status. It runs in parallel with the upload and never blocks it, and any failure becomes `failed`.
+- A **reader module**: given the picked file, loads the PDF reader (`unpdf`) or DOCX reader (`mammoth`, raw text from an array buffer) only then, extracts text with a time limit, and returns text and a status. It runs in parallel with the upload and never blocks it, and any failure becomes `failed`. The submit is the one place that waits: if the read has not finished when Send is pressed, it waits up to 5 seconds and then sends the CV as `failed` with no text (owner's decision, 2026-11-05).
 - The apply form keeps the reader's result and the extractor's suggestions in component state, applies them only to empty answers, and tracks which values are still untouched suggestions so Undo and a CV replacement affect only those. Typed answers are never overwritten.
 - One notice on the CV step ("Filled from your CV") with an Undo button; each suggested value is an ordinary editable answer on its own step.
 - Groups are filled only when they have no Entries. A filled group respects `maxEntries`.

@@ -302,18 +302,19 @@ export function ApplyForm({
     (values) =>
       startTransition(async () => {
         setFormError(undefined);
+        // A read still running when Send is pressed gets up to 5 s; after that the CV goes as
+        // `failed` (use-cv-autofill.ts), so the applicant is never stuck behind a slow reader.
+        const cvText =
+          cvMode !== "off" && values.cvFileId
+            ? ((await autofill.cvTextForSubmit()) ?? undefined)
+            : undefined;
         const result = await submitApplication(company.slug, jobSlug, {
           name: values.name,
           email: values.email,
           phone: values.phone,
           cvFileId: cvMode === "off" ? undefined : (values.cvFileId ?? undefined),
           answers: compactAnswers(values.answers, fields),
-          // Only with a CV, and only if reading has finished (it never delays Send); the API
-          // stores a "not read" row for a CV sent without text.
-          cvText:
-            cvMode !== "off" && values.cvFileId
-              ? (autofill.cvText ?? undefined)
-              : undefined,
+          cvText,
           website: values.website,
           source,
         });
