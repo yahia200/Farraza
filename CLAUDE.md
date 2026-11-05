@@ -56,6 +56,8 @@ Use the local docs first: they match the installed version. Paths are relative t
 | `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner` | 3.1151.0 / 3.1151.0 | `apps/api/node_modules/@aws-sdk/client-s3/README.md` and `dist-types/` (commands in `dist-types/commands/`, request shapes in `dist-types/models/models_0.d.ts`); `apps/api/node_modules/@aws-sdk/s3-request-presigner/README.md` and `dist-types/index.d.ts` | https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/ |
 | `file-type` | 22.2.0 | `apps/api/node_modules/file-type/readme.md`, `apps/api/node_modules/file-type/source/index.d.ts` | https://github.com/sindresorhus/file-type |
 | `browser-image-compression` | 2.0.2 | `apps/web/node_modules/browser-image-compression/README.md`, `apps/web/node_modules/browser-image-compression/dist/browser-image-compression.d.ts` | https://github.com/Donaldcwl/browser-image-compression#readme |
+| `unpdf` | 2.1.0 | `apps/web/node_modules/unpdf/README.md` (API and "Process Untrusted PDFs"), `dist/index.d.mts` | https://github.com/unjs/unpdf |
+| `mammoth` | 1.13.0 | `apps/web/node_modules/mammoth/README.md` (`mammoth.extractRawText`, browser input `{ arrayBuffer }`), `lib/index.d.ts` | https://github.com/mwilliamson/mammoth.js |
 
 Prisma 8 differs most from older knowledge: there is no `PrismaClient`, no `prisma generate`, and no `schema.prisma`. See the "Database" section below.
 

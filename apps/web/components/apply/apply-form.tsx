@@ -54,6 +54,7 @@ import {
 } from "./apply-values";
 import { AttachmentStep } from "./attachment-step";
 import { CvStep } from "./cv-step";
+import { useCvAutofill } from "./use-cv-autofill";
 import { GroupStep } from "./group-step";
 import { QuestionStep } from "./question-step";
 import type { PublicJob } from "@/lib/public-jobs";
@@ -151,6 +152,8 @@ export function ApplyForm({
     resolver,
     defaultValues: emptyValues(fields),
   });
+  // CV autofill: reads the CV beside the upload and fills empty values (use-cv-autofill.ts).
+  const autofill = useCvAutofill(form, fields);
   const [pending, startTransition] = useTransition();
   const [formError, setFormError] = useState<string>();
   const [sent, setSent] = useState(false);
@@ -224,6 +227,8 @@ export function ApplyForm({
 
   /** Every answer goes through here, so a step showing an error re-checks as it's fixed. */
   function answer(path: Path<ApplyValues>, value: AnswerInput) {
+    // The applicant's own change: that value is no longer an untouched CV suggestion.
+    autofill.touch(path);
     form.setValue(path, value, { shouldDirty: true });
     const answers = form.getValues("answers");
     setLockedOptions(
@@ -303,6 +308,12 @@ export function ApplyForm({
           phone: values.phone,
           cvFileId: cvMode === "off" ? undefined : (values.cvFileId ?? undefined),
           answers: compactAnswers(values.answers, fields),
+          // Only with a CV, and only if reading has finished (it never delays Send); the API
+          // stores a "not read" row for a CV sent without text.
+          cvText:
+            cvMode !== "off" && values.cvFileId
+              ? (autofill.cvText ?? undefined)
+              : undefined,
           website: values.website,
           source,
         });
@@ -421,6 +432,9 @@ export function ApplyForm({
                   error={fieldState.error?.message}
                   onChange={(fileId) => answer("cvFileId", fileId)}
                   onBusyChange={(busy) => setStepUploading(CV_STEP, busy)}
+                  onPick={autofill.pick}
+                  filledCount={autofill.filled}
+                  onUndoFill={autofill.undo}
                 />
               )}
             />
