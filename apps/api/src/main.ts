@@ -1,11 +1,16 @@
 import { NestFactory } from '@nestjs/core';
 import { StandardSchemaValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import { configureBodyParsers } from './common/body-limits.js';
 import { AppModule } from './app.module.js';
 import { toValidationException } from './common/validation-errors.js';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // Nest's own body parsers are off: configureBodyParsers sets a larger JSON
+  // limit for the public submit route only (common/body-limits.ts).
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
+  configureBodyParsers(app);
   const config = app.get(ConfigService);
 
   app.setGlobalPrefix('api');
