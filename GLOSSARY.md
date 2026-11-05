@@ -32,6 +32,14 @@ _Avoid_: Submission, entry, candidate (a Candidate is the person; an Application
 The document an applicant submits with an Application through the form's dedicated CV slot. An Application has at most one CV, and a job's form decides whether it is off, optional, or required.
 _Avoid_: Resume
 
+**CV text**:
+The plain text read out of a CV. A CV whose text cannot be read, such as a scanned page, is marked unreadable, which is different from a CV that says nothing about something. CV text and anything read from it stay out of sight: Members never see them, only scores, rankings or flags worked out from them.
+_Avoid_: Parsed CV, extracted data
+
+**Autofill**:
+Suggesting answers to an applicant, while they fill in the form, from what was read in their CV. Each suggestion goes only into an empty answer, can be edited or cleared, and counts as an answer only once the applicant submits it; nothing read from the CV is ever an answer on its own.
+_Avoid_: Prefill, CV parsing (parsing is how the text is read, not what the applicant sees)
+
 **Attachment**:
 A file an applicant uploads to answer a file question on the form. It belongs to that question and is distinct from the CV.
 _Avoid_: Upload, document
