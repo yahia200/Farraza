@@ -1,12 +1,13 @@
 import { parseAnswers, type Answers } from './answers.js';
 import { submitApplicationSchema } from './applications.js';
+import { extractGroupAnswers } from './cv-groups.js';
 import type { FormField } from './form-fields.js';
 import { normalizePhone } from './phone.js';
 import type { PresetKey } from './preset-keys.js';
 
 /**
- * What an extractor offers the apply form. The SAME shape is returned by every extractor (the
- * contact one here; the Education and Experience one in ticket 07), so the server (ticket 04) and
+ * What an extractor offers the apply form. The SAME shape covers contacts and groups (ticket 07
+ * adds the Education and Experience Entries through `extractContactSuggestions`), so the server (ticket 04) and
  * the browser (ticket 05) consume it the same way.
  *
  * - `name`, `email`, `phone`: the built-in contact values. Each is already valid for the apply
@@ -228,5 +229,7 @@ export function extractContactSuggestions(text: string, fields: readonly FormFie
       suggestions.answers[field.key] = checked.answers[field.key]!;
     }
   }
+  // Education and Experience Entries (ticket 07), in the same answers map.
+  Object.assign(suggestions.answers, extractGroupAnswers(text, fields));
   return suggestions;
 }

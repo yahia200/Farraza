@@ -27,7 +27,7 @@ export const CV_TEXT_CAP = 50_000;
 export const CV_TEXT_MIN_LENGTH = 100;
 
 /** Bumped whenever an extractor heuristic changes, so stored results can be told apart and re-run. */
-export const CV_EXTRACTOR_VERSION = 1;
+export const CV_EXTRACTOR_VERSION = 2;
 
 /**
  * C0 controls except tab, line feed and carriage return, plus DEL and the C1 controls. JSON writes
