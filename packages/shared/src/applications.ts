@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cvTextSchema } from './cv-text.js';
 import { phoneSchema } from './phone.js';
 
 /** Request bodies for applications: the public apply form and the pipeline. */
@@ -26,6 +27,12 @@ export const submitApplicationSchema = z.strictObject({
    * Whether it is missing, allowed or required is the service's call: it needs the form version.
    */
   cvFileId: z.uuid({ error: 'Upload your CV again.' }).optional(),
+  /**
+   * The text the browser read from the CV, with a status (ADR-0006). Optional and never a reason to
+   * refuse a submit: overlong text is cut and the status is recomputed (see cv-text.ts). The
+   * service ignores it when the form takes no CV or none was sent.
+   */
+  cvText: cvTextSchema.optional(),
   /** Set from the link's `utm_source`, not typed by the applicant. */
   source: z.string().max(100).optional(),
   /** Honeypot: hidden in the page, so people leave it empty and bots fill it in. */
