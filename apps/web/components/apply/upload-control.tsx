@@ -51,6 +51,7 @@ export function UploadControl({
   value,
   onChange,
   onBusyChange,
+  onPick,
 }: {
   companySlug: string;
   jobSlug: string;
@@ -64,6 +65,11 @@ export function UploadControl({
   onChange: (fileId: string | null) => void;
   /** True while a file is being sent, so the form can hold back Next, Skip and Send. */
   onBusyChange: (busy: boolean) => void;
+  /**
+   * The file that will be uploaded (a File) or no file any more (null: removed, or the new pick was
+   * refused). Not called for "Try again". The CV step uses it to start reading the CV's text.
+   */
+  onPick?: (file: File | null) => void;
 }) {
   const inputId = useId();
   const [upload, setUpload] = useState<Upload | null>(null);
@@ -141,6 +147,7 @@ export function UploadControl({
 
     if (problem) {
       setUpload(null);
+      onPick?.(null);
       onBusyChange(false);
       setRejection(problem.message);
       return;
@@ -148,6 +155,8 @@ export function UploadControl({
 
     setUpload({ file, status: 'sending', percent: 0, reducedFrom });
     onBusyChange(true);
+    // Reading starts here, beside the upload, and nothing waits for it. Not on "Try again".
+    if (reduce) onPick?.(file);
 
     try {
       const created = await createUpload(companySlug, jobSlug, {
@@ -189,6 +198,7 @@ export function UploadControl({
     setUpload(null);
     setRejection(undefined);
     onChange(null);
+    onPick?.(null);
     onBusyChange(false);
   }
 
@@ -207,6 +217,7 @@ export function UploadControl({
         onFiles={([file]) => void send(file)}
         onReject={(message) => {
           setUpload(null);
+          onPick?.(null);
           setRejection(message);
         }}
       />

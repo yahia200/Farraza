@@ -8,6 +8,7 @@ import {
   QuestionnaireItem,
   QuestionnaireTitle,
 } from '@/components/ui/questionnaire';
+import { CvAutofillNotice } from './cv-autofill-notice';
 import { UploadControl } from './upload-control';
 
 /** What the file chooser offers: extensions as well as types, as some systems report no type for .docx. */
@@ -28,6 +29,9 @@ export function CvStep({
   error,
   onChange,
   onBusyChange,
+  onPick,
+  filledCount,
+  onUndoFill,
 }: {
   companySlug: string;
   jobSlug: string;
@@ -39,6 +43,12 @@ export function CvStep({
   onChange: (fileId: string | null) => void;
   /** True while a file is being sent, so the form can hold back Next, Skip and Send. */
   onBusyChange: (busy: boolean) => void;
+  /** The picked file, or null when it was removed or refused: starts or cancels reading its text. */
+  onPick: (file: File | null) => void;
+  /** How many form values are still untouched suggestions from the CV (0 hides the notice). */
+  filledCount: number;
+  /** Clears the untouched suggestions. */
+  onUndoFill: () => void;
 }) {
   const [sending, setSending] = useState(false);
   const label = required ? 'Upload your CV' : 'Upload your CV (optional)';
@@ -60,7 +70,10 @@ export function CvStep({
           setSending(busy);
           onBusyChange(busy);
         }}
+        onPick={onPick}
       />
+
+      <CvAutofillNotice count={filledCount} onUndo={onUndoFill} />
 
       <QuestionnaireError>
         {error ??
