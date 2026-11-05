@@ -8,7 +8,7 @@
 
 **Blocked by:** 05, 07.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] A CV with two schools and three jobs fills two Education cards and three Experience cards (within `maxEntries`)
 - [ ] A group with an Entry already typed or started is not changed

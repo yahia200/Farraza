@@ -10,7 +10,7 @@
 
 **Blocked by:** 02.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Invented CV text with clear Education and Experience sections yields the right number of entries with their confident sub-answers
 - [ ] Text with no recognisable section, or with sections in unusual order or style, yields nothing rather than wrong values

@@ -11,7 +11,7 @@
 
 **Blocked by:** 02.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] A submit with a CV and a text stores one row with the status, text and extractor version, and the Application is created as before
 - [ ] The stored structured result equals the shared extractor's output for that text and that form version

@@ -9,7 +9,7 @@
 
 **Blocked by:** 01 (the cap).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] The status rule is correct on both sides of the threshold, and a client cannot claim `readable` for text that is too short
 - [ ] Text over the cap is cut and the rest is kept; an absent CV text field is accepted

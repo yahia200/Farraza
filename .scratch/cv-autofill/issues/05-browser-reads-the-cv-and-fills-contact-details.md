@@ -11,7 +11,7 @@
 
 **Blocked by:** 02.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Picking a PDF or DOCX CV fills empty name, email and phone, and shows the notice; the upload and the form stay responsive
 - [ ] A value the applicant already typed is never replaced, even if reading finishes after they typed

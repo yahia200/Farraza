@@ -8,7 +8,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] The four keys exist with their required types, and the catalog test pins them (and that no key was removed or retyped)
 - [ ] A recruiter can insert each Preset, relabel it, save the draft and publish; the stored Question keeps its Preset key after relabelling

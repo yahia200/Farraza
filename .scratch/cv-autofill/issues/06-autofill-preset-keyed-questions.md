@@ -8,7 +8,7 @@
 
 **Blocked by:** 03, 05.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] A form with the four contact Presets gets them filled from a CV that has those links
 - [ ] A relabelled or reordered Preset Question is still found and filled

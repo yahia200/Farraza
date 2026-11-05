@@ -6,7 +6,7 @@ Record the verified limits, the evidence and the chosen cap in this ticket under
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] The real default body limit of the API and of Server Actions is stated, with the doc or type reference it came from
 - [ ] A body near the cap was sent through the real web-to-API path and accepted; one above it was refused with a clear error

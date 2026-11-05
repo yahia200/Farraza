@@ -9,7 +9,7 @@
 
 **Blocked by:** 05.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Replacing the CV refreshes untouched suggestions and keeps edited values
 - [ ] Removing the CV clears untouched suggestions and keeps edited values
