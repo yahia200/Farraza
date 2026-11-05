@@ -50,13 +50,13 @@ A free-text Requirement or a rule on a date could be used to filter on age, gend
 
 ## Layer 1: rules (Screening rules)
 
-### Built (first slice)
+### Built (first slice and the finer conditions)
 
-Screening rules (`jobs.screening_rules`, saved on the Job's Settings tab, ADR-0005) are built. A rule is about one top-level question and has a reject or flag outcome; `evaluateScreeningRules` runs once at submit, and a rule that fired records a generated reason. Covered types: `single_select`, `multi_select`, `number`, `date`, `short_text`, `long_text`, `yes_no`. Not covered yet: `url`, `file` (presence is `required`) and `repeating_group` (a rule on a sub-question is refused and groups are ignored). Reject sends the Application to Rejected with an `auto_rejected` event; flag stores the reasons on the Application with a `flagged` event, and the candidate list, board and sheet show a marker. The old field-level rule properties and `findKnockout` are gone (`parseFormFields` strips them from versions saved earlier). The rest of Layer 1 below is the design the first slice followed; the rows marked future are not built.
+Screening rules (`jobs.screening_rules`, saved on the Job's Settings tab, ADR-0005) are built. A rule is about one top-level question and has a reject or flag outcome; `evaluateScreeningRules` runs once at submit, and a rule that fired records a generated reason. Covered types: `single_select`, `multi_select`, `number`, `date`, `short_text`, `long_text`, `yes_no`. Not covered yet: `url`, `file` (presence is `required`) and `repeating_group` (a rule on a sub-question is refused and groups are ignored). Reject sends the Application to Rejected with an `auto_rejected` event; flag stores the reasons on the Application with a `flagged` event, and the candidate list, board and sheet show a marker. The old field-level rule properties and `findKnockout` are gone (`parseFormFields` strips them from versions saved earlier). The finer conditions in the table below are built too (`packages/shared/src/screening-rules.ts`): single-select `in`/`not_in`, multi-select `any_of`/`all_of`/`none_of`, number `min`/`max`/`range`, dates fixed or relative to the submission date, and word rules on text. What is still future: `url` rules, `repeating_group` rules and the move-to-stage outcome.
 
 ### Expansion: more types, finer conditions
 
-Each row below is a candidate rule. All are exact comparisons on a typed answer, so they cost nothing and can be explained in one sentence ("rejected because years of experience was 2, minimum 5").
+Each row below was a candidate rule; rows marked **Not built** are still future, the rest are built. All are exact comparisons on a typed answer, so they cost nothing and can be explained in one sentence ("rejected because years of experience was 2, minimum 5").
 
 | Type | Conditions to offer |
 |---|---|
@@ -65,9 +65,9 @@ Each row below is a candidate rule. All are exact comparisons on a typed answer,
 | `yes_no` | As today. |
 | `number` | Below a minimum, above a maximum, or outside a range. This is separate from the field's own `min`/`max`, which only validate input. |
 | `date` | Before or after a fixed date. Relative to the submission date, for example "available within 60 days" (`Temporal.PlainDate`, as `dates.ts` already uses). |
-| `url` | Present or absent; optionally the host must be in an allow-list (for example a profile link on a given site). Low value, so last on the list. |
+| `url` | **Not built.** Present or absent; optionally the host must be in an allow-list (for example a profile link on a given site). Low value, so last on the list. |
 | `short_text`, `long_text` | **Words**: any-of, all-of or none-of a list, whole-word and case-insensitive, on that one answer. Layer 1 owns text answers; Layer 2 reads the CV only. Length and presence stay with the field's own limits and `required`. Regex is deferred (backlog, low priority: it needs a linear-time engine to avoid ReDoS). |
-| `repeating_group` | **Entry count** at least N. **Total duration** at least N months, summed over the entries of the `experience` preset from its start and end dates. **Any entry** whose sub-answer matches (a title containing a word, a level in a set). Needs the Preset keys; a rule must look inside the group that carries the matching group key, not anywhere on the form (`docs/db-schema.md`, Preset keys). |
+| `repeating_group` | **Not built.** **Entry count** at least N. **Total duration** at least N months, summed over the entries of the `experience` preset from its start and end dates. **Any entry** whose sub-answer matches (a title containing a word, a level in a set). Needs the Preset keys; a rule must look inside the group that carries the matching group key, not anywhere on the form (`docs/db-schema.md`, Preset keys). |
 | `file` | Presence is already `required`. No rule. |
 
 ### Expansion: more outcomes, not just reject
@@ -78,7 +78,7 @@ Reject is a blunt outcome for a soft condition. Each rule chooses one:
 |---|---|
 | Reject | Built. Place in Rejected, recorded as an `auto_rejected` event with the reasons. |
 | Flag | Built. Leave the Application where it is and show a marker on the card, the table row and the sheet, with the reason (a `flagged` event). |
-| Move to stage | Future. Place in a chosen non-final stage (for example Screening), for conditions that mean "look at this first". |
+| Move to stage | Not built. Place in a chosen non-final stage (for example Screening), for conditions that mean "look at this first". |
 
 A rule can also carry the Requirement's tier: a must-have that fails flags more loudly than a nice-to-have.
 

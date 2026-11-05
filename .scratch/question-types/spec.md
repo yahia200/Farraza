@@ -1,4 +1,4 @@
-Status: needs-triage
+Status: resolved
 
 # Number, date and URL question types
 
