@@ -25,3 +25,4 @@ export * from './image-upload.js';
 export * from './screening-display.js';
 export * from './cv-text.js';
 export * from './cv-contacts.js';
+export * from './cv-groups.js';
