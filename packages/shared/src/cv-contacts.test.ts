@@ -181,3 +181,35 @@ describe('extractContactSuggestions: links and location by Preset key', () => {
     expect(answerFor(extractContactSuggestions(text, [portfolio]), portfolio)).toBeUndefined();
   });
 });
+
+// The server runs the extractor on applicant-supplied text up to the cap (50,000 characters), so
+// it must not take quadratic time on it. These took about 2 s each before the email pattern was
+// anchored and bounded. The limit is loose (a CI machine can be slow); the bug was seconds, not ms.
+describe('hostile CV text', () => {
+  const FIFTY_THOUSAND = 50_000;
+  const hostile: Record<string, string> = {
+    'a long run with no @': 'a'.repeat(FIFTY_THOUSAND),
+    'dots and letters': 'a.'.repeat(FIFTY_THOUSAND / 2),
+    'a long run of digits ending in a letter': `${'1'.repeat(FIFTY_THOUSAND - 1)}x`,
+    'repeated www.': 'www.'.repeat(FIFTY_THOUSAND / 4),
+    'hyphenated labels': 'a-a.'.repeat(FIFTY_THOUSAND / 4),
+  };
+
+  for (const [name, text] of Object.entries(hostile)) {
+    it(`finishes quickly on ${name}`, () => {
+      const started = performance.now();
+      extractContactSuggestions(text, form);
+      expect(performance.now() - started).toBeLessThan(500);
+    });
+  }
+
+  it('still finds an email in the middle of such text', () => {
+    const text = `${'a'.repeat(20_000)} sara@example.com ${'b'.repeat(20_000)}`;
+    expect(extractContactSuggestions(text, form).email).toBe('sara@example.com');
+  });
+
+  it('does not offer a truncated email for a local part over 64 characters', () => {
+    const text = `${'a'.repeat(70)}@example.com`;
+    expect(extractContactSuggestions(text, form).email).toBeUndefined();
+  });
+});

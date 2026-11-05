@@ -54,7 +54,15 @@ function findName(lines: string[]): string | undefined {
 
 // --- Email ------------------------------------------------------------------------------------
 
-const EMAIL = /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)*\.\p{L}{2,}/gu;
+/**
+ * The text is applicant-supplied and the server runs this on up to `CV_TEXT_CAP` characters, so the
+ * pattern must stay linear. It starts only at the start of a run of local-part characters (the
+ * lookbehind) and bounds each part to the real limits: 64 for the local part, 63 per domain label.
+ * Without the start anchor, a long run with no `@` was re-scanned from every position (about 2 s
+ * for 50,000 characters).
+ */
+const EMAIL =
+  /(?<![\p{L}\p{N}._%+-])[\p{L}\p{N}._%+-]{1,64}@[\p{L}\p{N}-]{1,63}(?:\.[\p{L}\p{N}-]{1,63})*\.\p{L}{2,63}/gu;
 
 function findEmail(text: string): string | undefined {
   for (const match of text.matchAll(EMAIL)) {
