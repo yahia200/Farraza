@@ -425,6 +425,27 @@ describe('parseFormFields', () => {
       }
     });
 
+    it('takes the contact Preset keys on their required types and refuses them on others, once per form', () => {
+      const urlQuestion = { key: ABOUT, type: 'url', label: 'LinkedIn', helpText: null, required: false, config: {} };
+      const city = { ...shortText, key: ABOUT_2, presetKey: 'contact.location' };
+      for (const presetKey of ['contact.linkedin_url', 'contact.portfolio_url', 'contact.github_url']) {
+        expect(parseFormFields([{ ...urlQuestion, presetKey }])).toMatchObject({ ok: true });
+        expect(parseFormFields([{ ...shortText, presetKey }])).toEqual({
+          ok: false,
+          errors: [{ path: '0.presetKey', message: WRONG_TYPE_PRESET_KEY }],
+        });
+      }
+      expect(parseFormFields([city])).toMatchObject({ ok: true });
+      expect(parseFormFields([{ ...urlQuestion, presetKey: 'contact.location' }])).toEqual({
+        ok: false,
+        errors: [{ path: '0.presetKey', message: WRONG_TYPE_PRESET_KEY }],
+      });
+      expect(parseFormFields([city, { ...city, key: ABOUT }])).toEqual({
+        ok: false,
+        errors: [{ path: '1.presetKey', message: DUPLICATE_PRESET_KEY }],
+      });
+    });
+
     it('refuses the same top-level Preset key twice, pointing at the second, and accepts two different ones', () => {
       const company = { ...shortText, key: ABOUT_2, presetKey: 'experience.company' };
       const jobTitle = { ...shortText, presetKey: 'experience.job_title' };

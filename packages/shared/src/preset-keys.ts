@@ -51,6 +51,11 @@ export const PRESET_KEY_TYPES = {
   'experience.start_date': 'date',
   'experience.end_date': 'date',
   'experience.description': 'long_text',
+  // Contact: four single-question Presets (CV autofill ticket 03), one key each.
+  'contact.linkedin_url': 'url',
+  'contact.portfolio_url': 'url',
+  'contact.location': 'short_text',
+  'contact.github_url': 'url',
 } as const satisfies Record<string, PresetQuestionType>;
 
 export type PresetKey = keyof typeof PRESET_KEY_TYPES;
