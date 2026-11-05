@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldError, FieldGroup, FieldLabel, FieldSet } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
+import { toast } from '@/components/ui/toast';
 import { BrandingFields } from './branding-fields';
 
 /**
@@ -22,7 +23,6 @@ export function CompanySettingsForm({ company }: { company: MyCompany }) {
   // Mirrors CompanyPolicy.update in the API, which enforces it anyway (403).
   const canEdit = company.role === 'owner' || company.role === 'admin';
   const [formError, setFormError] = useState<string>();
-  const [saved, setSaved] = useState(false);
 
   const form = useForm<CompanySettingsFormInput>({
     resolver: zodResolver(companySettingsFormSchema),
@@ -37,15 +37,19 @@ export function CompanySettingsForm({ company }: { company: MyCompany }) {
 
   async function onSubmit(values: CompanySettingsFormInput) {
     setFormError(undefined);
-    setSaved(false);
-    const result = await updateCompanySettings(company.slug, values);
-    if (result.saved) {
-      setSaved(true);
-      // The saved values become the new baseline, so the form is no longer "dirty".
-      form.reset(values);
-      return;
+    try {
+      const result = await updateCompanySettings(company.slug, values);
+      if (result.saved) {
+        toast.add({ type: 'success', title: 'Settings saved' });
+        // The saved values become the new baseline, so the form is no longer "dirty".
+        form.reset(values);
+        return;
+      }
+      setFormError(applyActionFailure(form, result));
+    } catch {
+      // The action returns API failures, but a dropped connection or a server error still throws.
+      setFormError("We couldn't save your settings. Check your connection and try again.");
     }
-    setFormError(applyActionFailure(form, result));
   }
 
   return (
@@ -60,11 +64,6 @@ export function CompanySettingsForm({ company }: { company: MyCompany }) {
           {formError && (
             <Alert variant="destructive">
               <AlertDescription>{formError}</AlertDescription>
-            </Alert>
-          )}
-          {saved && (
-            <Alert>
-              <AlertDescription>Settings saved.</AlertDescription>
             </Alert>
           )}
 

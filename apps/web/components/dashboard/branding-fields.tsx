@@ -1,10 +1,14 @@
 'use client';
 
-import { Controller, useWatch, type Control, type Path } from 'react-hook-form';
-import type { CompanyBrandingFormInput } from '@repo/shared';
+import { ChevronDownIcon } from 'lucide-react';
+import { Controller,useWatch, type Control, type Path } from 'react-hook-form';
+import { startingColorFor, type CompanyBrandingFormInput } from '@repo/shared';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
+import { Button } from '@/components/ui/button';
+import { HexColorPicker } from '@/components/ui/color-picker';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { initials } from './initials';
 
 /**
@@ -65,19 +69,43 @@ export function BrandingFields<T extends CompanyBrandingFormInput>({
           <Field data-invalid={fieldState.invalid}>
             <FieldLabel htmlFor="company-color">Brand color</FieldLabel>
             <div className="flex items-center gap-3">
-              <span
-                aria-hidden
-                className="size-8 shrink-0 rounded-full border bg-muted"
-                style={brandColor && !fieldState.invalid ? { backgroundColor: brandColor } : undefined}
-              />
-              <Input
-                {...field}
-                value={field.value as string}
-                id="company-color"
-                aria-describedby="company-color-description"
-                placeholder="#1a73e8"
-                aria-invalid={fieldState.invalid}
-              />
+              {/* One control that reads as a dropdown: swatch, hex and a chevron, all opening the picker. Inside a disabled fieldset (Settings, for a Member who can't edit) the native button is disabled with it. */}
+              <Popover>
+                <PopoverTrigger
+                  id="company-color"
+                  aria-describedby="company-color-description"
+                  aria-invalid={fieldState.invalid}
+                  className="group flex w-full h-9 min-w-0 items-center gap-2 rounded-full border border-input bg-transparent pl-1.5 pr-2.5 text-left text-sm outline-hidden transition-colors hover:bg-muted/50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 disabled:pointer-events-none disabled:opacity-50 dark:bg-input/30"
+                >
+                  <span
+                    aria-hidden
+                    className="size-6 shrink-0 rounded-full border bg-muted"
+                    style={brandColor && !fieldState.invalid ? { backgroundColor: brandColor } : undefined}
+                  />
+                  <span className={brandColor ? 'flex-1 truncate font-mono' : 'flex-1 truncate text-muted-foreground'}>
+                    {brandColor || 'Pick a color'}
+                  </span>
+                  <ChevronDownIcon
+                    aria-hidden
+                    className="size-4 shrink-0 text-muted-foreground transition-transform group-data-popup-open:rotate-180"
+                  />
+                </PopoverTrigger>
+                <PopoverContent align="start" collisionPadding={16} className="w-72 max-w-[calc(100vw-2rem)] gap-4">
+                  <HexColorPicker
+                    value={field.value as string}
+                    fallback={startingColorFor(companyName)}
+                    onChange={field.onChange}
+                  />
+                  <Input
+                    {...field}
+                    value={field.value as string}
+                    aria-label="Hex color"
+                    placeholder="#1a73e8"
+                    autoComplete="off"
+                    aria-invalid={fieldState.invalid}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <FieldDescription id="company-color-description">
               Used on your public job pages. Leave empty for the default.

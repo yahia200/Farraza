@@ -34,7 +34,9 @@ export default function JobLayout({ children, params }: LayoutProps<'/dashboard/
               </div>
             </div>
             <div className="flex items-start gap-2">
+              {job.status === 'open' && (
               <CopyJobLinkButton companySlug={company.slug} jobSlug={job.slug} status={job.status} variant="label" />
+              )}
               {canManageJobs(company.role) && <JobStatusActionsSlot companySlug={company.slug} job={job} />}
             </div>
           </div>

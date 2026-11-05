@@ -58,7 +58,6 @@ import { useCvAutofill } from "./use-cv-autofill";
 import { GroupStep } from "./group-step";
 import { QuestionStep } from "./question-step";
 import type { PublicJob } from "@/lib/public-jobs";
-import { initials } from "@/components/dashboard/initials";
 
 /** The applicant's details, asked first, one per step. */
 const CONTACT_STEPS = [
@@ -302,31 +301,38 @@ export function ApplyForm({
     (values) =>
       startTransition(async () => {
         setFormError(undefined);
-        // A read still running when Send is pressed gets up to 5 s; after that the CV goes as
-        // `failed` (use-cv-autofill.ts), so the applicant is never stuck behind a slow reader.
-        const cvText =
-          cvMode !== "off" && values.cvFileId
-            ? ((await autofill.cvTextForSubmit()) ?? undefined)
-            : undefined;
-        const result = await submitApplication(company.slug, jobSlug, {
-          name: values.name,
-          email: values.email,
-          phone: values.phone,
-          cvFileId: cvMode === "off" ? undefined : (values.cvFileId ?? undefined),
-          answers: compactAnswers(values.answers, fields),
-          cvText,
-          website: values.website,
-          source,
-        });
-        if (result.ok) {
-          setSent(true);
-          return;
-        }
-        if (result.fieldErrors) {
-          applyServerErrors(result.fieldErrors);
-        }
-        if (result.formError) {
-          setFormError(result.formError);
+        try {
+          // A read still running when Send is pressed gets up to 5 s; after that the CV goes as
+          // `failed` (use-cv-autofill.ts), so the applicant is never stuck behind a slow reader.
+          const cvText =
+            cvMode !== "off" && values.cvFileId
+              ? ((await autofill.cvTextForSubmit()) ?? undefined)
+              : undefined;
+          const result = await submitApplication(company.slug, jobSlug, {
+            name: values.name,
+            email: values.email,
+            phone: values.phone,
+            cvFileId: cvMode === "off" ? undefined : (values.cvFileId ?? undefined),
+            answers: compactAnswers(values.answers, fields),
+            cvText,
+            website: values.website,
+            source,
+          });
+          if (result.ok) {
+            setSent(true);
+            return;
+          }
+          if (result.fieldErrors) {
+            applyServerErrors(result.fieldErrors);
+          }
+          if (result.formError) {
+            setFormError(result.formError);
+          }
+        } catch {
+          // The action returns API failures, but a dropped connection or a server error still throws.
+          setFormError(
+            "We couldn't send your application. Check your connection and try again.",
+          );
         }
       }),
     showFirstError,
@@ -334,7 +340,7 @@ export function ApplyForm({
 
   if (sent) {
     return (
-      <Card>
+      <Card className="w-full">
         {cardHeader()}
         <CardContent>
           <Empty className="border">
@@ -364,23 +370,21 @@ export function ApplyForm({
   function cardHeader() {
     return (
       <CardHeader>
-        <CardDescription className="flex items-center gap-2 text-xl text-primary">
-          <Avatar className="size-8 rounded-xl">
-            {company.logoUrl && <AvatarImage src={company.logoUrl} alt="" />}
-            <AvatarFallback
-              className="rounded-[inherit] bg-primary text-sm text-primary-foreground"
-              style={
-                company.brandColor
-                  ? { backgroundColor: company.brandColor, color: "white" }
-                  : undefined
-              }
-            >
-              {initials(company.name)}
+        {/* The company row is the public company page's header, so the two pages read as one site. */}
+        <div className="flex items-center gap-2">
+          <Avatar>
+            {company.logoUrl ? (
+              <AvatarImage src={company.logoUrl} alt="" />
+            ) : null}
+            <AvatarFallback>
+              {company.name.slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          {company.name}
-        </CardDescription>
-        <CardTitle className="text-2xl">{jobTitle}</CardTitle>
+          <span className="font-heading text-lg font-medium">
+            {company.name}
+          </span>
+        </div>
+        <CardTitle>{jobTitle}</CardTitle>
         {jobDescription && (
           <CardDescription className="whitespace-pre-line">
             {jobDescription}
@@ -392,7 +396,7 @@ export function ApplyForm({
 
   if (!started) {
     return (
-      <Card>
+      <Card className="w-full">
         {cardHeader()}
         <CardFooter>
           <Button type="button" onClick={() => setStarted(true)}>
@@ -405,7 +409,7 @@ export function ApplyForm({
   }
 
   return (
-    <Card>
+    <Card className="w-full">
       {cardHeader()}
       <CardContent className="pt-(--card-spacing)">
         <Questionnaire

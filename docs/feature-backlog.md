@@ -69,6 +69,14 @@ A regex condition for `short_text` and `long_text` Screening rules, left out of 
 - A manager's pattern runs on the server against applicant text, so a backtracking engine (native `RegExp`) risks ReDoS. Use a linear-time engine such as `re2js` (pure-JS RE2 port); read its installed README and `.d.ts` first, it is not yet verified.
 - Validate the pattern when the rule is saved, so a bad one is an editor error and never a failure at submit.
 
+### Company logo: upload instead of a link
+
+Today the logo is a pasted `https://` link (`logoUrl`, `BrandingFields`). Replace it with an upload, so a company doesn't need to host its own image.
+
+- The storage side exists (presigned uploads to the bucket, `files` rows, `browser-image-compression` on the web app); the logo needs its own file purpose, a size/type limit (small images only) and a public-readable URL, because the public apply pages show it to anyone.
+- Keep `logoUrl` as the stored value, so the public pages and the sidebar don't change. Decide what happens to the old object when the logo is replaced or removed.
+- Applies to Settings, step 2 of "Add company" and the branding card on the overview.
+
 ### Two-factor authentication (2FA) with TOTP
 
 Let users protect their account with a time-based one-time password from an authenticator app (Google Authenticator, 1Password, etc.).

@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { ApplyForm } from '@/components/apply/apply-form';
+import { Card, CardFooter, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getPublicJob } from '@/lib/public-jobs';
 
@@ -58,37 +59,39 @@ async function Apply({ params, searchParams }: PageProps<'/[companySlug]/[jobSlu
   const { utm_source } = await searchParams;
 
   return (
-    <>
-      <main className="mx-auto flex-1 w-screen py-10 sm:py-14 px-4">
-        <section className="flex flex-col gap-6 w-full max-w-2xl mx-auto">
-          <ApplyForm
-            company={company}
-            jobSlug={jobSlug}
-            jobTitle={job.title}
-            jobDescription={job.description}
-            cvMode={cvMode}
-            fields={fields}
-            source={typeof utm_source === 'string' ? utm_source : undefined}
-          />
-        </section>
-      </main>
-    </>
+    // Same frame as the company page (/{companySlug}).
+    <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:py-14">
+      <ApplyForm
+        company={company}
+        jobSlug={jobSlug}
+        jobTitle={job.title}
+        jobDescription={job.description}
+        cvMode={cvMode}
+        fields={fields}
+        source={typeof utm_source === 'string' ? utm_source : undefined}
+      />
+    </main>
   );
 }
 
 /** Fixed sizes only: no Math.random() in anything prerendered. */
 function ApplySkeleton() {
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-10 px-4 py-10 sm:py-14" aria-busy="true">
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-3">
-          <Skeleton className="size-10 rounded-xl" />
-          <Skeleton className="h-4 w-32" />
-        </div>
-        <Skeleton className="h-9 w-2/3" />
-        <Skeleton className="h-16 w-full" />
-      </div>
-      <Skeleton className="h-96 w-full rounded-3xl" />
+    <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:py-14">
+      <Card className="w-full" aria-busy="true">
+        <span className="sr-only">Loading application</span>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Skeleton className="size-8 rounded-full" />
+            <Skeleton className="h-6 w-40" />
+          </div>
+          <Skeleton className="h-5 w-2/3" />
+          <Skeleton className="h-4 w-full" />
+        </CardHeader>
+        <CardFooter>
+          <Skeleton className="h-8 w-28" />
+        </CardFooter>
+      </Card>
     </main>
   );
 }

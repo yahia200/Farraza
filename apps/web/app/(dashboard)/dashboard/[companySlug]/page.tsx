@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { BrandingCard } from '@/components/dashboard/branding-card';
 import { CompanyPage, PageTitle } from '@/components/dashboard/company-page';
 import { CardGridSkeleton, PageTitleSkeleton, SkeletonGroup } from '@/components/dashboard/skeletons';
 import { NAV_ITEMS } from '@/components/dashboard/nav-items';
@@ -26,7 +27,8 @@ export default function OverviewPage({ params }: PageProps<'/dashboard/[companyS
     >
       {(company) => (
         <>
-          <PageTitle title={company.name} description={`You're signed in as ${company.role}.`} />
+          <PageTitle title={company.name} />
+          <BrandingCard company={company} />
           <div className="grid gap-4 md:grid-cols-3">
             {NAV_ITEMS.filter((item) => item.path).map((item) => (
               <Link key={item.title} href={`/dashboard/${company.slug}${item.path}`}>
