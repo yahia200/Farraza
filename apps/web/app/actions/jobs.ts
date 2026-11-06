@@ -8,6 +8,11 @@ import {
   RELOAD_MESSAGE,
   saveHighlightedQuestionsSchema,
   saveRatingCriteriaSchema,
+  saveRequirementsSchema,
+  groupRequirementErrors,
+  requirementErrorsFromIssues,
+  type Requirement,
+  type RequirementErrors,
   updateJobSchema,
   groupRuleErrors,
   type CreateJobInput,
@@ -262,4 +267,55 @@ export async function saveScreeningRules(
   revalidatePath(settingsPath);
   revalidatePath(`/dashboard/${companySlug}/jobs/${jobSlug}/candidates`);
   return { rules: saved.rules };
+}
+
+export type SaveRequirementsResult = ActionFailure<never> & {
+  /** Refusals by Requirement index (`groupRequirementErrors`), from the shared validator or the API's 400. */
+  requirementErrors?: Record<number, RequirementErrors>;
+  requirements?: Requirement[];
+  version?: number;
+};
+
+/**
+ * Saves the Job's Requirements, calling PUT .../jobs/:jobSlug/requirements with the whole new list
+ * (apps/api/src/jobs; answers `{ requirements, version }`). Unlike the Screening rules there is no form
+ * to check against, so the body is validated here with `saveRequirementsSchema` (the API's own schema)
+ * and its messages are shown on the Requirement they are about. An unchanged list creates no version
+ * (the API answers the stored list and version). Returns failures rather than throwing. Revalidates the
+ * Settings page, which re-reads the job. Applicants never see Requirements, so the public job is left alone.
+ */
+export async function saveRequirements(
+  companySlug: string,
+  jobSlug: string,
+  requirements: Requirement[],
+): Promise<SaveRequirementsResult> {
+  const settingsPath = `/dashboard/${companySlug}/jobs/${jobSlug}/settings`;
+  const parsed = saveRequirementsSchema.safeParse({ requirements });
+  if (!parsed.success) {
+    const { byRequirement, form } = groupRequirementErrors(requirementErrorsFromIssues(parsed.error.issues));
+    return { requirementErrors: byRequirement, formError: form[0] };
+  }
+
+  const response = await apiFetch(`${jobsPath(companySlug, jobSlug)}/requirements`, {
+    method: 'PUT',
+    body: JSON.stringify(parsed.data),
+  });
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (!response.ok) {
+    if (response.status === 409) {
+      // Someone saved at the same moment: show the newer list.
+      revalidatePath(settingsPath);
+    }
+    return failureFromResponse(response, [], {
+      ...NO_PERMISSION,
+      404: () => ({ formError: 'This job no longer exists. Reload the page.' }),
+      409: (message) => ({ formError: message }),
+    });
+  }
+
+  const saved = (await response.json()) as { requirements: Requirement[]; version: number };
+  revalidatePath(settingsPath);
+  return { requirements: saved.requirements, version: saved.version };
 }

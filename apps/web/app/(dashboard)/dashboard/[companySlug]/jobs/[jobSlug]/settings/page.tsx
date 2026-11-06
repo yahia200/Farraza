@@ -4,6 +4,7 @@ import { canManageJobs } from '@repo/shared';
 import { JobPage, type LoadedJob } from '@/components/dashboard/jobs/job-page';
 import { JobPageTransition } from '@/components/dashboard/jobs/job-page-transition';
 import { RatingCriteriaSection } from '@/components/dashboard/jobs/settings/rating-criteria-section';
+import { RequirementsEditor } from '@/components/dashboard/jobs/settings/requirements-editor';
 import { ScreeningRulesEditor } from '@/components/dashboard/jobs/settings/screening-rules-editor';
 import { JobSettingsSkeleton } from '@/components/dashboard/skeletons';
 import { getJobForm, type MyCompany } from '@/lib/dal';
@@ -29,7 +30,7 @@ async function Settings({ company, job }: { company: MyCompany; job: LoadedJob }
   if (!canManageJobs(company.role)) {
     return (
       <p className="max-w-3xl rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">
-        Only admins and recruiters can change a job&apos;s screening rules and rating criteria.
+        Only admins and recruiters can change a job&apos;s requirements, screening rules and rating criteria.
       </p>
     );
   }
@@ -70,6 +71,25 @@ async function Settings({ company, job }: { company: MyCompany; job: LoadedJob }
             , then come back.
           </p>
         )}
+      </section>
+      <section aria-labelledby="requirements-title" className="flex flex-col gap-3">
+        <div className="space-y-1">
+          <h2 id="requirements-title" className="font-heading text-base font-semibold">
+            Requirements
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            What a candidate should have, each with the keywords that count as evidence in their CV. Candidates are
+            checked against these and the result is shown to your team as advice: CV matching never rejects anyone.
+            Editing requirements leaves the results already shown alone until you re-check candidates.
+          </p>
+        </div>
+        <RequirementsEditor
+          key={job.requirementsVersion}
+          companySlug={company.slug}
+          jobSlug={job.slug}
+          savedRequirements={job.requirements}
+          savedVersion={job.requirementsVersion}
+        />
       </section>
       <RatingCriteriaSection companySlug={company.slug} jobSlug={job.slug} savedKeys={job.ratingCriteria} />
     </div>
