@@ -1,11 +1,21 @@
 import { Injectable } from '@nestjs/common';
-import type { Answers, FilePurpose, FormFields, RatingValues, ScreeningFlag } from '@repo/shared';
+import type {
+  Answers,
+  FilePurpose,
+  FormFields,
+  RatingValues,
+  Requirement,
+  RequirementMatches,
+  ScreeningFlag,
+} from '@repo/shared';
 import type { StageKind } from '../jobs/job.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
   ApplicationDetailRow,
   CardRow,
   CardRowWithAnswers,
+  CvState,
+  RequirementCheckRow,
   ApplicationFile,
   ApplicationStatus,
   DownloadableFile,
@@ -85,6 +95,18 @@ export class PipelineRepository {
     return this.prisma.db.orm.public.Rating;
   }
 
+  private get requirementResults() {
+    return this.prisma.db.orm.public.ApplicationRequirementResult;
+  }
+
+  private get requirementVersions() {
+    return this.prisma.db.orm.public.JobRequirementVersion;
+  }
+
+  private get cvTexts() {
+    return this.prisma.db.orm.public.CvText;
+  }
+
   private get formVersions() {
     return this.prisma.db.orm.public.FormVersion;
   }
@@ -158,6 +180,19 @@ export class PipelineRepository {
   }
 
   /**
+   * The ids of this Job's Applications whose stored Requirement result missed a must-have, in one
+   * query by the company and the Job (the result row carries both). Applications with no result row
+   * (never checked, or a CV that was not `readable`) are not in it.
+   */
+  async findMissedMustHaveIds(companyId: string, jobId: string): Promise<Set<string>> {
+    const rows = await this.requirementResults
+      .select('applicationId')
+      .where({ companyId, jobId, missedMustHave: true })
+      .all();
+    return new Set(rows.map((row) => row.applicationId));
+  }
+
+  /**
    * The `fields` of each of these form versions of this company's job, by version id. Unknown ids,
    * and ids of another job's or company's versions, are left out.
    */
@@ -194,7 +229,7 @@ export class PipelineRepository {
       .first();
     if (!row) return null;
 
-    const [eventRows, noteRows, ratingRows] = await Promise.all([
+    const [eventRows, noteRows, ratingRows, cvState, requirementCheck] = await Promise.all([
       this.events
         .where({ applicationId })
         .orderBy((event) => event.createdAt.asc())
@@ -211,6 +246,8 @@ export class PipelineRepository {
         .include('user')
         .orderBy((rating) => rating.createdAt.asc())
         .all(),
+      this.findCvState(companyId, applicationId),
+      this.findRequirementCheck(companyId, applicationId),
     ]);
 
     return {
@@ -230,6 +267,8 @@ export class PipelineRepository {
       cvMode: row.formVersion.cvMode,
       answers: row.answers as Answers,
       flags: row.flags as ScreeningFlag[],
+      cvState,
+      requirementCheck,
       events: eventRows.map((event) => ({
         id: event.id,
         type: event.type,
@@ -253,6 +292,44 @@ export class PipelineRepository {
         createdAt: rating.createdAt,
         updatedAt: rating.updatedAt,
       })),
+    };
+  }
+
+  /**
+   * What became of the Application's CV text: the status of the `cv_texts` row of its CV file, or
+   * `none` when it has no CV file or that file has no row. Only `status` is selected: the text itself
+   * is never read by a route (ADR-0006).
+   */
+  private async findCvState(companyId: string, applicationId: string): Promise<CvState> {
+    const file = await this.files
+      .select('id')
+      .where({ companyId, applicationId, purpose: 'cv', status: 'uploaded' })
+      .first();
+    if (!file) return 'none';
+    const text = await this.cvTexts.select('status').where({ companyId, fileId: file.id }).first();
+    return text?.status ?? 'none';
+  }
+
+  /**
+   * The Application's stored Requirement result with the Requirements of the version it names,
+   * looked up by (Job, version) from the immutable `job_requirement_versions` row. Null with no result.
+   */
+  private async findRequirementCheck(
+    companyId: string,
+    applicationId: string,
+  ): Promise<RequirementCheckRow | null> {
+    const result = await this.requirementResults.where({ companyId, applicationId }).first();
+    if (!result) return null;
+    const version = await this.requirementVersions
+      .select('requirements')
+      .where({ companyId, jobId: result.jobId, version: result.version })
+      .first();
+    return {
+      version: result.version,
+      missedMustHave: result.missedMustHave,
+      // CHECKed objects/arrays, written only by the submit from the matcher and a parsed list.
+      results: result.results as RequirementMatches,
+      requirements: (version?.requirements ?? []) as Requirement[],
     };
   }
 
