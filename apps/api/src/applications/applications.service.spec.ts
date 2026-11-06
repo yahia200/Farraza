@@ -2172,6 +2172,34 @@ describe('ApplicationsService', () => {
     });
   });
 
+  // Requirements are internal (spec: "Requirements and results invisible to applicants"). The public
+  // routes build their payloads field by field, so this pins that no key anywhere in what they return
+  // mentions a Requirement, its keywords or a match.
+  describe('no Requirement reaches the public routes', () => {
+    /** Every object key in a payload, however deep. */
+    const keysOf = (value: unknown): string[] =>
+      Array.isArray(value)
+        ? value.flatMap(keysOf)
+        : value !== null && typeof value === 'object'
+          ? Object.entries(value).flatMap(([key, inner]) => [key, ...keysOf(inner)])
+          : [];
+
+    it('carries no requirement field in the apply page, the listing, the branding or the submit answer', async () => {
+      repository.seedJob({ slug: 'backend', cvMode: 'optional' });
+
+      const payloads = [
+        await service.getPublicJob('acme', 'backend'),
+        await service.listCompanyJobs('acme'),
+        await service.getCompanyBranding('acme'),
+        await service.submit('acme', 'backend', applicant()),
+      ];
+
+      for (const payload of payloads) {
+        expect(keysOf(payload).filter((key) => /requirement|keyword|missedMustHave|mustHave/i.test(key))).toEqual([]);
+      }
+    });
+  });
+
   // The public listing at /{companySlug}: a company's branding and only its open jobs, projected to
   // the fields applicants may see. The repository query is checked against the real database by hand.
   describe('listCompanyJobs', () => {

@@ -1,8 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import type { ScreeningRule } from '@repo/shared';
+import type { Requirement, ScreeningRule } from '@repo/shared';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { DEFAULT_STAGES } from './job.js';
-import type { Job, JobStatus, JobWithStages, PublicLabel, Stage, StageKind } from './job.js';
+import type {
+  Job,
+  JobStatus,
+  JobWithStages,
+  PublicLabel,
+  RequirementVersion,
+  Stage,
+  StageKind,
+} from './job.js';
 
 @Injectable()
 export class JobsRepository {
@@ -15,6 +23,10 @@ export class JobsRepository {
 
   private get jobs() {
     return this.prisma.db.orm.public.Job;
+  }
+
+  private get requirementVersions() {
+    return this.prisma.db.orm.public.JobRequirementVersion;
   }
 
   private get formVersions() {
@@ -39,7 +51,12 @@ export class JobsRepository {
         })),
       );
 
-      return { ...toJob(jobRow), stages: sortStages(stageRows.map(toStage)) };
+      return {
+        ...toJob(jobRow),
+        stages: sortStages(stageRows.map(toStage)),
+        requirements: [],
+        requirementsVersion: 0,
+      };
     });
   }
 
@@ -56,7 +73,37 @@ export class JobsRepository {
       .where({ companyId, slug })
       .include('stages')
       .first();
-    return row ? { ...toJob(row), stages: sortStages(row.stages.map(toStage)) } : null;
+    if (!row) return null;
+    const latest = await this.findLatestRequirementVersion(row.id);
+    return {
+      ...toJob(row),
+      stages: sortStages(row.stages.map(toStage)),
+      requirements: latest?.requirements ?? [],
+      requirementsVersion: latest?.version ?? 0,
+    };
+  }
+
+  /** The job's current Requirements: its highest `job_requirement_versions.version`, or null. */
+  async findLatestRequirementVersion(jobId: string): Promise<RequirementVersion | null> {
+    const row = await this.requirementVersions
+      .where({ jobId })
+      .orderBy((v) => v.version.desc())
+      .first();
+    return row ? toRequirementVersion(row) : null;
+  }
+
+  /**
+   * Inserts the next version of a job's Requirements in one statement. `version` is the caller's
+   * "current + 1"; if another save took that number first, UNIQUE (job_id, version) raises a unique
+   * violation (the service answers 409). Rows are never updated or deleted here.
+   */
+  async createRequirementVersion(input: {
+    companyId: string;
+    jobId: string;
+    version: number;
+    requirements: Requirement[];
+  }): Promise<RequirementVersion> {
+    return toRequirementVersion(await this.requirementVersions.create(input));
   }
 
   async update(
@@ -159,6 +206,23 @@ function toJob(row: {
     // Same reasoning: CHECKed to be a JSON array, and the service writes only rules that
     // `parseScreeningRules` accepted.
     screeningRules: row.screeningRules as ScreeningRule[],
+  };
+}
+
+function toRequirementVersion(row: {
+  companyId: string;
+  jobId: string;
+  version: number;
+  requirements: unknown;
+  createdAt: Date;
+}): RequirementVersion {
+  return {
+    companyId: row.companyId,
+    jobId: row.jobId,
+    version: row.version,
+    // CHECKed to be a JSON array, and the service writes only lists `requirementsSchema` accepted.
+    requirements: row.requirements as Requirement[],
+    createdAt: row.createdAt,
   };
 }
 

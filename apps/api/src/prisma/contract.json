@@ -40,6 +40,10 @@
       "model": "Identity",
       "namespace": "public"
     },
+    "job_requirement_versions": {
+      "model": "JobRequirementVersion",
+      "namespace": "public"
+    },
     "jobs": {
       "model": "Job",
       "namespace": "public"
@@ -1797,6 +1801,110 @@
               },
               "namespaceId": "public",
               "table": "jobs"
+            }
+          },
+          "JobRequirementVersion": {
+            "fields": {
+              "companyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "jobId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "requirements": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/jsonb@1",
+                  "kind": "scalar"
+                }
+              },
+              "version": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "company": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "companyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Company",
+                  "namespace": "public"
+                }
+              },
+              "job": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "jobId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Job",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "companyId": {
+                  "column": "company_id"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "jobId": {
+                  "column": "job_id"
+                },
+                "requirements": {
+                  "column": "requirements"
+                },
+                "version": {
+                  "column": "version"
+                }
+              },
+              "namespaceId": "public",
+              "table": "job_requirement_versions"
             }
           },
           "Membership": {
@@ -4248,6 +4356,127 @@
                 }
               ]
             },
+            "job_requirement_versions": {
+              "checks": [
+                {
+                  "expression": "jsonb_typeof(requirements) = 'array'",
+                  "name": "job_requirement_versions_requirements_array_96ffa383",
+                  "prefix": "job_requirement_versions_requirements_array"
+                },
+                {
+                  "expression": "version > 0",
+                  "name": "job_requirement_versions_version_positive_341aaa74",
+                  "prefix": "job_requirement_versions_version_positive"
+                }
+              ],
+              "columns": {
+                "company_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "created_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "default": {
+                    "expression": "gen_random_uuid()",
+                    "kind": "function"
+                  },
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "job_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "requirements": {
+                  "codecId": "pg/jsonb@1",
+                  "nativeType": "jsonb",
+                  "nullable": false
+                },
+                "version": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "company_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "job_requirement_versions"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "companies"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "job_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "job_requirement_versions"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "jobs"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "company_id"
+                  ],
+                  "name": "job_requirement_versions_company_id_idx_1303a718",
+                  "prefix": "job_requirement_versions_company_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "job_id"
+                  ],
+                  "name": "job_requirement_versions_job_id_idx_58a5bbdd",
+                  "prefix": "job_requirement_versions_job_id_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "job_id",
+                    "version"
+                  ]
+                }
+              ]
+            },
             "jobs": {
               "checks": [
                 {
@@ -5674,7 +5903,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "2ffa0e27fd66e9bf8db34eec35a4f98f67c8fd355f584fba85c84a38cb0fbb0d"
+    "storageHash": "2f45bc31580cb9c9cf233dcfc5b3f5d51b022a47c8426bb128df794bf588d8ea"
   },
   "execution": {
     "executionHash": "6c72d2e21cac19476b009440c451b74d3f8aaae32e374ce19a06cc2a66cb6742",

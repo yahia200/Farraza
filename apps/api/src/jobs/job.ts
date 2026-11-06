@@ -1,4 +1,4 @@
-import type { ScreeningRule } from '@repo/shared';
+import type { Requirement, ScreeningRule } from '@repo/shared';
 export type JobStatus = 'draft' | 'open' | 'closed';
 export type StageKind = 'normal' | 'hired' | 'rejected';
 export type PublicLabel = 'received' | 'in_review' | 'interview' | 'offer' | 'closed';
@@ -39,8 +39,24 @@ export interface Job {
   screeningRules: ScreeningRule[];
 }
 
+/**
+ * One immutable version of a Job's Requirements (`job_requirement_versions`). The Job's current
+ * version is its highest `version`; a version is never edited, and an empty list is a valid one.
+ */
+export interface RequirementVersion {
+  companyId: string;
+  jobId: string;
+  version: number;
+  requirements: Requirement[];
+  createdAt: Date;
+}
+
 export interface JobWithStages extends Job {
   stages: Stage[];
+  /** The Job's current Requirements (its highest `RequirementVersion`); `[]` before the first save. */
+  requirements: Requirement[];
+  /** The number of that version; `0` while the Job has none. */
+  requirementsVersion: number;
 }
 
 export const DEFAULT_STAGES: ReadonlyArray<Omit<Stage, 'id'>> = [

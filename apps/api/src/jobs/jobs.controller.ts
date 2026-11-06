@@ -14,6 +14,10 @@ import {
   type SaveRatingCriteriaDto,
 } from './dto/save-rating-criteria.dto.js';
 import {
+  saveRequirementsSchema,
+  type SaveRequirementsDto,
+} from './dto/save-requirements.dto.js';
+import {
   saveScreeningRulesSchema,
   type SaveScreeningRulesDto,
 } from './dto/save-screening-rules.dto.js';
@@ -82,6 +86,16 @@ export class JobsController {
     @Body({ schema: saveScreeningRulesSchema }) dto: SaveScreeningRulesDto,
   ) {
     return this.jobs.saveScreeningRules(user, membership, jobSlug, dto);
+  }
+
+  @Put(':jobSlug/requirements')
+  saveRequirements(
+    @CurrentUser() user: User,
+    @CurrentMembership() membership: Membership,
+    @Param('jobSlug') jobSlug: string,
+    @Body({ schema: saveRequirementsSchema }) dto: SaveRequirementsDto,
+  ) {
+    return this.jobs.saveRequirements(user, membership, jobSlug, dto);
   }
 
   @Post(':jobSlug/open')

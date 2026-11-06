@@ -358,6 +358,26 @@ model CvText {
   @@map("cv_texts")
 }
 
+/// One immutable version of a Job's Requirements (keyword match, Layer 2). The Job's current version is its highest `version`. Written only when a save changes the list; never updated.
+model JobRequirementVersion {
+  id           Uuid              @id @default(sql`gen_random_uuid()`)
+  companyId    Uuid              @map("company_id")
+  jobId        Uuid              @map("job_id")
+  version      Int
+  /// The Requirement list (`requirementsSchema` in @repo/shared); `[]` is a valid version. No FK: the ids live inside the array and are referenced by later result rows.
+  requirements Jsonb
+  createdAt    TimestamptzJsDate @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  job     Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, version])
+  @@index([companyId])
+  @@check(expression: "version > 0", name: "job_requirement_versions_version_positive")
+  @@check(expression: "jsonb_typeof(requirements) = 'array'", name: "job_requirement_versions_requirements_array")
+  @@map("job_requirement_versions")
+}
+
 enum SessionMfa {
   Pending  = "pending"
   Verified = "verified"
