@@ -13,7 +13,9 @@ import { Test } from '@nestjs/testing';
 import {
   parseFormFields,
   SCREENING_RULES_LIMIT,
+  REQUIREMENTS_LIMIT,
   type FormFields,
+  type Requirement,
   type ScreeningRule,
 } from '@repo/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -25,8 +27,9 @@ import type { User } from '../users/user.js';
 import { DEFAULT_STAGES } from './job.js';
 import { saveHighlightedQuestionsSchema } from './dto/save-highlighted-questions.dto.js';
 import { saveRatingCriteriaSchema } from './dto/save-rating-criteria.dto.js';
+import { saveRequirementsSchema } from './dto/save-requirements.dto.js';
 import { saveScreeningRulesSchema } from './dto/save-screening-rules.dto.js';
-import type { Job, JobWithStages } from './job.js';
+import type { Job, JobWithStages, RequirementVersion } from './job.js';
 import { JobPolicy } from './job.policy.js';
 import type { JobsRepository } from './jobs.repository.js';
 import { JobsService } from './jobs.service.js';
@@ -46,6 +49,7 @@ type PublicApi<T> = { [K in keyof T]: T[K] };
 class InMemoryJobsRepository implements PublicApi<JobsRepository> {
   private readonly jobs: { companyId: string; job: JobWithStages }[] = [];
   private readonly publishedFormJobIds = new Set<string>();
+  private readonly requirementVersions: RequirementVersion[] = [];
   private nextId = 1;
 
   /** Test setup: a draft job with the default stages. */
@@ -65,6 +69,8 @@ class InMemoryJobsRepository implements PublicApi<JobsRepository> {
       highlightedQuestionKeys: [],
       ratingCriteria: [],
       screeningRules: [],
+      requirements: [],
+      requirementsVersion: 0,
       stages: DEFAULT_STAGES.map((stage, index) => ({
         ...stage,
         id: `${id}-stage-${index}`,
@@ -86,7 +92,81 @@ class InMemoryJobsRepository implements PublicApi<JobsRepository> {
     const found = this.jobs.find(
       (row) => row.companyId === companyId && row.job.slug === slug,
     );
-    return found ? { ...found.job } : null;
+    if (!found) return null;
+    const latest = this.latestVersion(found.job.id);
+    return {
+      ...found.job,
+      requirements: structuredClone(latest?.requirements ?? []),
+      requirementsVersion: latest?.version ?? 0,
+    };
+  }
+
+  /** Test setup and assertions: every stored version of a job, oldest first. */
+  versionsOf(jobId: string): RequirementVersion[] {
+    return structuredClone(
+      this.requirementVersions
+        .filter((row) => row.jobId === jobId)
+        .sort((a, b) => a.version - b.version),
+    );
+  }
+
+  /** Test setup: store the next version of a job directly, as another request would. */
+  seedVersion(job: JobWithStages, requirements: Requirement[]): void {
+    const version = (this.latestVersion(job.id)?.version ?? 0) + 1;
+    this.requirementVersions.push({
+      companyId: 'company-1',
+      jobId: job.id,
+      version,
+      requirements: structuredClone(requirements),
+      createdAt: new Date('2026-01-03T00:00:00Z'),
+    });
+  }
+
+  private beforeInsert: (() => void) | null = null;
+
+  /** Test setup: run `hook` once, just before the next version insert (a racing save). */
+  beforeNextVersionInsert(hook: () => void): void {
+    this.beforeInsert = hook;
+  }
+
+  private latestVersion(jobId: string): RequirementVersion | null {
+    return (
+      this.requirementVersions
+        .filter((row) => row.jobId === jobId)
+        .sort((a, b) => b.version - a.version)[0] ?? null
+    );
+  }
+
+  async findLatestRequirementVersion(
+    jobId: string,
+  ): Promise<RequirementVersion | null> {
+    const latest = this.latestVersion(jobId);
+    return latest ? structuredClone(latest) : null;
+  }
+
+  /** Mirrors UNIQUE (job_id, version): a taken number is a unique violation. */
+  async createRequirementVersion(input: {
+    companyId: string;
+    jobId: string;
+    version: number;
+    requirements: Requirement[];
+  }): Promise<RequirementVersion> {
+    const hook = this.beforeInsert;
+    this.beforeInsert = null;
+    hook?.();
+    if (
+      this.requirementVersions.some(
+        (row) => row.jobId === input.jobId && row.version === input.version,
+      )
+    ) {
+      throw Object.assign(new Error('duplicate key'), { sqlState: '23505' });
+    }
+    const row: RequirementVersion = {
+      ...structuredClone(input),
+      createdAt: new Date('2026-01-03T00:00:00Z'),
+    };
+    this.requirementVersions.push(row);
+    return structuredClone(row);
   }
 
   async hasPublishedForm(jobId: string): Promise<boolean> {
@@ -977,6 +1057,206 @@ describe('JobsService', () => {
       await expect(
         validate({ rules: new Array(SCREENING_RULES_LIMIT + 1).fill({}) }),
       ).rejects.toMatchObject({ response: { errors: [{ path: 'rules' }] } });
+    });
+  });
+
+  describe('saveRequirements', () => {
+    const req = (n: number, over: Partial<Requirement> = {}): Requirement => ({
+      id: `50000000-0000-4000-8000-${String(n).padStart(12, '0')}`,
+      text: `Requirement ${n}`,
+      tier: 'must_have',
+      keywords: ['postgres', 'postgresql'],
+      ...over,
+    });
+    const save = (
+      slug: string,
+      requirements: Requirement[],
+      role: MemberRole = 'recruiter',
+    ) =>
+      service.saveRequirements(user, membershipWithRole(role), slug, {
+        requirements,
+      });
+    const current = (slug: string) =>
+      service.get(membershipWithRole('owner'), slug);
+
+    it('creates version 1 for a first save and reports it on the Job', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+      const requirements = [req(1), req(2, { tier: 'nice_to_have' })];
+
+      const saved = await save(job.slug, requirements);
+
+      expect(saved).toEqual({ requirements, version: 1 });
+      const payload = await current(job.slug);
+      expect(payload.requirements).toEqual(requirements);
+      expect(payload.requirementsVersion).toBe(1);
+    });
+
+    it('reads as no Requirements and version 0 before any save', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+      const payload = await current(job.slug);
+      expect(payload.requirements).toEqual([]);
+      expect(payload.requirementsVersion).toBe(0);
+    });
+
+    it('creates version N+1 when the list changes', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+      await save(job.slug, [req(1)]);
+
+      const saved = await save(job.slug, [req(1), req(2)]);
+
+      expect(saved.version).toBe(2);
+      expect((await current(job.slug)).requirementsVersion).toBe(2);
+    });
+
+    it('creates nothing when the list is identical to the current version', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+      await save(job.slug, [req(1)]);
+
+      const saved = await save(job.slug, [req(1)]);
+
+      expect(saved).toEqual({ requirements: [req(1)], version: 1 });
+      expect(jobs.versionsOf(job.id)).toHaveLength(1);
+    });
+
+    it('counts a reorder as a change', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+      await save(job.slug, [req(1), req(2)]);
+
+      expect((await save(job.slug, [req(2), req(1)])).version).toBe(2);
+    });
+
+    it('saves an empty list as a new version with no Requirements', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+      await save(job.slug, [req(1)]);
+
+      const saved = await save(job.slug, []);
+
+      expect(saved).toEqual({ requirements: [], version: 2 });
+      expect(jobs.versionsOf(job.id)[1]?.requirements).toEqual([]);
+    });
+
+    it('creates no version for an empty list on a Job that never had Requirements', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+
+      expect(await save(job.slug, [])).toEqual({
+        requirements: [],
+        version: 0,
+      });
+      expect(jobs.versionsOf(job.id)).toHaveLength(0);
+    });
+
+    it('never modifies an older version', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+      await save(job.slug, [req(1)]);
+      await save(job.slug, [req(1, { text: 'Edited' }), req(2)]);
+      await save(job.slug, []);
+
+      const versions = jobs.versionsOf(job.id);
+      expect(versions.map((v) => v.version)).toEqual([1, 2, 3]);
+      expect(versions[0]?.requirements).toEqual([req(1)]);
+      expect(versions[1]?.requirements).toEqual([
+        req(1, { text: 'Edited' }),
+        req(2),
+      ]);
+    });
+
+    it('keeps a Requirement’s id when the manager edits it', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+      await save(job.slug, [req(1)]);
+
+      await save(job.slug, [
+        req(1, { text: 'Run Postgres', keywords: ['postgres', 'psql'] }),
+      ]);
+
+      const [first, second] = jobs.versionsOf(job.id);
+      expect(second?.requirements[0]?.id).toBe(first?.requirements[0]?.id);
+      expect(second?.requirements[0]?.keywords).toEqual(['postgres', 'psql']);
+    });
+
+    it.each(['draft', 'open', 'closed'] as const)(
+      'saves on a %s Job',
+      async (status) => {
+        const job = jobs.seedJob(company.id, `Job ${status}`);
+        if (status !== 'draft') {
+          jobs.publishFormFor(job.id);
+          await jobs.open(job.id, new Date());
+        }
+        if (status === 'closed') await jobs.close(job.id, new Date());
+
+        expect((await save(job.slug, [req(1)])).version).toBe(1);
+      },
+    );
+
+    it('lets an owner, admin and recruiter save but refuses an interviewer', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+
+      for (const [n, role] of (['owner', 'admin', 'recruiter'] as const).entries()) {
+        await expect(
+          save(job.slug, [req(n + 1)], role),
+        ).resolves.toBeDefined();
+      }
+      await expect(
+        save(job.slug, [req(9)], 'interviewer'),
+      ).rejects.toBeInstanceOf(AuthorizationError);
+      expect(jobs.versionsOf(job.id)).toHaveLength(3);
+    });
+
+    it('404s for a Job of another company', async () => {
+      jobs.seedJob('company-2', 'Other Job');
+
+      await expect(save('other-job', [req(1)])).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('answers 409 when someone else saved a new version first', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+      jobs.beforeNextVersionInsert(() =>
+        jobs.seedVersion(job, [req(9)]),
+      );
+
+      await expect(save(job.slug, [req(1)])).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+  });
+
+  describe('the save requirements request body', () => {
+    const pipe = new StandardSchemaValidationPipe({
+      exceptionFactory: toValidationException,
+    });
+    const validate = (body: unknown) =>
+      pipe.transform(body, { type: 'body', schema: saveRequirementsSchema });
+    const valid = {
+      id: '50000000-0000-4000-8000-000000000001',
+      text: 'Postgres',
+      tier: 'must_have',
+      keywords: ['postgres'],
+    };
+
+    it('passes an empty list and a valid one through', async () => {
+      await expect(validate({ requirements: [] })).resolves.toEqual({
+        requirements: [],
+      });
+      await expect(validate({ requirements: [valid] })).resolves.toEqual({
+        requirements: [valid],
+      });
+    });
+
+    it('refuses an unknown key, a requirement with no keywords and an over-cap list', async () => {
+      await expect(
+        validate({ requirements: [], extra: 1 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(
+        validate({ requirements: [{ ...valid, keywords: [] }] }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      const many = Array.from({ length: REQUIREMENTS_LIMIT + 1 }, (_, i) => ({
+        ...valid,
+        id: `50000000-0000-4000-8000-${String(i + 1).padStart(12, '0')}`,
+      }));
+      await expect(validate({ requirements: many })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
   });
 

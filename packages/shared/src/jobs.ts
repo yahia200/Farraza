@@ -3,6 +3,7 @@ import { cvModeSchema } from './cv-mode.js';
 import { MAX_FIELDS } from './form-fields.js';
 import { highlightedQuestionKeysSchema } from './highlights.js';
 import { ratingCriteriaKeysSchema } from './rating-criteria.js';
+import { requirementsSchema } from './requirements.js';
 import { screeningRulesSchema } from './screening-rules.js';
 
 /** Request bodies for the API's /companies/:companySlug/jobs endpoints. */
@@ -58,6 +59,14 @@ export type SaveRatingCriteriaInput = z.infer<typeof saveRatingCriteriaSchema>;
  */
 export const saveScreeningRulesSchema = z.strictObject({ rules: screeningRulesSchema });
 export type SaveScreeningRulesInput = z.infer<typeof saveScreeningRulesSchema>;
+
+/**
+ * Saving a Job's Requirements (PUT .../jobs/:jobSlug/requirements): the whole new list. Unlike the
+ * Screening rules there is no form to check against, so `requirementsSchema` validates every item
+ * here and the service has nothing left to parse. An empty list is valid.
+ */
+export const saveRequirementsSchema = z.strictObject({ requirements: requirementsSchema });
+export type SaveRequirementsInput = z.infer<typeof saveRequirementsSchema>;
 
 /**
  * Response for the public company listing (GET /api/public/:companySlug): a

@@ -195,6 +195,8 @@ class FakeJobs implements Pick<PublicApi<JobsService>, 'get'> {
     highlightedQuestionKeys: [],
     ratingCriteria: [],
     screeningRules: [],
+    requirements: [],
+    requirementsVersion: 0,
     stages: [
       {
         id: 'stage-applied',
