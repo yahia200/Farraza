@@ -621,6 +621,10 @@ These are the relations declared in `contract.prisma`. Columns marked "no FK" ab
 - A `candidate` has many `applications`.
 - An `application` belongs to one `job`, one `candidate`, one `form_version`, and one `stage`, and has many `application_events`, `notes`, `ratings`, and `files`, and at most one `application_requirement_results`.
 
+### The external `bullmq` schema
+
+Besides `public`, the database holds a `bullmq` schema (15 tables: `job`, `event`, `scheduler`, `meta`, `migration` and others) that BullMQ's PostgreSQL backend creates and migrates itself at API boot (`migrate: true` in `recheck/recheck.module.ts`; ADR-0007). It is not in `contract.prisma` and must not be: Prisma only inspects the schemas the contract names. Checked on a fresh database: `prisma db update` and `prisma db verify`, including `--strict`, run clean with the schema present and leave it untouched.
+
 ## 6. Changing the schema
 
 Don't write DDL by hand. Edit `apps/api/src/prisma/contract.prisma`, then:
