@@ -5,6 +5,8 @@ import type {
   CvTextStatus,
   FilePurpose,
   FormFields,
+  Requirement,
+  RequirementMatches,
   ScreeningFlag,
   ScreeningOutcome,
   ScreeningRule,
@@ -16,6 +18,8 @@ export interface OpenJob {
   form: { id: string; fields: FormFields; cvMode: CvMode };
   /** The job's Screening rules, read at submit. Never leaves the API: no public payload carries them. */
   screeningRules: ScreeningRule[];
+  /** The job's current Requirements version (highest `job_requirement_versions.version`), or null if it never had one. Never leaves the API. */
+  requirements: { version: number; list: Requirement[] } | null;
   firstStageId: string;
   rejectedStageId: string;
 }
@@ -95,6 +99,17 @@ export interface NewCvText {
   extractorVersion: number;
 }
 
+/**
+ * The Requirement result row written with the Application (`docs/db-schema.md` §3.24). Built by the
+ * service from the job's current version and a readable CV text; the version says which Requirements
+ * it was checked against. Never returned by a public route.
+ */
+export interface NewRequirementResult {
+  version: number;
+  results: RequirementMatches;
+  missedMustHave: boolean;
+}
+
 export interface NewApplication {
   companyId: string;
   jobId: string;
@@ -108,6 +123,8 @@ export interface NewApplication {
   files: FileToAttach[];
   /** Saved in the same transaction; null when the Application has no CV. */
   cvText: NewCvText | null;
+  /** Saved in the same transaction; null when there is nothing to check (no version, or no readable CV). */
+  requirementResult: NewRequirementResult | null;
   source: string | null;
   events: Array<{
     type: 'applied' | 'auto_rejected' | 'flagged';
