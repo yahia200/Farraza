@@ -108,6 +108,10 @@ _Avoid_: Log, activity, audit record
 A rule a manager sets on a Job, about one form question, that is checked once when an Application is submitted. Each rule has an outcome: reject sends the Application straight to the Rejected stage; flag leaves it where it is and marks it with the reason. The reason is worked out from the rule and the answer, and only the Job's Members see it. Rules are checked against the answer alone, never the CV. Editing a Screening rule never changes Applications already submitted.
 _Avoid_: Auto-reject rule (the old name, from when reject was the only outcome), Knockout (the internal code term), filter
 
+**Requirement**:
+Something a manager says a Candidate should have, written for a Job in plain words, such as "Has run Postgres in production", and marked must-have or nice-to-have. Each Requirement lists the keywords and synonyms that count as evidence of it in a CV. A Requirement is checked against the CV text only, never the form answers (that is a Screening rule's job), and it only advises: a must-have the CV does not mention is flagged for a reviewer, and nothing is ever rejected or moved because of a Requirement. A CV whose text cannot be read never counts as missing a Requirement.
+_Avoid_: Criterion (a Criterion is a Rating dimension), Skill, Screening rule (a Screening rule checks a form answer and can reject)
+
 ## Accounts
 
 **Identity**:

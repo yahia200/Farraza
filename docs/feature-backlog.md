@@ -22,6 +22,8 @@ The first slice is built (`.scratch/screening-rules/spec.md`, ADR-0005, `docs/db
 
 Check that the CV mentions each Requirement's terms. Shows matched or not matched plus the terms found. Flags a missed must-have, never rejects. Layer 2 reads the CV only: text answers are Layer 1's (word rules on `short_text` and `long_text`).
 
+**Designed and ticketed (2026-11-06):** spec and nine tickets in `.scratch/keyword-match/`, background work decided in ADR-0007 (BullMQ over Postgres, with two gates to pass first). Decided: manager-supplied keywords, a pure-function matcher, versioned Requirements, results stored at submit, and a manual Re-check for Applications that need it.
+
 - Needs a Requirements list on the Job and CV text extraction (a scanned PDF must read as "unreadable", not "missing").
 - Terms are manager-supplied keywords and synonyms (recommended) or auto-extracted.
 - Matching in app code, or Postgres full-text search (not yet verified against the Prisma 8 contract).
