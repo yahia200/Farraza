@@ -17,6 +17,8 @@ import {
   checkCvFile,
   fileFormatPhrase,
   evaluateScreeningRules,
+  matchRequirements,
+  missedMustHave,
   isMediaContentType,
   matchAllowedType,
   parseAnswers,
@@ -29,7 +31,7 @@ import {
 } from '@repo/shared';
 import { SNIFF_BYTES, sniffFileType } from '../storage/file-sniff.js';
 import { StorageService } from '../storage/storage.service.js';
-import type { FileToAttach, FileToVerify, NewCvText, OpenJob } from './application.js';
+import type { FileToAttach, FileToVerify, NewCvText, NewRequirementResult, OpenJob } from './application.js';
 import { ApplicationsRepository } from './applications.repository.js';
 import type { CreateUploadDto } from './dto/create-upload.dto.js';
 import type { SubmitApplicationDto } from './dto/submit-application.dto.js';
@@ -208,6 +210,7 @@ export class ApplicationsService {
     // says what its outcome did. When both fire, the flags are still stored and recorded.
     const placedIn = rejected ? found.rejectedStageId : found.firstStageId;
 
+    const cvText = this.buildCvText(found, files, dto);
     const result = await this.applications.submit({
       companyId: found.company.id,
       jobId: found.job.id,
@@ -218,7 +221,8 @@ export class ApplicationsService {
       answers: parsed.answers,
       flags,
       files,
-      cvText: this.buildCvText(found, files, dto),
+      cvText,
+      requirementResult: this.checkRequirements(found, cvText),
       source,
       events: [
         { type: 'applied', fromStageId: null, toStageId: found.firstStageId, data: { source } },
@@ -245,6 +249,19 @@ export class ApplicationsService {
       throw fileConflict(wanted.find((file) => file.id === result.fileId));
     }
     return { received: true };
+  }
+
+  /**
+   * The Requirement result to save with the Application, or null when there is nothing to check:
+   * the job has no Requirements version, or the CV text is not `readable` (none, `unreadable` or
+   * `failed`). Pure, so it cannot fail a submit. A version with an empty list still gets a row, so
+   * the Application counts as checked against that version.
+   */
+  private checkRequirements(found: OpenJob, cvText: NewCvText | null): NewRequirementResult | null {
+    if (!found.requirements || cvText?.status !== 'readable') return null;
+    const { version, list } = found.requirements;
+    const results = matchRequirements(list, cvText.text);
+    return { version, results, missedMustHave: missedMustHave(list, results) };
   }
 
   /**

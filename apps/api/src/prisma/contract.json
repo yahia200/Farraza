@@ -8,6 +8,10 @@
       "model": "ApplicationEvent",
       "namespace": "public"
     },
+    "application_requirement_results": {
+      "model": "ApplicationRequirementResult",
+      "namespace": "public"
+    },
     "applications": {
       "model": "Application",
       "namespace": "public"
@@ -701,6 +705,146 @@
               },
               "namespaceId": "public",
               "table": "application_events"
+            }
+          },
+          "ApplicationRequirementResult": {
+            "fields": {
+              "applicationId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "checkedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              },
+              "companyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "jobId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "missedMustHave": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "results": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/jsonb@1",
+                  "kind": "scalar"
+                }
+              },
+              "version": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "application": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "applicationId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Application",
+                  "namespace": "public"
+                }
+              },
+              "company": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "companyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Company",
+                  "namespace": "public"
+                }
+              },
+              "job": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "jobId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Job",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "applicationId": {
+                  "column": "application_id"
+                },
+                "checkedAt": {
+                  "column": "checked_at"
+                },
+                "companyId": {
+                  "column": "company_id"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "jobId": {
+                  "column": "job_id"
+                },
+                "missedMustHave": {
+                  "column": "missed_must_have"
+                },
+                "results": {
+                  "column": "results"
+                },
+                "version": {
+                  "column": "version"
+                }
+              },
+              "namespaceId": "public",
+              "table": "application_requirement_results"
             }
           },
           "Candidate": {
@@ -3159,6 +3303,162 @@
                 ]
               },
               "uniques": []
+            },
+            "application_requirement_results": {
+              "checks": [
+                {
+                  "expression": "jsonb_typeof(results) = 'object'",
+                  "name": "application_requirement_results_results_object_e01ff703",
+                  "prefix": "application_requirement_results_results_object"
+                },
+                {
+                  "expression": "version > 0",
+                  "name": "application_requirement_results_version_positive_341aaa74",
+                  "prefix": "application_requirement_results_version_positive"
+                }
+              ],
+              "columns": {
+                "application_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "checked_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "company_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "default": {
+                    "expression": "gen_random_uuid()",
+                    "kind": "function"
+                  },
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "job_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "missed_must_have": {
+                  "codecId": "pg/bool@1",
+                  "nativeType": "bool",
+                  "nullable": false
+                },
+                "results": {
+                  "codecId": "pg/jsonb@1",
+                  "nativeType": "jsonb",
+                  "nullable": false
+                },
+                "version": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "company_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "application_requirement_results"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "companies"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "job_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "application_requirement_results"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "jobs"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "application_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "application_requirement_results"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "applications"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "company_id"
+                  ],
+                  "name": "application_requirement_results_company_id_idx_1303a718",
+                  "prefix": "application_requirement_results_company_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "job_id"
+                  ],
+                  "name": "application_requirement_results_job_id_idx_58a5bbdd",
+                  "prefix": "application_requirement_results_job_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "job_id",
+                    "version"
+                  ],
+                  "name": "application_requirement_results_job_id_version_idx_8c696c43",
+                  "prefix": "application_requirement_results_job_id_version_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "application_id"
+                  ]
+                }
+              ]
             },
             "applications": {
               "checks": [
@@ -5903,7 +6203,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "2f45bc31580cb9c9cf233dcfc5b3f5d51b022a47c8426bb128df794bf588d8ea"
+    "storageHash": "3bbe7e5ef39732c709874cb5e08d8ab3a0130dae5d2c1ad598654da2da224e22"
   },
   "execution": {
     "executionHash": "6c72d2e21cac19476b009440c451b74d3f8aaae32e374ce19a06cc2a66cb6742",

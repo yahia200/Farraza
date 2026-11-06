@@ -455,6 +455,25 @@ One immutable version of a Job's **Requirements** (`GLOSSARY.md`, `.scratch/keyw
 - A Job's current Requirements are its row with the highest `version` (there is no pointer on `jobs`); a Job with no row has none (the Job payload reads `requirements: []`, `requirementsVersion: 0`). `[]` is a valid version once a Job has had Requirements, so a manager can switch the layer off; saving `[]` on a Job that never had any writes nothing.
 - Written only by `PUT /api/companies/:companySlug/jobs/:jobSlug/requirements` (`JobsService.saveRequirements`).
 
+### 3.24 `application_requirement_results` (model `ApplicationRequirementResult`)
+What a Job's **Requirements** said about one Application's CV text (`GLOSSARY.md`, `.scratch/keyword-match/spec.md`). At most one row per Application, written in the submit transaction after the Application and its `cv_texts` row (`ApplicationsRepository.submit`). **Never read by a public route.**
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK, DEFAULT `gen_random_uuid()` |
+| `company_id` | `companyId` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
+| `job_id` | `jobId` | `uuid` | NOT NULL, FK → `jobs.id` ON DELETE CASCADE |
+| `application_id` | `applicationId` | `uuid` | NOT NULL, UNIQUE, FK → `applications.id` ON DELETE CASCADE |
+| `version` | `version` | `integer` | NOT NULL, **no FK** (the `job_requirement_versions.version` that was checked; with `job_id` it names that row) |
+| `results` | `results` | `jsonb` | NOT NULL, **no FK** (per Requirement id: `{ matched, terms }`, shape in §4.6) |
+| `missed_must_have` | `missedMustHave` | `boolean` | NOT NULL (a must-have Requirement did not match) |
+| `checked_at` | `checkedAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+
+- UNIQUE (`application_id`): one row per Application, and the key a Re-check upserts on. CHECK `application_requirement_results_version_positive`: `version > 0`. CHECK `application_requirement_results_results_object`: `jsonb_typeof(results) = 'object'`. INDEX (`company_id`), INDEX (`job_id`, `version`) (for "results older than the current version"), plus Prisma's INDEX (`job_id`).
+- `version` has no FK on purpose: the version row is identified by (`job_id`, `version`), both rows are removed by the Job's cascade, and Requirement versions are never deleted otherwise. Services copy `company_id` and `job_id` from the Application (§7).
+- Written only when the Job has a current Requirements version **and** the Application's CV text is `readable`. A Job with no version, or a missing, `unreadable` or `failed` CV, writes no row. A version whose list is `[]` still writes a row (`results` `{}`, `missed_must_have` false), so the Application counts as checked against that version. The checker is pure, so it cannot fail a submit.
+- Applications that existed before a Job had a version, or before this table, have no row.
+
 ## 4. JSONB shapes
 
 The database does not validate these. The application does, using the Zod schemas and parsers in `packages/shared` (`@repo/shared`).
@@ -589,15 +608,22 @@ An object from a Criterion key (the catalog `RATING_CRITERIA` in `packages/share
 ### 4.5 `job_requirement_versions.requirements`
 A JSON array of at most `REQUIREMENTS_LIMIT` (10) objects `{ id, text, tier: 'must_have' | 'nice_to_have', keywords: string[] }` (`requirementsSchema` in `packages/shared/src/requirements.ts`; 1 to 15 keywords of 1 to 40 characters, text up to 200). The `id` is a UUID that stays the same when the manager edits that Requirement, so later result rows can name it; ids are unique within a list. Order is the manager's display order and counts as a change.
 
+### 4.6 `application_requirement_results.results`
+A JSON object keyed by Requirement `id` (a UUID from the checked version's list): `{ "<requirementId>": { "matched": true, "terms": ["Golang"] } }` (`RequirementMatches` in `packages/shared/src/requirements.ts`). `terms` are the keywords, as the manager listed them, that matched. Every Requirement of the checked version has a key; `{}` for an empty version. Keys may name Requirements a later version dropped.
+
 ## 5. Relationships
 
 These are the relations declared in `contract.prisma`. Columns marked "no FK" above are not relations.
 
-- A `company` has many `memberships`, `jobs`, `stages`, `form_versions`, `candidates`, `applications`, `files`, and `cv_texts`.
+- A `company` has many `memberships`, `jobs`, `stages`, `form_versions`, `candidates`, `applications`, `files`, and `cv_texts`, and `application_requirement_results`.
 - A `user` has many `memberships`, `sessions`, `identities`, `email_tokens`, `refresh_tokens`, one `mfa_totp`, and many `mfa_recovery_codes` and `mfa_failures`, and is referenced by `jobs.created_by`, `notes.author_id`, `ratings.user_id` and `oidc_states.link_user_id`.
-- A `job` has many `form_versions`, `stages`, `applications`, `files`, `cv_texts`, and `job_requirement_versions`.
+- A `job` has many `form_versions`, `stages`, `applications`, `files`, `cv_texts`, `job_requirement_versions`, and `application_requirement_results`.
 - A `candidate` has many `applications`.
-- An `application` belongs to one `job`, one `candidate`, one `form_version`, and one `stage`, and has many `application_events`, `notes`, `ratings`, and `files`.
+- An `application` belongs to one `job`, one `candidate`, one `form_version`, and one `stage`, and has many `application_events`, `notes`, `ratings`, and `files`, and at most one `application_requirement_results`.
+
+### The external `bullmq` schema
+
+Besides `public`, the database holds a `bullmq` schema (15 tables: `job`, `event`, `scheduler`, `meta`, `migration` and others) that BullMQ's PostgreSQL backend creates and migrates itself at API boot (`migrate: true` in `recheck/recheck.module.ts`; ADR-0007). It is not in `contract.prisma` and must not be: Prisma only inspects the schemas the contract names. Checked on a fresh database: `prisma db update` and `prisma db verify`, including `--strict`, run clean with the schema present and leave it untouched.
 
 ## 6. Changing the schema
 

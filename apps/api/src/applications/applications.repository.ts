@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { FilePurpose, FormFields, ScreeningRule } from '@repo/shared';
+import type { FilePurpose, FormFields, Requirement, ScreeningRule } from '@repo/shared';
 import { isUniqueViolation } from '../common/db-errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
@@ -45,6 +45,10 @@ export class ApplicationsRepository {
 
   private get jobs() {
     return this.prisma.db.orm.public.Job;
+  }
+
+  private get requirementVersions() {
+    return this.prisma.db.orm.public.JobRequirementVersion;
   }
 
   private get formVersions() {
@@ -128,6 +132,12 @@ export class ApplicationsRepository {
       .first();
     if (!form) return null;
 
+    // The job's current Requirements: its highest version, if it ever had one.
+    const latest = await this.requirementVersions
+      .where({ companyId: company.id, jobId: job.id })
+      .orderBy((v) => v.version.desc())
+      .first();
+
     const stages = [...job.stages].sort((a, b) => a.position - b.position);
     const first = stages.find((stage) => stage.kind === 'normal');
     const rejected = stages.find((stage) => stage.kind === 'rejected');
@@ -148,6 +158,9 @@ export class ApplicationsRepository {
         cvMode: form.cvMode,
       },
       screeningRules: job.screeningRules as ScreeningRule[],
+      requirements: latest
+        ? { version: latest.version, list: latest.requirements as Requirement[] }
+        : null,
       firstStageId: first.id,
       rejectedStageId: rejected.id,
     };
@@ -280,6 +293,20 @@ export class ApplicationsRepository {
             // A spread: an interface (CvSuggestions) has no index signature, so it is not a JsonValue.
             result: { ...input.cvText.result },
             extractorVersion: input.cvText.extractorVersion,
+          });
+        }
+
+        // Last, in the same transaction (docs/db-schema.md §3.24): a refused file rolls it back too.
+        // The UNIQUE (application_id) makes a second row for this Application impossible.
+        if (input.requirementResult) {
+          await tx.orm.public.ApplicationRequirementResult.create({
+            companyId: input.companyId,
+            jobId: input.jobId,
+            applicationId: application.id,
+            version: input.requirementResult.version,
+            // A spread: RequirementMatches is a Record of interfaces-by-shape, not yet a JsonValue.
+            results: { ...input.requirementResult.results },
+            missedMustHave: input.requirementResult.missedMustHave,
           });
         }
       });
