@@ -1,6 +1,8 @@
 import { parseAnswers, type Answers } from './answers.js';
 import { submitApplicationSchema } from './applications.js';
 import { extractGroupAnswers } from './cv-groups.js';
+import type { CvLayout } from './cv-layout.js';
+import { findName } from './cv-name.js';
 import type { FormField } from './form-fields.js';
 import { normalizePhone } from './phone.js';
 import type { PresetKey } from './preset-keys.js';
@@ -25,31 +27,6 @@ export interface CvSuggestions {
   email?: string;
   phone?: string;
   answers: Answers;
-}
-
-// --- Name -------------------------------------------------------------------------------------
-
-/** Lines that head a CV or a section and are never a person's name. */
-const NOT_A_NAME =
-  /^(curriculum vitae|resume|résumé|cv|profile|summary|contact|contact details|personal details|personal information|objective|about me|experience|education|skills)$/i;
-
-/** Letters (any script), marks, then words joined by space, hyphen, apostrophe or full stop. */
-const NAME_WORD = /^[\p{L}\p{M}][\p{L}\p{M}'’.-]*$/u;
-
-const NAME_SCAN_LINES = 10;
-
-function findName(lines: string[]): string | undefined {
-  for (const line of lines.slice(0, NAME_SCAN_LINES)) {
-    const candidate = line.replace(/\s+/g, ' ').trim();
-    if (candidate === '' || NOT_A_NAME.test(candidate)) continue;
-    const words = candidate.split(' ');
-    if (words.length < 2 || words.length > 5) continue;
-    if (!words.every((word) => NAME_WORD.test(word))) continue;
-    // The application form's own rule (2 to 100 characters).
-    const checked = submitApplicationSchema.shape.name.safeParse(candidate);
-    if (checked.success) return checked.data;
-  }
-  return undefined;
 }
 
 // --- Email ------------------------------------------------------------------------------------
@@ -199,21 +176,30 @@ const LINK_KEYS = {
 /**
  * Reads contact details out of CV text and offers them for the form (phase one of the extractor,
  * `.scratch/cv-autofill/spec.md`). Heuristics, so every value is a guess to be checked by the
- * applicant: first plausible line for the name, first valid email, first valid phone (through
- * `normalizePhone`), first LinkedIn / GitHub / other link, and a "City, Country" near the top or a
- * labelled location.
+ * applicant: the best-scoring line near the top for the name (`cv-name.ts`: position, the email's
+ * words, and, when `layout` is given, font size and bold), first valid email, first valid phone
+ * (through `normalizePhone`), first LinkedIn / GitHub / other link, and a "City, Country" near the
+ * top or a labelled location.
+ *
+ * `layout` is optional and browser-only (`cv-layout.ts`): a DOCX, a failed layout read and every
+ * caller without it get the same answer minus the layout bonus.
  *
  * Questions are found by Preset key only, never by label or position; a Question without one is
  * ignored, and so is any Preset key not on the form. Every value for a Question goes through
  * `parseAnswers`, so it respects that Question's type and limits; one that fails is left out.
  * Bump `CV_EXTRACTOR_VERSION` (cv-text.ts) when a heuristic here changes.
  */
-export function extractContactSuggestions(text: string, fields: readonly FormField[]): CvSuggestions {
+export function extractContactSuggestions(
+  text: string,
+  fields: readonly FormField[],
+  layout?: CvLayout,
+): CvSuggestions {
   const lines = text.split(/\r\n|\r|\n/);
   const suggestions: CvSuggestions = { answers: {} };
 
-  const name = findName(lines);
+  // The email first: it is the more reliable value, and it helps pick the name.
   const email = findEmail(text);
+  const name = findName(lines, email, layout);
   const phone = findPhone(text);
   if (name) suggestions.name = name;
   if (email) suggestions.email = email;
