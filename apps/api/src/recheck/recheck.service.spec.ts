@@ -26,6 +26,8 @@ interface FakeApplication {
   status: 'active' | 'rejected' | 'hired' | 'withdrawn';
   cv: 'readable' | 'unreadable' | 'failed' | null;
   text: string;
+  /** False when the CV `files` row is still `pending` (no finished upload). */
+  cvUploaded: boolean;
   result: { version: number; missedMustHave: boolean; results: RequirementMatches } | null;
 }
 
@@ -44,7 +46,7 @@ class InMemoryRecheckRepository implements PublicApi<RecheckRepository> {
   }
 
   seedApplication(input: Partial<FakeApplication> & { id: string; jobId: string }): void {
-    this.applications.push({ status: 'active', cv: 'readable', text: '', result: null, ...input });
+    this.applications.push({ status: 'active', cv: 'readable', text: '', cvUploaded: true, result: null, ...input });
   }
 
   /** Test setup: run `hook` after every save, as another request could between chunks. */
@@ -69,6 +71,7 @@ class InMemoryRecheckRepository implements PublicApi<RecheckRepository> {
           a.jobId === jobId &&
           a.status !== 'rejected' &&
           a.cv === 'readable' &&
+          a.cvUploaded &&
           (a.result === null || a.result.version < version),
       )
       .sort((a, b) => a.id.localeCompare(b.id));
@@ -207,6 +210,7 @@ describe('RecheckService', () => {
       repo.seedApplication({ id: 'unreadable', jobId: job.id, cv: 'unreadable' });
       repo.seedApplication({ id: 'failed', jobId: job.id, cv: 'failed' });
       repo.seedApplication({ id: 'nocv', jobId: job.id, cv: null });
+      repo.seedApplication({ id: 'pending', jobId: job.id, cvUploaded: false });
       repo.seedApplication({
         id: 'current',
         jobId: job.id,
