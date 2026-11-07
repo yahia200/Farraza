@@ -43,3 +43,6 @@ yarn-error.log*
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Real CVs used for manual parser testing (personal data)
+test/cvs/
