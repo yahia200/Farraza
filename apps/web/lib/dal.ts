@@ -14,7 +14,7 @@ import type {
   RatingSummary,
   RatingValues,
 } from '@repo/shared';
-import { highlightKindOf, type ScreeningFlag, type ScreeningRule } from '@repo/shared';
+import { highlightKindOf, type Requirement, type ScreeningFlag, type ScreeningRule } from '@repo/shared';
 import { apiFetch } from './api';
 import { formatDate } from './format';
 
@@ -170,6 +170,10 @@ export interface CompanyJob {
   ratingCriteria: string[];
   /** The Job's Screening rules as last saved (reject or flag, one question each); edited on the job's Settings tab. */
   screeningRules: ScreeningRule[];
+  /** The Job's Requirements as last saved (keyword-match; edited on the Settings tab). */
+  requirements: Requirement[];
+  /** The Requirements' version number: 0 before any save, +1 per changed save. */
+  requirementsVersion: number;
 }
 
 /** Mirrors Stage in apps/api/src/jobs/job.ts. */
@@ -280,8 +284,24 @@ function toCompanyJob({
   highlightedQuestionKeys,
   ratingCriteria,
   screeningRules,
+  requirements,
+  requirementsVersion,
 }: CompanyJob): CompanyJob {
-  return { id, title, slug, description, status, openedAt, closedAt, createdAt, highlightedQuestionKeys, ratingCriteria, screeningRules };
+  return {
+    id,
+    title,
+    slug,
+    description,
+    status,
+    openedAt,
+    closedAt,
+    createdAt,
+    highlightedQuestionKeys,
+    ratingCriteria,
+    screeningRules,
+    requirements,
+    requirementsVersion,
+  };
 }
 
 /** Expose only what the UI needs. */
