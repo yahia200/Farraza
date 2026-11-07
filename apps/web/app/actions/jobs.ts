@@ -9,6 +9,9 @@ import {
   saveHighlightedQuestionsSchema,
   saveRatingCriteriaSchema,
   saveRequirementsSchema,
+  parseRecheckStatus,
+  type RecheckPoll,
+  type RecheckStatus,
   groupRequirementErrors,
   requirementErrorsFromIssues,
   type Requirement,
@@ -20,7 +23,7 @@ import {
   type ScreeningRule,
   type UpdateJobInput,
 } from '@repo/shared';
-import type { ActionFailure } from '@/lib/action-failure';
+import { GENERIC_FAILURE_MESSAGE, type ActionFailure } from '@/lib/action-failure';
 import { apiFetch, failureFromResponse, readApiError } from '@/lib/api';
 import { expireCompanyJobs, expirePublicJob } from '@/lib/public-jobs';
 
@@ -318,4 +321,68 @@ export async function saveRequirements(
   const saved = (await response.json()) as { requirements: Requirement[]; version: number };
   revalidatePath(settingsPath);
   return { requirements: saved.requirements, version: saved.version };
+}
+
+export type RecheckCountResult = ActionFailure<never> & { count?: number };
+export type StartRecheckResult = ActionFailure<never> & { status?: RecheckStatus };
+
+const recheckPath = (companySlug: string, jobSlug: string) => `${jobsPath(companySlug, jobSlug)}/recheck`;
+
+/**
+ * How many Applications a Re-check would touch (GET .../jobs/:jobSlug/recheck, `{ count }`; 0 when the
+ * Job has no Requirements version). Open to any member. Returns failures instead of throwing.
+ */
+export async function getRecheckCount(companySlug: string, jobSlug: string): Promise<RecheckCountResult> {
+  const response = await apiFetch(recheckPath(companySlug, jobSlug));
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (!response.ok) {
+    return failureFromResponse(response, [], {
+      404: () => ({ formError: 'This job no longer exists. Reload the page.' }),
+    });
+  }
+  const body = (await response.json()) as { count?: unknown };
+  return typeof body.count === 'number' ? { count: body.count } : { formError: GENERIC_FAILURE_MESSAGE };
+}
+
+/**
+ * Starts a Re-check (POST .../jobs/:jobSlug/recheck, 202 with the status). The API makes this a no-op
+ * while a run is waiting or active and queues nothing at a count of zero, so a repeat call is harmless.
+ * Needs the permission that saves Requirements (interviewers get 403). No page revalidation: the results
+ * change nothing the Settings page renders; the board and list read them on their next load.
+ */
+export async function startRecheck(companySlug: string, jobSlug: string): Promise<StartRecheckResult> {
+  const response = await apiFetch(recheckPath(companySlug, jobSlug), { method: 'POST' });
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (!response.ok) {
+    return failureFromResponse(response, [], {
+      ...NO_PERMISSION,
+      404: () => ({ formError: 'This job no longer exists. Reload the page.' }),
+    });
+  }
+  const status = parseRecheckStatus(await response.json());
+  return status ? { status } : { formError: GENERIC_FAILURE_MESSAGE };
+}
+
+/**
+ * The Re-check's progress (GET .../jobs/:jobSlug/recheck/status), polled by the Settings tab through this
+ * action because the browser never calls the API. Failures come back as `{ ok: false, message }`, which
+ * ends the polling (`nextPoll` in @repo/shared).
+ */
+export async function getRecheckStatus(companySlug: string, jobSlug: string): Promise<RecheckPoll> {
+  const response = await apiFetch(`${recheckPath(companySlug, jobSlug)}/status`);
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (!response.ok) {
+    const failure = await failureFromResponse(response, [], {
+      404: () => ({ formError: 'This job no longer exists. Reload the page.' }),
+    });
+    return { ok: false, message: failure.formError ?? GENERIC_FAILURE_MESSAGE };
+  }
+  const status = parseRecheckStatus(await response.json());
+  return status ? { ok: true, status } : { ok: false, message: GENERIC_FAILURE_MESSAGE };
 }

@@ -29,6 +29,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RecheckControl } from './recheck-control';
 import { Spinner } from '@/components/ui/spinner';
 import { toast } from '@/components/ui/toast';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -47,7 +48,9 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
  * (`requirement-editor.ts`, tested there). The caps and their messages come from `requirementsSchema`
  * (`saveRequirements` runs it), so the editor has no copy of the rules beyond the counters it shows.
  *
- * Ticket 08 adds the Re-check control next to the Save row; the Requirements' `version` is `savedVersion`.
+ * The Re-check control (`RecheckControl`, ticket 08) sits under the Save row. It reads the saved version
+ * through the API, not this draft; a save remounts the editor (the page keys it on the version), which
+ * makes the control read the count and any run in progress again.
  */
 export function RequirementsEditor({
   companySlug,
@@ -188,6 +191,7 @@ export function RequirementsEditor({
           </Button>
         )}
       </div>
+      <RecheckControl companySlug={companySlug} jobSlug={jobSlug} />
       <p className="text-sm text-muted-foreground">
         {atLimit
           ? `A job can have at most ${REQUIREMENTS_LIMIT} requirements.`
