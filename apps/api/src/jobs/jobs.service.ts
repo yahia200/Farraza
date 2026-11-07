@@ -1,6 +1,12 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { AuthorizationService } from '@nestjs/authorization';
-import { checkHighlightKeys, parseScreeningRules, type ScreeningRule } from '@repo/shared';
+import {
+  checkHighlightKeys,
+  parseScreeningRules,
+  type Requirement,
+  type ScreeningRule,
+} from '@repo/shared';
+import { isDeepStrictEqual } from 'node:util';
 import { randomBytes } from 'node:crypto';
 import { slugify } from '../common/slugify.js';
 import type { Membership } from '../companies/company.js';
@@ -9,6 +15,7 @@ import { FormsRepository } from '../forms/forms.repository.js';
 import type { CreateJobDto } from './dto/create-job.dto.js';
 import type { SaveHighlightedQuestionsDto } from './dto/save-highlighted-questions.dto.js';
 import type { SaveRatingCriteriaDto } from './dto/save-rating-criteria.dto.js';
+import type { SaveRequirementsDto } from './dto/save-requirements.dto.js';
 import type { SaveScreeningRulesDto } from './dto/save-screening-rules.dto.js';
 import type { UpdateJobDto } from './dto/update-job.dto.js';
 import type { Job, JobWithStages } from './job.js';
@@ -158,6 +165,43 @@ export class JobsService {
       throw new NotFoundException();
     }
     return { rules: saved.screeningRules };
+  }
+
+  /**
+   * Saves the Job's Requirements as a new immutable version when the list differs from the current
+   * one, and does nothing otherwise (order counts: it is the display order). Any Job status. The body
+   * schema (`saveRequirementsSchema`) already validated every item, so there is nothing left to
+   * parse. A Job with no version reads as `[]`, so saving `[]` on it is a no-op (version `0`); once
+   * there is a version, `[]` is a real change and makes an empty version. Two saves racing for the
+   * same number lose with a 409 (UNIQUE (job_id, version)), not silently overwritten.
+   */
+  async saveRequirements(
+    user: User,
+    membership: Membership,
+    jobSlug: string,
+    dto: SaveRequirementsDto,
+  ): Promise<{ requirements: Requirement[]; version: number }> {
+    await this.authorization.authorize(JobPolicy, 'update', user, membership);
+
+    const job = await this.get(membership, jobSlug);
+    if (isDeepStrictEqual(job.requirements, dto.requirements)) {
+      return { requirements: job.requirements, version: job.requirementsVersion };
+    }
+
+    try {
+      const created = await this.jobs.createRequirementVersion({
+        companyId: membership.company.id,
+        jobId: job.id,
+        version: job.requirementsVersion + 1,
+        requirements: dto.requirements,
+      });
+      return { requirements: created.requirements, version: created.version };
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException('Someone else just changed the requirements. Reload and try again.');
+      }
+      throw error;
+    }
   }
 
   private async availableSlug(companyId: string, title: string): Promise<string> {

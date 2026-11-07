@@ -22,6 +22,8 @@ The first slice is built (`.scratch/screening-rules/spec.md`, ADR-0005, `docs/db
 
 Check that the CV mentions each Requirement's terms. Shows matched or not matched plus the terms found. Flags a missed must-have, never rejects. Layer 2 reads the CV only: text answers are Layer 1's (word rules on `short_text` and `long_text`).
 
+**Built (2026-11-07):** Layer 2 is in: Requirements editor on the Settings tab, result stored at submit, the "Missing must-have" marker on the card, row and sheet (with a Requirements section on the sheet), and the Re-check button with progress. Checked end to end in a browser against the real API (ticket 09, `.scratch/keyword-match/screenshots/`). Open: whether Cloud Run has CPU always allocated (ADR-0007), the legal review, and no filter or sort on the marker yet.
+
 **Designed and ticketed (2026-11-06):** spec and nine tickets in `.scratch/keyword-match/`, background work decided in ADR-0007 (BullMQ over Postgres, with two gates to pass first). Decided: manager-supplied keywords, a pure-function matcher, versioned Requirements, results stored at submit, and a manual Re-check for Applications that need it.
 
 - Needs a Requirements list on the Job and CV text extraction (a scanned PDF must read as "unreadable", not "missing").

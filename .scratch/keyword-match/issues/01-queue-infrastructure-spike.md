@@ -10,10 +10,14 @@
 
 **Blocked by:** none.
 
-**Status:** open
+**Status:** resolved
 
-- [ ] The three gates in ADR-0007 are checked and the result written into the ADR
-- [ ] The throwaway queue is removed or kept as the Re-check queue skeleton, not left as dead code
-- [ ] `docs/db-schema.md` notes the external `bullmq` schema
-- [ ] `.claude/rules/api.md` and the CLAUDE.md doc table list the new packages
-- [ ] `pnpm lint`, `pnpm check-types` and `pnpm --filter api test` pass
+- [x] The three gates in ADR-0007 are checked and the result written into the ADR
+- [x] The throwaway queue is removed or kept as the Re-check queue skeleton, not left as dead code
+- [x] `docs/db-schema.md` notes the external `bullmq` schema
+- [x] `.claude/rules/api.md` and the CLAUDE.md doc table list the new packages
+- [x] `pnpm lint`, `pnpm check-types` and `pnpm --filter api test` pass
+
+## Answer
+
+Done (commit 131423c). All three ADR-0007 gates passed on a fresh database; results and the differences from the ADR's assumptions (`setDefaultBackendFactory`, `migrate: true`, an options type that only models Redis) are written into `docs/adr/0007-background-work-on-bullmq-over-postgres.md`. **Still open for the owner:** whether the Cloud Run API service has CPU always allocated.

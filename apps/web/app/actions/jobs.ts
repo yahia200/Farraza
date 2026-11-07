@@ -8,6 +8,14 @@ import {
   RELOAD_MESSAGE,
   saveHighlightedQuestionsSchema,
   saveRatingCriteriaSchema,
+  saveRequirementsSchema,
+  parseRecheckStatus,
+  type RecheckPoll,
+  type RecheckStatus,
+  groupRequirementErrors,
+  requirementErrorsFromIssues,
+  type Requirement,
+  type RequirementErrors,
   updateJobSchema,
   groupRuleErrors,
   type CreateJobInput,
@@ -15,7 +23,7 @@ import {
   type ScreeningRule,
   type UpdateJobInput,
 } from '@repo/shared';
-import type { ActionFailure } from '@/lib/action-failure';
+import { GENERIC_FAILURE_MESSAGE, type ActionFailure } from '@/lib/action-failure';
 import { apiFetch, failureFromResponse, readApiError } from '@/lib/api';
 import { expireCompanyJobs, expirePublicJob } from '@/lib/public-jobs';
 
@@ -262,4 +270,129 @@ export async function saveScreeningRules(
   revalidatePath(settingsPath);
   revalidatePath(`/dashboard/${companySlug}/jobs/${jobSlug}/candidates`);
   return { rules: saved.rules };
+}
+
+export type SaveRequirementsResult = ActionFailure<never> & {
+  /** Refusals by Requirement index (`groupRequirementErrors`), from the shared validator or the API's 400. */
+  requirementErrors?: Record<number, RequirementErrors>;
+  requirements?: Requirement[];
+  version?: number;
+};
+
+/**
+ * Saves the Job's Requirements, calling PUT .../jobs/:jobSlug/requirements with the whole new list
+ * (apps/api/src/jobs; answers `{ requirements, version }`). Unlike the Screening rules there is no form
+ * to check against, so the body is validated here with `saveRequirementsSchema` (the API's own schema)
+ * and its messages are shown on the Requirement they are about. An unchanged list creates no version
+ * (the API answers the stored list and version). Returns failures rather than throwing. Revalidates the
+ * Settings page, which re-reads the job. Applicants never see Requirements, so the public job is left alone.
+ */
+export async function saveRequirements(
+  companySlug: string,
+  jobSlug: string,
+  requirements: Requirement[],
+): Promise<SaveRequirementsResult> {
+  const settingsPath = `/dashboard/${companySlug}/jobs/${jobSlug}/settings`;
+  const parsed = saveRequirementsSchema.safeParse({ requirements });
+  if (!parsed.success) {
+    const { byRequirement, form } = groupRequirementErrors(requirementErrorsFromIssues(parsed.error.issues));
+    return { requirementErrors: byRequirement, formError: form[0] };
+  }
+
+  const response = await apiFetch(`${jobsPath(companySlug, jobSlug)}/requirements`, {
+    method: 'PUT',
+    body: JSON.stringify(parsed.data),
+  });
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (!response.ok) {
+    if (response.status === 409) {
+      // Someone saved at the same moment: show the newer list.
+      revalidatePath(settingsPath);
+    }
+    return failureFromResponse(response, [], {
+      ...NO_PERMISSION,
+      404: () => ({ formError: 'This job no longer exists. Reload the page.' }),
+      409: (message) => ({ formError: message }),
+    });
+  }
+
+  const saved = (await response.json()) as { requirements: Requirement[]; version: number };
+  revalidatePath(settingsPath);
+  return { requirements: saved.requirements, version: saved.version };
+}
+
+export type RecheckCountResult = ActionFailure<never> & { count?: number };
+export type StartRecheckResult = ActionFailure<never> & { status?: RecheckStatus };
+
+const recheckPath = (companySlug: string, jobSlug: string) => `${jobsPath(companySlug, jobSlug)}/recheck`;
+
+/**
+ * How many Applications a Re-check would touch (GET .../jobs/:jobSlug/recheck, `{ count }`; 0 when the
+ * Job has no Requirements version). Open to any member. Returns failures instead of throwing.
+ */
+export async function getRecheckCount(companySlug: string, jobSlug: string): Promise<RecheckCountResult> {
+  const response = await apiFetch(recheckPath(companySlug, jobSlug));
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (!response.ok) {
+    return failureFromResponse(response, [], {
+      404: () => ({ formError: 'This job no longer exists. Reload the page.' }),
+    });
+  }
+  const body = (await response.json()) as { count?: unknown };
+  return typeof body.count === 'number' ? { count: body.count } : { formError: GENERIC_FAILURE_MESSAGE };
+}
+
+/**
+ * Starts a Re-check (POST .../jobs/:jobSlug/recheck, 202 with the status). The API makes this a no-op
+ * while a run is waiting or active and queues nothing at a count of zero, so a repeat call is harmless.
+ * Needs the permission that saves Requirements (interviewers get 403). No page revalidation here: the run
+ * is not finished yet. The control calls `refreshCandidates` when polling sees it end.
+ */
+export async function startRecheck(companySlug: string, jobSlug: string): Promise<StartRecheckResult> {
+  const response = await apiFetch(recheckPath(companySlug, jobSlug), { method: 'POST' });
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (!response.ok) {
+    return failureFromResponse(response, [], {
+      ...NO_PERMISSION,
+      404: () => ({ formError: 'This job no longer exists. Reload the page.' }),
+    });
+  }
+  const status = parseRecheckStatus(await response.json());
+  return status ? { status } : { formError: GENERIC_FAILURE_MESSAGE };
+}
+
+/**
+ * The Re-check's progress (GET .../jobs/:jobSlug/recheck/status), polled by the Settings tab through this
+ * action because the browser never calls the API. Failures come back as `{ ok: false, message }`, which
+ * ends the polling (`nextPoll` in @repo/shared).
+ */
+export async function getRecheckStatus(companySlug: string, jobSlug: string): Promise<RecheckPoll> {
+  const response = await apiFetch(`${recheckPath(companySlug, jobSlug)}/status`);
+  if (response.status === 401) {
+    redirect('/sign-in');
+  }
+  if (!response.ok) {
+    const failure = await failureFromResponse(response, [], {
+      404: () => ({ formError: 'This job no longer exists. Reload the page.' }),
+    });
+    return { ok: false, message: failure.formError ?? GENERIC_FAILURE_MESSAGE };
+  }
+  const status = parseRecheckStatus(await response.json());
+  return status ? { ok: true, status } : { ok: false, message: GENERIC_FAILURE_MESSAGE };
+}
+
+/**
+ * Called by the Re-check control when a run has finished: the board, table and sheet read the stored
+ * results through `use cache: private` DAL functions (lib/dal.ts), which nothing else invalidates, so
+ * without this they kept showing the pre-run markers (found in the ticket 09 browser pass). Revalidates
+ * the candidates path only; it reads nothing and changes nothing.
+ */
+export async function refreshCandidates(companySlug: string, jobSlug: string): Promise<void> {
+  revalidatePath(`/dashboard/${companySlug}/jobs/${jobSlug}/candidates`);
 }

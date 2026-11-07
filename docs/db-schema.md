@@ -438,6 +438,43 @@ The text the applicant's browser read from their CV, and what the server derived
 - Deleted with its CV file (and so with the Application, company or job that removes the file). There is no update: a row is written once.
 - Only a CV file gets a row. A submit with a CV and no text sent writes a `failed` row with empty text, so "not read" differs from "no CV" (no row).
 
+### 3.23 `job_requirement_versions` (model `JobRequirementVersion`)
+One immutable version of a Job's **Requirements** (`GLOSSARY.md`, `.scratch/keyword-match/spec.md`). A save that changes the list inserts the next version; a save that changes nothing inserts nothing. Never updated or deleted by the application.
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK, DEFAULT `gen_random_uuid()` |
+| `company_id` | `companyId` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
+| `job_id` | `jobId` | `uuid` | NOT NULL, FK → `jobs.id` ON DELETE CASCADE |
+| `version` | `version` | `integer` | NOT NULL |
+| `requirements` | `requirements` | `jsonb` | NOT NULL, **no FK** (a JSON array of Requirements, shape in §4.5) |
+| `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+
+- UNIQUE (`job_id`, `version`): two saves racing for the same number cannot both win. INDEX (`company_id`), INDEX (`job_id`) (Prisma adds one for every FK).
+- CHECK `job_requirement_versions_version_positive`: `version > 0`. CHECK `job_requirement_versions_requirements_array`: `jsonb_typeof(requirements) = 'array'`.
+- A Job's current Requirements are its row with the highest `version` (there is no pointer on `jobs`); a Job with no row has none (the Job payload reads `requirements: []`, `requirementsVersion: 0`). `[]` is a valid version once a Job has had Requirements, so a manager can switch the layer off; saving `[]` on a Job that never had any writes nothing.
+- Written only by `PUT /api/companies/:companySlug/jobs/:jobSlug/requirements` (`JobsService.saveRequirements`).
+
+### 3.24 `application_requirement_results` (model `ApplicationRequirementResult`)
+What a Job's **Requirements** said about one Application's CV text (`GLOSSARY.md`, `.scratch/keyword-match/spec.md`). At most one row per Application, written in the submit transaction after the Application and its `cv_texts` row (`ApplicationsRepository.submit`). **Never read by a public route** (checked ticket 09: the public job payload and the submit answer carry no Requirement, result or marker, and `applications.service.spec.ts` pins it). No row is written for an `unreadable`, `failed` or missing CV; a CV under `CV_TEXT_MIN_LENGTH` (100) characters after trimming is stored as `unreadable`. Checked end to end: no schema change was needed.
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK, DEFAULT `gen_random_uuid()` |
+| `company_id` | `companyId` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
+| `job_id` | `jobId` | `uuid` | NOT NULL, FK → `jobs.id` ON DELETE CASCADE |
+| `application_id` | `applicationId` | `uuid` | NOT NULL, UNIQUE, FK → `applications.id` ON DELETE CASCADE |
+| `version` | `version` | `integer` | NOT NULL, **no FK** (the `job_requirement_versions.version` that was checked; with `job_id` it names that row) |
+| `results` | `results` | `jsonb` | NOT NULL, **no FK** (per Requirement id: `{ matched, terms }`, shape in §4.6) |
+| `missed_must_have` | `missedMustHave` | `boolean` | NOT NULL (a must-have Requirement did not match) |
+| `checked_at` | `checkedAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+
+- UNIQUE (`application_id`): one row per Application, and the key a Re-check upserts on. CHECK `application_requirement_results_version_positive`: `version > 0`. CHECK `application_requirement_results_results_object`: `jsonb_typeof(results) = 'object'`. INDEX (`company_id`), INDEX (`job_id`, `version`) (for "results older than the current version"), plus Prisma's INDEX (`job_id`).
+- `version` has no FK on purpose: the version row is identified by (`job_id`, `version`), both rows are removed by the Job's cascade, and Requirement versions are never deleted otherwise. Services copy `company_id` and `job_id` from the Application (§7).
+- Written only when the Job has a current Requirements version **and** the Application's CV text is `readable`. A Job with no version, or a missing, `unreadable` or `failed` CV, writes no row. A version whose list is `[]` still writes a row (`results` `{}`, `missed_must_have` false), so the Application counts as checked against that version. The checker is pure, so it cannot fail a submit.
+- Applications that existed before a Job had a version, or before this table, have no row.
+- **Re-check** (`recheck/`, `RecheckRepository`): an Application needs one when it is not `rejected`, its CV (`files.purpose = 'cv'` and `files.status = 'uploaded'`, the same file `findCvState` reads, joined to `cv_texts`) is `readable`, and it has no row here or a row with `version` below the Job's current version. The count and the next chunk use that same predicate (raw SQL joining `applications`, `files`, `cv_texts` and this table), and a chunk's write is `upsert ... conflictOn: { applicationId }` that also refreshes `checked_at`, so a retried chunk or a racing submit leaves one row. Re-check never deletes a row: a rejected Application keeps its old result, and an Application whose CV later stops being `readable` cannot happen (CV text is written once).
+
 ## 4. JSONB shapes
 
 The database does not validate these. The application does, using the Zod schemas and parsers in `packages/shared` (`@repo/shared`).
@@ -569,15 +606,25 @@ A `rated` event is written on every save of a Rating, even one that changes noth
 
 An object from a Criterion key (the catalog `RATING_CRITERIA` in `packages/shared/src/rating-criteria.ts`) to a whole score 1 to 5: `{ "communication": 5, "culture_fit": 3 }`. A Criterion the Member did not score is absent; a value is never `null` (the request's `null` removes the key). It may hold keys the Job no longer uses: a save carries those over untouched (§7). The database checks only that it is an object; the keys and the range are checked by `saveRatingSchema` and `checkRatingCriteria`.
 
+### 4.5 `job_requirement_versions.requirements`
+A JSON array of at most `REQUIREMENTS_LIMIT` (10) objects `{ id, text, tier: 'must_have' | 'nice_to_have', keywords: string[] }` (`requirementsSchema` in `packages/shared/src/requirements.ts`; 1 to 15 keywords of 1 to 40 characters, text up to 200). The `id` is a UUID that stays the same when the manager edits that Requirement, so later result rows can name it; ids are unique within a list. Order is the manager's display order and counts as a change.
+
+### 4.6 `application_requirement_results.results`
+A JSON object keyed by Requirement `id` (a UUID from the checked version's list): `{ "<requirementId>": { "matched": true, "terms": ["Golang"] } }` (`RequirementMatches` in `packages/shared/src/requirements.ts`). `terms` are the keywords, as the manager listed them, that matched. Every Requirement of the checked version has a key; `{}` for an empty version. Keys may name Requirements a later version dropped.
+
 ## 5. Relationships
 
 These are the relations declared in `contract.prisma`. Columns marked "no FK" above are not relations.
 
-- A `company` has many `memberships`, `jobs`, `stages`, `form_versions`, `candidates`, `applications`, `files`, and `cv_texts`.
+- A `company` has many `memberships`, `jobs`, `stages`, `form_versions`, `candidates`, `applications`, `files`, and `cv_texts`, and `application_requirement_results`.
 - A `user` has many `memberships`, `sessions`, `identities`, `email_tokens`, `refresh_tokens`, one `mfa_totp`, and many `mfa_recovery_codes` and `mfa_failures`, and is referenced by `jobs.created_by`, `notes.author_id`, `ratings.user_id` and `oidc_states.link_user_id`.
-- A `job` has many `form_versions`, `stages`, `applications`, `files`, and `cv_texts`.
+- A `job` has many `form_versions`, `stages`, `applications`, `files`, `cv_texts`, `job_requirement_versions`, and `application_requirement_results`.
 - A `candidate` has many `applications`.
-- An `application` belongs to one `job`, one `candidate`, one `form_version`, and one `stage`, and has many `application_events`, `notes`, `ratings`, and `files`.
+- An `application` belongs to one `job`, one `candidate`, one `form_version`, and one `stage`, and has many `application_events`, `notes`, `ratings`, and `files`, and at most one `application_requirement_results`.
+
+### The external `bullmq` schema
+
+Besides `public`, the database holds a `bullmq` schema (15 tables: `job`, `event`, `scheduler`, `meta`, `migration` and others) that BullMQ's PostgreSQL backend creates and migrates itself at API boot (`migrate: true` in `recheck/recheck.module.ts`; ADR-0007). It is not in `contract.prisma` and must not be: Prisma only inspects the schemas the contract names. Checked on a fresh database: `prisma db update` and `prisma db verify`, including `--strict`, run clean with the schema present and leave it untouched.
 
 ## 6. Changing the schema
 
@@ -617,6 +664,7 @@ The database cannot check these, so the services must:
 - `email_tokens` and `oidc_states` rows are consumed with one atomic `DELETE … RETURNING`, so a link or a callback works exactly once. Saving a row first deletes expired rows and enforces a cap, so anyone asking for links or starting logins can't grow the tables without bound (the store contracts in `@nestjs/authentication`'s `email-token-store.interface.d.ts` and `oidc-state-store.interface.d.ts`).
 - The refresh-token and MFA stores (`@nestjs/authentication`'s `refresh-token-store.interface.d.ts` and `mfa-store.interface.d.ts`) rely on single atomic writes, never a read followed by a write: `markRefreshTokenUsed` is `UPDATE … WHERE used_at IS NULL` (one winner per token, the rest are a reuse), `claimTotpStep` is an update that only raises `last_used_step`, `consumeRecoveryCode` is one `DELETE`, and `saveTotp` is an upsert whose `last_used_step` is `GREATEST(stored, new)` so it is never lowered. `recordMfaFailure` is deliberately three separate statements without a transaction (insert, prune, count) so that every recorded attempt is visible to the next caller at once. A revocation row can exist before or after the family's tokens, which is why `revoked_refresh_families` has no FK.
 - A Google sign-in is matched to a user through `identities` (`provider`, `subject`) only. Linking a new identity to an existing user by email is allowed only when both Google and `users.email_verified` say the address is verified.
+- `job_requirement_versions.company_id` is copied from the Job on insert. `JobsService.saveRequirements` reads the Job's current version (highest `version`), compares the new list with it (deep equality, order counts) and, if it differs, inserts `version + 1` in a single `INSERT`; a unique violation on (`job_id`, `version`) means another save won, answered as a 409. Versions are never updated, so older ones stay exactly as saved. No public route and no Application payload carries Requirements (`applications.service.spec.ts`, "no Requirement reaches the public routes").
 
 ## 8. Not built yet
 

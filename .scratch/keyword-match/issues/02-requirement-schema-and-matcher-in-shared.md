@@ -9,10 +9,10 @@
 
 **Blocked by:** none.
 
-**Status:** open
+**Status:** resolved
 
-- [ ] "C#", "Node.js" and "C++" match; "Go" does not match "Google"
-- [ ] Case and trailing "s" are handled; negation is not (documented in a test comment)
-- [ ] An empty list is valid; a Requirement with no keywords is rejected with a `<path>` error
-- [ ] Exports added to the shared index and the package builds
-- [ ] `pnpm --filter @repo/shared test` passes
+- [x] "C#", "Node.js" and "C++" match; "Go" does not match "Google"
+- [x] Case and trailing "s" are handled; negation is not (documented in a test comment)
+- [x] An empty list is valid; a Requirement with no keywords is rejected with a `<path>` error
+- [x] Exports added to the shared index and the package builds
+- [x] `pnpm --filter @repo/shared test` passes

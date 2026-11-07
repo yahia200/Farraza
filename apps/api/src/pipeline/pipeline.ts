@@ -7,6 +7,9 @@ import type {
   HighlightKind,
   RatingSummary,
   RatingValues,
+  Requirement,
+  RequirementMatches,
+  RequirementTier,
   ScreeningFlag,
 } from '@repo/shared';
 import type { StageKind } from '../jobs/job.js';
@@ -36,10 +39,16 @@ export interface ApplicationCard {
   rating: CardRating;
   /** The flag-outcome Screening rules that fired at submit, as stored (`applications.flags`); `[]` for none. */
   flags: ScreeningFlag[];
+  /**
+   * A must-have Requirement did not match this Application's CV text, from its stored result
+   * (`application_requirement_results.missed_must_have`). False with no stored result, which includes
+   * every unreadable, failed or missing CV, and a miss of only nice-to-haves.
+   */
+  missedMustHave: boolean;
 }
 
-/** A card as `PipelineRepository` reads it, before the service adds the Highlighted answers and the rating. */
-export type CardRow = Omit<ApplicationCard, 'highlights' | 'rating'>;
+/** A card as `PipelineRepository` reads it, before the service adds the Highlighted answers, the rating and the marker. */
+export type CardRow = Omit<ApplicationCard, 'highlights' | 'rating' | 'missedMustHave'>;
 
 /** A card row plus what the service needs to resolve its Highlighted answers. Stays inside the API. */
 export interface CardRowWithAnswers extends CardRow {
@@ -97,10 +106,44 @@ export interface ApplicationDetail {
   flags: ScreeningFlag[];
   events: ApplicationEventView[];
   notes: NoteView[];
+  /** What became of the CV's text: only `readable` can have Requirement results. CV text is never returned. */
+  cvState: CvState;
+  /** The stored Requirement check, or null when there is none (never checked, or CV not `readable`). */
+  requirementCheck: RequirementCheck | null;
   /** Every Member's Rating of this Application, oldest first. */
   ratings: RatingView[];
   /** The count, the average and the per-Criterion averages of `ratings` (`summariseRatings`). */
   ratingSummary: RatingSummary;
+}
+
+/** `none`: no CV text row (no CV, or one never read). The others are `cv_texts.status`. */
+export type CvState = 'readable' | 'unreadable' | 'failed' | 'none';
+
+/** One Requirement with its verdict for this Application: text and tier come from the checked version. */
+export interface RequirementResultView {
+  id: string;
+  text: string;
+  tier: RequirementTier;
+  matched: boolean;
+  /** The listed keywords that matched, as the manager wrote them. */
+  terms: string[];
+}
+
+export interface RequirementCheck {
+  /** The `job_requirement_versions.version` this Application was checked against. */
+  version: number;
+  missedMustHave: boolean;
+  /** One entry per Requirement of that version, in its order. */
+  results: RequirementResultView[];
+}
+
+/** The stored check as `PipelineRepository` reads it: the raw result beside the version it names. */
+export interface RequirementCheckRow {
+  version: number;
+  missedMustHave: boolean;
+  results: RequirementMatches;
+  /** The Requirements of `version` (looked up by Job and version); `[]` if the version row is gone. */
+  requirements: Requirement[];
 }
 
 /**
@@ -123,8 +166,12 @@ export interface RatingRow extends RatingValues {
 }
 
 /** The detail as `PipelineRepository.findDetail` reads it, before the service resolves names and the summary. */
-export type ApplicationDetailRow = Omit<ApplicationDetail, 'ratings' | 'ratingSummary'> & {
+export type ApplicationDetailRow = Omit<
+  ApplicationDetail,
+  'ratings' | 'ratingSummary' | 'requirementCheck'
+> & {
   ratings: RatingRow[];
+  requirementCheck: RequirementCheckRow | null;
 };
 
 /** A Rating as the API answers after a save: the Member's own scores and when they were saved. */

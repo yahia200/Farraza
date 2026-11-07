@@ -12,6 +12,7 @@ import { AverageRatingLabel } from "./average-rating-label";
 import { candidatesHref } from "./candidates-href";
 import { ContactActions } from "./contact-actions";
 import { FlagMarker } from "./flag-marker";
+import { MissedMustHaveMarker } from "./missed-must-have-marker";
 import { HighlightAnswer } from "./highlight-answer";
 import {
   MoveToStageSelect,
@@ -158,9 +159,10 @@ export function CandidateCard({
         className="absolute right-2 top-2"
       />
       {/* A sibling of the link too: a button inside it would be nested interactive content. */}
-      {card.flags.length > 0 && (
-        <div className="px-3 pb-2">
+      {(card.flags.length > 0 || card.missedMustHave) && (
+        <div className="flex flex-wrap gap-1.5 px-3 pb-2">
           <FlagMarker flags={card.flags} />
+          {card.missedMustHave && <MissedMustHaveMarker />}
         </div>
       )}
       <div className="flex items-center gap-2 px-3 pb-3">

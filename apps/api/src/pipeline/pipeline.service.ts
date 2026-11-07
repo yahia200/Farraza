@@ -23,7 +23,7 @@ import type { SaveRatingDto } from './dto/save-rating.dto.js';
 import { StorageService } from '../storage/storage.service.js';
 import { DOWNLOAD_URL_TTL_SECONDS } from '../storage/storage.js';
 import { FormsRepository } from '../forms/forms.repository.js';
-import type { ApplicationCard, ApplicationDetail, BoardColumn, FileLink, HighlightedQuestion, SavedRating } from './pipeline.js';
+import type { ApplicationCard, ApplicationDetail, BoardColumn, CvState, RequirementCheck, RequirementCheckRow, FileLink, HighlightedQuestion, SavedRating } from './pipeline.js';
 import { PipelineRepository } from './pipeline.repository.js';
 
 /**
@@ -39,6 +39,30 @@ function mergeCriteria(existing: Record<string, number>, requested: RatingCriter
     else merged[key] = score;
   }
   return merged;
+}
+
+/**
+ * The Requirement check the sheet shows: each Requirement of the version the result was checked
+ * against, with that version's text and tier. An `unreadable` or `failed` CV never gets a verdict (a
+ * failed read must not look like a missing skill), whatever row might exist; a Requirement without a
+ * stored verdict reads as not matched.
+ */
+function requirementCheckOf(cvState: CvState, row: RequirementCheckRow | null): RequirementCheck | null {
+  if (!row || cvState !== 'readable') return null;
+  return {
+    version: row.version,
+    missedMustHave: row.missedMustHave,
+    results: row.requirements.map((requirement) => {
+      const match = row.results[requirement.id];
+      return {
+        id: requirement.id,
+        text: requirement.text,
+        tier: requirement.tier,
+        matched: match?.matched ?? false,
+        terms: match?.terms ?? [],
+      };
+    }),
+  };
 }
 
 @Injectable()
@@ -59,7 +83,7 @@ export class PipelineService {
     const job = await this.jobs.get(membership, jobSlug);
     const highlightedQuestions = await this.highlightedQuestionsOf(job.id, job.highlightedQuestionKeys);
     const rows = await this.cardsOf(membership.company.id, job.id, highlightedQuestions);
-    const cards = await this.withRatings(membership.company.id, rows);
+    const cards = await this.withMarkers(membership.company.id, job.id, rows);
 
     const columns: BoardColumn[] = job.stages.map((stage) => ({
       id: stage.id,
@@ -101,7 +125,7 @@ export class PipelineService {
     companyId: string,
     jobId: string,
     highlighted: HighlightedQuestion[],
-  ): Promise<Omit<ApplicationCard, 'rating'>[]> {
+  ): Promise<Omit<ApplicationCard, 'rating' | 'missedMustHave'>[]> {
     if (highlighted.length === 0) {
       const rows = await this.pipeline.findCards(companyId, jobId);
       return rows.map((row) => ({ ...row, highlights: {} }));
@@ -131,22 +155,29 @@ export class PipelineService {
   }
 
   /**
-   * Adds each card's Average rating. One grouped query for the whole board, by the ids of the cards
-   * just read (a Rating has no job id); none at all when the Job has no Applications. A card whose
-   * Application has no Rating gets `{ average: null, count: 0 }`.
+   * Adds each card's Average rating and missed must-have marker. Two queries for the whole board,
+   * run together, never one per card, and none at all when the Job has no Applications. The rating is
+   * a grouped query by the ids of the cards just read (a Rating has no job id); a card whose
+   * Application has no Rating gets `{ average: null, count: 0 }`. The marker is the Job's result rows
+   * with a missed must-have; a card with no stored result is not marked.
    */
-  private async withRatings(
+  private async withMarkers(
     companyId: string,
-    cards: Omit<ApplicationCard, 'rating'>[],
+    jobId: string,
+    cards: Omit<ApplicationCard, 'rating' | 'missedMustHave'>[],
   ): Promise<ApplicationCard[]> {
     if (cards.length === 0) return [];
-    const summaries = await this.pipeline.findRatingSummaries(
-      companyId,
-      cards.map((card) => card.id),
-    );
+    const [summaries, missed] = await Promise.all([
+      this.pipeline.findRatingSummaries(
+        companyId,
+        cards.map((card) => card.id),
+      ),
+      this.pipeline.findMissedMustHaveIds(companyId, jobId),
+    ]);
     return cards.map((card) => ({
       ...card,
       rating: summaries.get(card.id) ?? { average: null, count: 0 },
+      missedMustHave: missed.has(card.id),
     }));
   }
 
@@ -154,7 +185,7 @@ export class PipelineService {
     const job = await this.jobs.get(membership, jobSlug);
     const detail = await this.pipeline.findDetail(membership.company.id, job.id, applicationId);
     if (!detail) throw new NotFoundException();
-    const { ratings: ratingRows, ...rest } = detail;
+    const { ratings: ratingRows, requirementCheck: checkRow, ...rest } = detail;
     const ratings = ratingRows.map((rating) => ({
       userId: rating.userId,
       name: rating.userName ?? FORMER_MEMBER_NAME,
@@ -162,7 +193,12 @@ export class PipelineService {
       criteria: rating.criteria,
       updatedAt: rating.updatedAt,
     }));
-    return { ...rest, ratings, ratingSummary: summariseRatings(ratings) };
+    return {
+      ...rest,
+      requirementCheck: requirementCheckOf(detail.cvState, checkRow),
+      ratings,
+      ratingSummary: summariseRatings(ratings),
+    };
   }
 
   /**

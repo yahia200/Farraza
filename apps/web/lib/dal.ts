@@ -14,7 +14,7 @@ import type {
   RatingSummary,
   RatingValues,
 } from '@repo/shared';
-import { highlightKindOf, type ScreeningFlag, type ScreeningRule } from '@repo/shared';
+import { highlightKindOf, type Requirement, type ScreeningFlag, type ScreeningRule } from '@repo/shared';
 import { apiFetch } from './api';
 import { formatDate } from './format';
 
@@ -170,6 +170,10 @@ export interface CompanyJob {
   ratingCriteria: string[];
   /** The Job's Screening rules as last saved (reject or flag, one question each); edited on the job's Settings tab. */
   screeningRules: ScreeningRule[];
+  /** The Job's Requirements as last saved (keyword-match; edited on the Settings tab). */
+  requirements: Requirement[];
+  /** The Requirements' version number: 0 before any save, +1 per changed save. */
+  requirementsVersion: number;
 }
 
 /** Mirrors Stage in apps/api/src/jobs/job.ts. */
@@ -280,8 +284,24 @@ function toCompanyJob({
   highlightedQuestionKeys,
   ratingCriteria,
   screeningRules,
+  requirements,
+  requirementsVersion,
 }: CompanyJob): CompanyJob {
-  return { id, title, slug, description, status, openedAt, closedAt, createdAt, highlightedQuestionKeys, ratingCriteria, screeningRules };
+  return {
+    id,
+    title,
+    slug,
+    description,
+    status,
+    openedAt,
+    closedAt,
+    createdAt,
+    highlightedQuestionKeys,
+    ratingCriteria,
+    screeningRules,
+    requirements,
+    requirementsVersion,
+  };
 }
 
 /** Expose only what the UI needs. */
@@ -317,6 +337,8 @@ export interface ApplicationSummary {
   rating: CardRating;
   /** The flag-outcome Screening rules that fired at submit, mirroring ApplicationCard.flags in apps/api/src/pipeline/pipeline.ts. `[]` for none. */
   flags: ScreeningFlag[];
+  /** A must-have Requirement did not match the CV text, mirroring ApplicationCard.missedMustHave. False with no stored result (including an unreadable or failed CV). */
+  missedMustHave: boolean;
 }
 
 /** Mirrors HighlightedQuestion in apps/api/src/pipeline/pipeline.ts: in form order, with the latest text. */
@@ -383,7 +405,7 @@ export async function getPipelineBoard(companySlug: string, jobSlug: string): Pr
       name,
       position,
       kind,
-      applications: applications.map(({ id: applicationId, status, submittedAt, candidate, highlights, rating, flags }) => ({
+      applications: applications.map(({ id: applicationId, status, submittedAt, candidate, highlights, rating, flags, missedMustHave }) => ({
         id: applicationId,
         status,
         submittedAt,
@@ -392,6 +414,7 @@ export async function getPipelineBoard(companySlug: string, jobSlug: string): Pr
         highlights,
         rating: { average: rating.average, count: rating.count },
         flags,
+        missedMustHave: missedMustHave === true,
       })),
     }))
     .sort((a, b) => a.position - b.position);
@@ -443,6 +466,17 @@ export function autoRejectedByOf(data: unknown): AutoRejectedBy {
   };
 }
 
+/** Mirrors CvState in apps/api/src/pipeline/pipeline.ts. */
+export type CvState = 'readable' | 'unreadable' | 'failed' | 'none';
+
+/** Mirrors RequirementCheck in apps/api/src/pipeline/pipeline.ts. */
+export interface RequirementCheckView {
+  /** The Requirements version this Application was checked against. */
+  version: number;
+  missedMustHave: boolean;
+  results: { id: string; text: string; tier: 'must_have' | 'nice_to_have'; matched: boolean; terms: string[] }[];
+}
+
 /** Mirrors ApplicationDetail in apps/api/src/pipeline/pipeline.ts (dates as ISO strings). */
 export interface ApplicationDetailView {
   id: string;
@@ -460,6 +494,10 @@ export interface ApplicationDetailView {
   autoRejectedBy: AutoRejectedBy | null;
   /** The flag rules that fired at submit, with their reasons (members only), mirroring ApplicationDetail.flags. `[]` for none. */
   flags: ScreeningFlag[];
+  /** What became of the CV's text, mirroring ApplicationDetail.cvState. The text itself never leaves the API. */
+  cvState: CvState;
+  /** The stored Requirement check, or null (never checked, or the CV was not `readable`), mirroring ApplicationDetail.requirementCheck. */
+  requirementCheck: RequirementCheckView | null;
   /** The application's history and its notes, oldest first; `buildActivityTimeline` joins them. */
   events: ActivityEvent[];
   notes: ActivityNote[];
@@ -504,6 +542,21 @@ export async function getApplication(
     answers: detail.answers,
     autoRejectedBy: autoRejected ? autoRejectedByOf(autoRejected.data) : null,
     flags: detail.flags ?? [],
+    cvState: detail.cvState ?? 'none',
+    // Field by field like the rest; an unreadable or failed CV arrives as null, so no verdict can render.
+    requirementCheck: detail.requirementCheck
+      ? {
+          version: detail.requirementCheck.version,
+          missedMustHave: detail.requirementCheck.missedMustHave,
+          results: detail.requirementCheck.results.map(({ id, text, tier, matched, terms }) => ({
+            id,
+            text,
+            tier,
+            matched,
+            terms,
+          })),
+        }
+      : null,
     events: detail.events.map(({ id, type, fromStageId, toStageId, actorId, data, createdAt }) => ({
       id,
       type,

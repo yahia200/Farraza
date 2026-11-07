@@ -358,6 +358,51 @@ model CvText {
   @@map("cv_texts")
 }
 
+/// One immutable version of a Job's Requirements (keyword match, Layer 2). The Job's current version is its highest `version`. Written only when a save changes the list; never updated.
+model JobRequirementVersion {
+  id           Uuid              @id @default(sql`gen_random_uuid()`)
+  companyId    Uuid              @map("company_id")
+  jobId        Uuid              @map("job_id")
+  version      Int
+  /// The Requirement list (`requirementsSchema` in @repo/shared); `[]` is a valid version. No FK: the ids live inside the array and are referenced by later result rows.
+  requirements Jsonb
+  createdAt    TimestamptzJsDate @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  job     Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, version])
+  @@index([companyId])
+  @@check(expression: "version > 0", name: "job_requirement_versions_version_positive")
+  @@check(expression: "jsonb_typeof(requirements) = 'array'", name: "job_requirement_versions_requirements_array")
+  @@map("job_requirement_versions")
+}
+
+/// What a Job's Requirements said about one Application's CV text (keyword match, Layer 2). At most one row per Application: written in the submit transaction, replaced by a Re-check. Never returned to the public.
+model ApplicationRequirementResult {
+  id             Uuid              @id @default(sql`gen_random_uuid()`)
+  companyId      Uuid              @map("company_id")
+  jobId          Uuid              @map("job_id")
+  applicationId  Uuid              @unique @map("application_id")
+  /// The `job_requirement_versions.version` of this Job that was checked. No FK: (job_id, version) names the row, and the Job's cascade removes both.
+  version        Int
+  /// Per Requirement id: { matched, terms } (RequirementMatches in @repo/shared). `{}` for a version with no Requirements.
+  results        Jsonb
+  /// True when a must-have Requirement did not match (`missedMustHave` in @repo/shared), stored so lists and boards need not re-derive it.
+  missedMustHave Boolean           @map("missed_must_have")
+  checkedAt      TimestamptzJsDate @default(now()) @map("checked_at")
+
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  job         Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@check(expression: "version > 0", name: "application_requirement_results_version_positive")
+  @@check(expression: "jsonb_typeof(results) = 'object'", name: "application_requirement_results_results_object")
+  @@index([companyId])
+  @@index([jobId, version])
+  @@map("application_requirement_results")
+}
+
 enum SessionMfa {
   Pending  = "pending"
   Verified = "verified"

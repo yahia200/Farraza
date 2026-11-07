@@ -18,6 +18,7 @@ import { StorageModule } from './storage/storage.module.js';
 import { validateEnv } from './config/env.schema.js';
 import { join } from 'node:path';
 import { FileTemplateEngine, LogMailTransport, MailModule, SmtpTransport } from '@nestjs/mail';
+import { RecheckModule } from './recheck/recheck.module.js';
 import { oidcOptions } from './auth/oidc.options.js';
 @Module({
   // validateEnv stops boot with a list of every missing or malformed variable
@@ -56,7 +57,7 @@ import { oidcOptions } from './auth/oidc.options.js';
   }),
   AuthorizationModule.forRoot(),
   ThrottlerModule.forRoot([{ ttl: minutes(1), limit: 100 }]),
-    HealthModule, PrismaModule, UsersModule, AuthModule, CompaniesModule, JobsModule, FormsModule, ApplicationsModule, PipelineModule, StorageModule],
+    HealthModule, PrismaModule, UsersModule, AuthModule, CompaniesModule, JobsModule, FormsModule, ApplicationsModule, PipelineModule, StorageModule, RecheckModule],
   // Counts each visitor (see TrustedClientThrottlerGuard), not the web server.
   providers: [{ provide: APP_GUARD, useClass: TrustedClientThrottlerGuard }]
 })

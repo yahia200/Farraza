@@ -9,9 +9,9 @@
 
 **Blocked by:** 06, 07.
 
-**Status:** open
+**Status:** resolved
 
-- [ ] The button is disabled at zero and during a run
-- [ ] Progress advances without a page reload and polling stops when the run ends
-- [ ] An error from the status route shows a message and stops polling rather than looping
-- [ ] `pnpm lint`, `pnpm check-types` and both test suites pass
+- [x] The button is disabled at zero and during a run
+- [x] Progress advances without a page reload and polling stops when the run ends
+- [x] An error from the status route shows a message and stops polling rather than looping
+- [x] `pnpm lint`, `pnpm check-types` and both test suites pass

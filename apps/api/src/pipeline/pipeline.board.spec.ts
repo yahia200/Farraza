@@ -28,8 +28,31 @@ interface StoredApplication extends CardRowWithAnswers {
 
 class InMemoryPipelineRepository implements Pick<
   PublicApi<PipelineRepository>,
-  'findCards' | 'findCardsWithAnswers' | 'findFormFields' | 'findRatingSummaries'
+  'findCards' | 'findCardsWithAnswers' | 'findFormFields' | 'findRatingSummaries' | 'findMissedMustHaveIds'
 > {
+  private readonly requirementResults: {
+    companyId: string;
+    jobId: string;
+    applicationId: string;
+    missedMustHave: boolean;
+  }[] = [];
+  /** Per call of `findMissedMustHaveIds`: its length is the query count for the marker. */
+  readonly markerReads: { companyId: string; jobId: string }[] = [];
+
+  seedResult(applicationId: string, missedMustHave: boolean, owner = { companyId: 'company-1', jobId: 'job-1' }): void {
+    this.requirementResults.push({ ...owner, applicationId, missedMustHave });
+  }
+
+  /** Mirrors the SQL: the Job's result rows with `missed_must_have`, by Application id. */
+  async findMissedMustHaveIds(companyId: string, jobId: string): Promise<Set<string>> {
+    this.markerReads.push({ companyId, jobId });
+    return new Set(
+      this.requirementResults
+        .filter((r) => r.companyId === companyId && r.jobId === jobId && r.missedMustHave)
+        .map((r) => r.applicationId),
+    );
+  }
+
   private readonly applications: StoredApplication[] = [];
   private readonly versions = new Map<
     string,
@@ -195,6 +218,8 @@ class FakeJobs implements Pick<PublicApi<JobsService>, 'get'> {
     highlightedQuestionKeys: [],
     ratingCriteria: [],
     screeningRules: [],
+    requirements: [],
+    requirementsVersion: 0,
     stages: [
       {
         id: 'stage-applied',
@@ -659,6 +684,51 @@ describe('the pipeline board', () => {
       const cards = await cardsOf('interviewer');
 
       expect(cards[0]?.flags).toEqual([flag]);
+    });
+  });
+
+  describe('the missed must-have marker on each card', () => {
+    it('is true only for an Application whose stored result missed a must-have', async () => {
+      repository.seedApplication({ id: 'mona' });
+      repository.seedApplication({ id: 'omar' });
+      repository.seedApplication({ id: 'lina' });
+      repository.seedResult('mona', true);
+      repository.seedResult('omar', false); // checked, only a nice-to-have missed (or nothing)
+      // lina has no result row: unreadable, failed or missing CV, or never checked
+
+      const cards = await cardsOf();
+
+      expect(cards.map((c) => [c.id, c.missedMustHave]).sort()).toEqual([
+        ['lina', false],
+        ['mona', true],
+        ['omar', false],
+      ]);
+    });
+
+    it('costs one query for the whole board, with or without Highlighted questions', async () => {
+      publish('version-1', formOf([city]));
+      for (const id of ['a', 'b', 'c']) repository.seedApplication({ id });
+      await cardsOf();
+      highlight(Q.city);
+      await cardsOf();
+
+      expect(repository.markerReads).toHaveLength(2);
+    });
+
+    it('ignores a result of another company or Job, and reaches an interviewer', async () => {
+      repository.seedApplication({ id: 'mona' });
+      repository.seedResult('mona', true, { companyId: 'company-2', jobId: 'job-1' });
+      repository.seedResult('mona', true, { companyId: 'company-1', jobId: 'job-9' });
+      expect((await cardsOf('interviewer'))[0]?.missedMustHave).toBe(false);
+
+      repository.seedResult('mona', true);
+      expect((await cardsOf('interviewer'))[0]?.missedMustHave).toBe(true);
+    });
+
+    it('reads nothing for a Job with no Applications', async () => {
+      await cardsOf();
+
+      expect(repository.markerReads).toEqual([]);
     });
   });
 

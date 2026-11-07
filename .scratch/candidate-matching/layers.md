@@ -88,6 +88,8 @@ Decided (2026-10-31): a Job-level `jobs.screening_rules` list keyed by question 
 
 ## Layer 2: keyword match
 
+**Status: built (2026-11-07)**, spec `.scratch/keyword-match/spec.md`. Checked in a browser: the Requirements editor, the marker on board card, table row and sheet, the sheet's Requirements section, "CV could not be read." for an unreadable CV, nothing for no CV, and Re-check with progress. Placeholders held up: caps 10 Requirements, 15 keywords, 40 and 200 characters, chunk size 50 (a run of 3 Applications finished in under 2 s; no larger run was tried), and the 100-character floor for `unreadable` (a test CV of 88 characters read as unreadable, as designed). Real CV sizes have not been seen: the test CVs were 180 to 240 characters. Matching is whole-word on the keyword as listed, so "Postgres" does not match "PostgreSQL"; managers must list both (the editor's help text says so). Still the owner's to answer: is Cloud Run set to CPU always allocated (ADR-0007)?
+
 ### What it does
 
 For each Requirement, check whether the CV text contains the Requirement's **terms**. The CV only: text answers are matched by Layer 1's word rules (decided 2026-10-31). The output per Requirement is matched or not matched, plus the terms that matched, so a reviewer sees why. A must-have with no match raises a flag. It never rejects.

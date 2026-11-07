@@ -11,6 +11,7 @@ import {
   extractContactSuggestions,
   type CvMode,
   type FormFields,
+  type Requirement,
   type ScreeningRule,
 } from '@repo/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -46,6 +47,7 @@ import type {
   NewApplication,
   NewCvText,
   NewPendingFile,
+  NewRequirementResult,
   OpenJob,
   SubmitResult,
 } from './application.js';
@@ -75,6 +77,8 @@ class InMemoryApplicationsRepository implements PublicApi<ApplicationsRepository
   readonly applications: NewApplication[] = [];
   /** The `cv_texts` table: one row per CV file, written with the Application. */
   readonly cvTexts: NewCvText[] = [];
+  /** The `application_requirement_results` table: at most one row per Application, written with it. */
+  readonly requirementResults: NewRequirementResult[] = [];
   /** Every company a job was seeded for, with its public branding — so the listing knows it exists. */
   private readonly companies = new Map<string, OpenJob['company']>();
   /** One row per seeded job (open or not), for the public listing: like the `jobs` table's rows. */
@@ -95,6 +99,8 @@ class InMemoryApplicationsRepository implements PublicApi<ApplicationsRepository
     open?: boolean;
     fields?: FormFields;
     screeningRules?: ScreeningRule[];
+    /** The job's current Requirements version; omit for a job that never had any. */
+    requirements?: { version: number; list: Requirement[] };
     logoUrl?: string | null;
     brandColor?: string | null;
   }): OpenJob {
@@ -117,6 +123,7 @@ class InMemoryApplicationsRepository implements PublicApi<ApplicationsRepository
         cvMode: options.cvMode,
       },
       screeningRules: options.screeningRules ?? [],
+      requirements: options.requirements ?? null,
       firstStageId: 'stage-applied',
       rejectedStageId: 'stage-rejected',
     };
@@ -282,6 +289,7 @@ class InMemoryApplicationsRepository implements PublicApi<ApplicationsRepository
     this.applications.push(input);
     // Same transaction as the Application: only reached when nothing above refused the submit.
     if (input.cvText) this.cvTexts.push(input.cvText);
+    if (input.requirementResult) this.requirementResults.push(input.requirementResult);
     return 'created';
   }
 }
@@ -2123,6 +2131,130 @@ describe('ApplicationsService', () => {
 
   // CV text is internal (spec: "visible to no Member"). The public routes build their payloads field
   // by field; this pins that neither the text nor what was derived from it is in any of them.
+  describe('Requirement result', () => {
+    const goId = '6f1b7f0e-3c53-4d6e-9a53-0c7e2f6a1a01';
+    const sqlId = '6f1b7f0e-3c53-4d6e-9a53-0c7e2f6a1a02';
+    const goRequirement: Requirement = { id: goId, text: 'Writes Go', tier: 'must_have', keywords: ['Go', 'Golang'] };
+    const sqlRequirement: Requirement = { id: sqlId, text: 'Knows SQL', tier: 'nice_to_have', keywords: ['SQL'] };
+    const cvWithGo =
+      'Backend engineer. Built and operated services in Golang and shipped them to production for several years, leading a small team.';
+
+    async function submitCv(cvText?: SubmitApplicationDto['cvText']) {
+      const fileId = await uploadCv(samplePdf());
+      return service.submit('acme', 'backend', applicant({ cvFileId: fileId, ...(cvText ? { cvText } : {}) }));
+    }
+
+    it('stores the result against the version it was checked with, in the same submit', async () => {
+      repository.seedJob({
+        slug: 'backend',
+        cvMode: 'optional',
+        requirements: { version: 3, list: [goRequirement, sqlRequirement] },
+      });
+
+      await expect(submitCv({ text: cvWithGo, status: 'readable' })).resolves.toEqual({ received: true });
+
+      expect(repository.applications).toHaveLength(1);
+      expect(repository.requirementResults).toEqual([
+        {
+          version: 3,
+          results: {
+            [goId]: { matched: true, terms: ['Golang'] },
+            [sqlId]: { matched: false, terms: [] },
+          },
+          missedMustHave: false,
+        },
+      ]);
+    });
+
+    it('marks a missed must-have', async () => {
+      repository.seedJob({
+        slug: 'backend',
+        cvMode: 'optional',
+        requirements: { version: 1, list: [goRequirement] },
+      });
+
+      await submitCv({ text: 'Frontend engineer with several years of React and TypeScript experience on large applications, leading a small team.', status: 'readable' });
+
+      expect(repository.requirementResults).toMatchObject([{ version: 1, missedMustHave: true }]);
+    });
+
+    it('stores a result for an empty current version, so the Application counts as checked', async () => {
+      repository.seedJob({ slug: 'backend', cvMode: 'optional', requirements: { version: 2, list: [] } });
+
+      await submitCv({ text: cvWithGo, status: 'readable' });
+
+      expect(repository.requirementResults).toEqual([{ version: 2, results: {}, missedMustHave: false }]);
+    });
+
+    it('returns no Requirements, results or marker from the public job payload', async () => {
+      repository.seedJob({
+        slug: 'backend',
+        cvMode: 'optional',
+        requirements: { version: 1, list: [goRequirement] },
+      });
+      await submitCv({ text: cvWithGo, status: 'readable' });
+
+      const body = JSON.stringify(await service.getPublicJob('acme', 'backend'));
+
+      expect(body).not.toMatch(/requirement|missedMustHave|keywords|results/i);
+      expect(body).not.toContain(goRequirement.text);
+    });
+
+    it('stores nothing for a job that never had Requirements, and the submit still succeeds', async () => {
+      repository.seedJob({ slug: 'backend', cvMode: 'optional' });
+
+      await expect(submitCv({ text: cvWithGo, status: 'readable' })).resolves.toEqual({ received: true });
+
+      expect(repository.applications).toHaveLength(1);
+      expect(repository.requirementResults).toEqual([]);
+    });
+
+    it.each([
+      ['unreadable', { text: 'scan', status: 'unreadable' as const }],
+      ['failed', { text: '', status: 'failed' as const }],
+      ['missing text (the browser could not read it)', undefined],
+    ])('stores nothing for a %s CV, and the submit still succeeds', async (_name, cvText) => {
+      repository.seedJob({
+        slug: 'backend',
+        cvMode: 'optional',
+        requirements: { version: 1, list: [goRequirement] },
+      });
+
+      await expect(submitCv(cvText)).resolves.toEqual({ received: true });
+
+      expect(repository.applications).toHaveLength(1);
+      expect(repository.requirementResults).toEqual([]);
+    });
+
+    it('stores nothing when the Application has no CV', async () => {
+      repository.seedJob({
+        slug: 'backend',
+        cvMode: 'off',
+        requirements: { version: 1, list: [goRequirement] },
+      });
+
+      await expect(service.submit('acme', 'backend', applicant())).resolves.toEqual({ received: true });
+
+      expect(repository.requirementResults).toEqual([]);
+    });
+
+    it('stores nothing when the submit is refused', async () => {
+      repository.seedJob({
+        slug: 'backend',
+        cvMode: 'optional',
+        requirements: { version: 1, list: [goRequirement] },
+      });
+      const fileId = await uploadCv(samplePdf());
+      const body = applicant({ cvFileId: fileId, cvText: { text: cvWithGo, status: 'readable' } });
+      await service.submit('acme', 'backend', body);
+      repository.requirementResults.length = 0;
+
+      await expect(service.submit('acme', 'backend', body)).rejects.toBeInstanceOf(ConflictException);
+
+      expect(repository.requirementResults).toEqual([]);
+    });
+  });
+
   describe('no CV text reaches the public routes', () => {
     it('carries neither the text nor the derived result in any public payload', async () => {
       repository.seedJob({ slug: 'backend', cvMode: 'optional' });
@@ -2168,6 +2300,34 @@ describe('ApplicationsService', () => {
 
       for (const payload of payloads) {
         expect(keysOf(payload).filter((key) => /rating|criteri/i.test(key))).toEqual([]);
+      }
+    });
+  });
+
+  // Requirements are internal (spec: "Requirements and results invisible to applicants"). The public
+  // routes build their payloads field by field, so this pins that no key anywhere in what they return
+  // mentions a Requirement, its keywords or a match.
+  describe('no Requirement reaches the public routes', () => {
+    /** Every object key in a payload, however deep. */
+    const keysOf = (value: unknown): string[] =>
+      Array.isArray(value)
+        ? value.flatMap(keysOf)
+        : value !== null && typeof value === 'object'
+          ? Object.entries(value).flatMap(([key, inner]) => [key, ...keysOf(inner)])
+          : [];
+
+    it('carries no requirement field in the apply page, the listing, the branding or the submit answer', async () => {
+      repository.seedJob({ slug: 'backend', cvMode: 'optional' });
+
+      const payloads = [
+        await service.getPublicJob('acme', 'backend'),
+        await service.listCompanyJobs('acme'),
+        await service.getCompanyBranding('acme'),
+        await service.submit('acme', 'backend', applicant()),
+      ];
+
+      for (const payload of payloads) {
+        expect(keysOf(payload).filter((key) => /requirement|keyword|missedMustHave|mustHave/i.test(key))).toEqual([]);
       }
     });
   });

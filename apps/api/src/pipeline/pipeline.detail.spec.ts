@@ -7,7 +7,7 @@ import type { JobWithStages } from '../jobs/job.js';
 import type { JobsService } from '../jobs/jobs.service.js';
 import type { StorageService } from '../storage/storage.service.js';
 import type { ScreeningFlag } from '@repo/shared';
-import type { ApplicationDetailRow, RatingRow } from './pipeline.js';
+import type { ApplicationDetailRow, CvState, RatingRow, RequirementCheckRow } from './pipeline.js';
 import type { PipelineRepository } from './pipeline.repository.js';
 import { PipelineService } from './pipeline.service.js';
 
@@ -26,13 +26,34 @@ interface StoredRating extends RatingRow {
 }
 
 class InMemoryPipelineRepository implements Pick<PublicApi<PipelineRepository>, 'findDetail'> {
-  private readonly applications: { id: string; companyId: string; jobId: string; flags: ScreeningFlag[] }[] = [];
+  private readonly applications: {
+    id: string;
+    companyId: string;
+    jobId: string;
+    flags: ScreeningFlag[];
+    cvState: CvState;
+    requirementCheck: RequirementCheckRow | null;
+  }[] = [];
   private readonly ratings: StoredRating[] = [];
   /** How many times `findDetail` ran: the detail must not cost a query per Rating. */
   detailReads = 0;
 
-  seedApplication(row: { id: string; companyId?: string; jobId?: string; flags?: ScreeningFlag[] }): void {
-    this.applications.push({ companyId: 'company-1', jobId: 'job-1', flags: [], ...row });
+  seedApplication(row: {
+    id: string;
+    companyId?: string;
+    jobId?: string;
+    flags?: ScreeningFlag[];
+    cvState?: CvState;
+    requirementCheck?: RequirementCheckRow | null;
+  }): void {
+    this.applications.push({
+      companyId: 'company-1',
+      jobId: 'job-1',
+      flags: [],
+      cvState: 'none',
+      requirementCheck: null,
+      ...row,
+    });
   }
 
   seedRating(row: Partial<StoredRating> & { applicationId: string }): void {
@@ -73,6 +94,8 @@ class InMemoryPipelineRepository implements Pick<PublicApi<PipelineRepository>, 
       cvMode: 'off',
       answers: {},
       flags: found.flags,
+      cvState: found.cvState,
+      requirementCheck: found.requirementCheck,
       events: [],
       notes: [],
       ratings,
@@ -283,5 +306,97 @@ describe('PipelineService.detail: Ratings and their summary', () => {
       expect(result.ratings).toHaveLength(1);
       expect(result.ratingSummary).toMatchObject({ count: 1, average: 5 });
     });
+  });
+});
+
+describe('PipelineService.detail: Requirement results and the CV state', () => {
+  const goId = '11111111-1111-4111-8111-111111111111';
+  const sqlId = '22222222-2222-4222-8222-222222222222';
+  const check: RequirementCheckRow = {
+    version: 2,
+    missedMustHave: true,
+    results: {
+      [goId]: { matched: false, terms: [] },
+      [sqlId]: { matched: true, terms: ['SQL'] },
+    },
+    requirements: [
+      { id: goId, text: 'Writes Go', tier: 'must_have', keywords: ['Go', 'Golang'] },
+      { id: sqlId, text: 'Knows SQL', tier: 'nice_to_have', keywords: ['SQL', 'psql'] },
+    ],
+  };
+  let repository: InMemoryPipelineRepository;
+  let service: PipelineService;
+
+  beforeEach(() => {
+    repository = new InMemoryPipelineRepository();
+    service = new PipelineService(
+      repository as unknown as PipelineRepository,
+      new FakeJobs() as unknown as JobsService,
+      { authorize: async () => {} } as unknown as AuthorizationService,
+      {} as StorageService,
+      {} as FormsRepository,
+    );
+  });
+
+  const detail = (role: MemberRole = 'recruiter') => service.detail(member('company-1', role), 'engineer', 'app-1');
+
+  it('lists each Requirement of the checked version with its text, tier, verdict and terms found', async () => {
+    repository.seedApplication({ id: 'app-1', cvState: 'readable', requirementCheck: check });
+
+    const result = await detail();
+
+    expect(result.cvState).toBe('readable');
+    expect(result.requirementCheck).toEqual({
+      version: 2,
+      missedMustHave: true,
+      results: [
+        { id: goId, text: 'Writes Go', tier: 'must_have', matched: false, terms: [] },
+        { id: sqlId, text: 'Knows SQL', tier: 'nice_to_have', matched: true, terms: ['SQL'] },
+      ],
+    });
+  });
+
+  it('shows a Requirement without a stored verdict as not matched rather than dropping it', async () => {
+    repository.seedApplication({
+      id: 'app-1',
+      cvState: 'readable',
+      requirementCheck: { ...check, missedMustHave: false, results: { [sqlId]: { matched: true, terms: ['SQL'] } } },
+    });
+
+    const result = await detail();
+
+    expect(result.requirementCheck?.results.map((r) => [r.id, r.matched])).toEqual([
+      [goId, false],
+      [sqlId, true],
+    ]);
+  });
+
+  it.each(['unreadable', 'failed'] as const)(
+    'gives no verdict for a %s CV, even if a stale row exists',
+    async (cvState) => {
+      repository.seedApplication({ id: 'app-1', cvState, requirementCheck: check });
+
+      const result = await detail();
+
+      expect(result.cvState).toBe(cvState);
+      expect(result.requirementCheck).toBeNull();
+    },
+  );
+
+  it('gives the state none and no check for an Application without CV text', async () => {
+    repository.seedApplication({ id: 'app-1' });
+
+    const result = await detail('interviewer');
+
+    expect(result.cvState).toBe('none');
+    expect(result.requirementCheck).toBeNull();
+  });
+
+  it('returns no CV text, only the state', async () => {
+    repository.seedApplication({ id: 'app-1', cvState: 'readable', requirementCheck: check });
+
+    const result = await detail();
+
+    expect(JSON.stringify(result)).not.toMatch(/cv_?text/i);
   });
 });
