@@ -15,10 +15,11 @@ import {
   touchAutofill,
   touchGroup,
   undoAutofill,
+  type CvLayout,
   type CvText,
   type PublicFormField,
 } from "@repo/shared";
-import { CV_READ_FAILED, CV_SUBMIT_WAIT_MS, readCvText } from "@/lib/cv-reader";
+import { CV_READ_FAILED, CV_SUBMIT_WAIT_MS, readCv, type CvRead } from "@/lib/cv-reader";
 import { emptyEntry, entriesOf, type AnswerInput, type ApplyValues, type EntryInput, type GroupField } from "./apply-values";
 
 /** The repeating group whose form path is `path` (`answers.<key>`), or undefined if it is not one. */
@@ -55,8 +56,8 @@ export function useCvAutofill(
   const generation = useRef(0);
   const mounted = useRef(true);
   // The current CV's read while it runs, and its result once it has finished (for `cvTextForSubmit`).
-  const inFlight = useRef<Promise<CvText> | null>(null);
-  const settled = useRef<CvText | null>(null);
+  const inFlight = useRef<Promise<CvRead> | null>(null);
+  const settled = useRef<CvRead | null>(null);
 
   useEffect(() => {
     mounted.current = true;
@@ -72,8 +73,8 @@ export function useCvAutofill(
   );
 
   const fillFrom = useCallback(
-    (text: string) => {
-      const suggestions = extractContactSuggestions(text, fields);
+    (text: string, layout?: CvLayout) => {
+      const suggestions = extractContactSuggestions(text, fields, layout);
       const suggested = suggestedValues(suggestions);
       const result = applySuggestions(state.current, suggested, (path) =>
         // Read the form now: the applicant may have typed while the CV was being read.
@@ -137,14 +138,15 @@ export function useCvAutofill(
       inFlight.current = null;
       clearSuggestions();
       if (!file) return;
-      const read = readCvText(file);
+      const read = readCv(file);
       inFlight.current = read;
       void read.then((result) => {
         if (!mounted.current || mine !== generation.current) return;
         settled.current = result;
         inFlight.current = null;
-        setCvText(result);
-        if (result.status === "readable") fillFrom(result.text);
+        setCvText(result.cv);
+        // The layout goes to the extractor only; `cvTextForSubmit` below hands out `cv` alone.
+        if (result.cv.status === "readable") fillFrom(result.cv.text, result.layout);
       });
     },
     [fillFrom, clearSuggestions],
@@ -158,15 +160,15 @@ export function useCvAutofill(
    */
   const cvTextForSubmit = useCallback(
     async (timeoutMs: number = CV_SUBMIT_WAIT_MS): Promise<CvText | null> => {
-      if (settled.current) return settled.current;
+      if (settled.current) return settled.current.cv;
       const read = inFlight.current;
       if (!read) return null;
       let timer: ReturnType<typeof setTimeout> | undefined;
-      const timeout = new Promise<CvText>((resolve) => {
-        timer = setTimeout(() => resolve(CV_READ_FAILED), timeoutMs);
+      const timeout = new Promise<CvRead>((resolve) => {
+        timer = setTimeout(() => resolve({ cv: CV_READ_FAILED }), timeoutMs);
       });
       try {
-        return await Promise.race([read, timeout]);
+        return (await Promise.race([read, timeout])).cv;
       } finally {
         clearTimeout(timer);
       }

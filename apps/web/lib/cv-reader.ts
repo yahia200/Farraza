@@ -1,9 +1,11 @@
 import {
   CV_DOCX_TYPE,
   CV_PDF_TYPE,
+  buildLayoutLines,
   contentTypeOf,
   normalizeCvText,
   resolveCvTextStatus,
+  type CvLayout,
   type CvText,
 } from "@repo/shared";
 
@@ -11,7 +13,8 @@ import {
  * Reads the text of the CV the applicant picked, in their browser (ADR-0006). The only module that
  * knows about the PDF and DOCX libraries, so swapping one touches nothing else.
  *
- * - PDF: `unpdf` (`node_modules/unpdf/README.md`: `getDocumentProxy`, `extractText`).
+ * - PDF: `unpdf` (`node_modules/unpdf/README.md`: `getDocumentProxy`, `extractText`, and
+ *   `extractTextItems` for the first page's layout: font size and bold, used to score the name).
  * - DOCX: `mammoth` (`node_modules/mammoth/README.md`, `mammoth.extractRawText`, input
  *   `{ arrayBuffer }` in the browser; types in `lib/index.d.ts`).
  * Both are loaded with `import()` only when a CV is picked
@@ -21,7 +24,16 @@ import {
  * Never throws and never rejects: any failure, a file of another type, or a timeout is
  * `{ text: "", status: "failed" }`. A file that gives (almost) no text is `unreadable`
  * (`resolveCvTextStatus`, the same rule the server applies).
+ *
+ * The result keeps the two apart on purpose: `cv` is what the submit sends (strict schema, text and
+ * status only), `layout` is for the extractor in this browser and is never sent or stored.
  */
+
+/** What a read gives back. `layout` is only ever set for a PDF whose layout could be read. */
+export interface CvRead {
+  cv: CvText;
+  layout?: CvLayout;
+}
 
 /** How long a read may take before it counts as `failed`. */
 export const CV_READ_TIMEOUT_MS = 15_000;
@@ -40,8 +52,8 @@ export const CV_READ_FAILED: CvText = { text: "", status: "failed" };
 
 const FAILED = CV_READ_FAILED;
 
-async function readPdf(data: ArrayBuffer): Promise<string> {
-  const { extractText, getDocumentProxy } = await import("unpdf");
+async function readPdf(data: ArrayBuffer): Promise<{ text: string; layout?: CvLayout }> {
+  const { extractText, extractTextItems, getDocumentProxy } = await import("unpdf");
   const pdf = await getDocumentProxy(new Uint8Array(data), {
     maxImageSize: MAX_IMAGE_PIXELS,
   });
@@ -49,10 +61,25 @@ async function readPdf(data: ArrayBuffer): Promise<string> {
     throw new Error("Too many pages");
   }
   const { text } = await extractText(pdf, { mergePages: true });
-  return text;
+
+  // The layout is a bonus: whatever goes wrong here, the text above is still returned. unpdf's
+  // `extractTextItems` reads every page (no page option; the page cap above bounds it) and we keep
+  // the first, where the name is.
+  let layout: CvLayout | undefined;
+  try {
+    const { items } = await extractTextItems(pdf);
+    // Cleaned like the CV text (symbol-font glyphs come out as control characters), so a layout
+    // line still equals the CV text line it was drawn as.
+    layout = {
+      lines: buildLayoutLines(items[0] ?? []).map((line) => ({ ...line, text: normalizeCvText(line.text) })),
+    };
+  } catch {
+    layout = undefined;
+  }
+  return { text, layout };
 }
 
-async function readDocx(data: ArrayBuffer): Promise<string> {
+async function readDocx(data: ArrayBuffer): Promise<{ text: string; layout?: CvLayout }> {
   // mammoth is CommonJS: the namespace import has the functions on `default` or directly.
   const imported = await import("mammoth");
   const mammoth = imported.default ?? imported;
@@ -61,7 +88,7 @@ async function readDocx(data: ArrayBuffer): Promise<string> {
   // extractors read a blank line as the gap between entries. Halve each run of line breaks so a
   // Word paragraph is one line and an empty paragraph is one blank line (checked with mammoth 1.x
   // on a hand-made DOCX).
-  return value.replace(/\n\n/g, "\n");
+  return { text: value.replace(/\n\n/g, "\n") };
 }
 
 /**
@@ -69,13 +96,13 @@ async function readDocx(data: ArrayBuffer): Promise<string> {
  * thread (README: "no worker"), so a read that is stuck in synchronous code cannot be interrupted;
  * the result is simply ignored when the timeout wins.
  */
-export async function readCvText(
+export async function readCv(
   file: File,
   { timeoutMs = CV_READ_TIMEOUT_MS }: { timeoutMs?: number } = {},
-): Promise<CvText> {
+): Promise<CvRead> {
   const type = contentTypeOf(file);
   if (type !== CV_PDF_TYPE && type !== CV_DOCX_TYPE) {
-    return FAILED;
+    return { cv: FAILED };
   }
 
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -92,12 +119,15 @@ export async function readCvText(
     read.catch(() => {});
     const raw = await Promise.race([read, timeout]);
     if (raw === null) {
-      return FAILED;
+      return { cv: FAILED };
     }
-    const text = normalizeCvText(raw);
-    return { text, status: resolveCvTextStatus(text, "readable") };
+    const text = normalizeCvText(raw.text);
+    return {
+      cv: { text, status: resolveCvTextStatus(text, "readable") },
+      layout: raw.layout,
+    };
   } catch {
-    return FAILED;
+    return { cv: FAILED };
   } finally {
     clearTimeout(timer);
   }
