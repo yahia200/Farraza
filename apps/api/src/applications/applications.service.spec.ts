@@ -2186,6 +2186,20 @@ describe('ApplicationsService', () => {
       expect(repository.requirementResults).toEqual([{ version: 2, results: {}, missedMustHave: false }]);
     });
 
+    it('returns no Requirements, results or marker from the public job payload', async () => {
+      repository.seedJob({
+        slug: 'backend',
+        cvMode: 'optional',
+        requirements: { version: 1, list: [goRequirement] },
+      });
+      await submitCv({ text: cvWithGo, status: 'readable' });
+
+      const body = JSON.stringify(await service.getPublicJob('acme', 'backend'));
+
+      expect(body).not.toMatch(/requirement|missedMustHave|keywords|results/i);
+      expect(body).not.toContain(goRequirement.text);
+    });
+
     it('stores nothing for a job that never had Requirements, and the submit still succeeds', async () => {
       repository.seedJob({ slug: 'backend', cvMode: 'optional' });
 

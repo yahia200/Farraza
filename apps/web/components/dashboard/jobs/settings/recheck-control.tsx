@@ -4,7 +4,7 @@ import { nextPoll, recheckButton, type RecheckPoll, type RecheckStatus } from '@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { RefreshCwIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
-import { getRecheckCount, getRecheckStatus, startRecheck } from '@/app/actions/jobs';
+import { getRecheckCount, getRecheckStatus, refreshCandidates, startRecheck } from '@/app/actions/jobs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -132,7 +132,12 @@ export function RecheckControl({ companySlug, jobSlug }: { companySlug: string; 
         } else {
           toast.add({ type: 'success', title: 'Re-check finished' });
         }
+        // The old count is stale now; `null` keeps the button disabled until the fresh one arrives (seen in the
+        // ticket 09 browser pass: it was enabled for ~50 ms, showing the pre-run number, a double-click window).
+        setCount(null);
         void refreshCount();
+        // Drops the cached board, table and sheet so the new markers show (they never revalidate otherwise).
+        void refreshCandidates(companySlug, jobSlug).catch(() => {});
         return;
       }
       timer = setTimeout(tick, POLL_INTERVAL_MS);
@@ -143,7 +148,7 @@ export function RecheckControl({ companySlug, jobSlug }: { companySlug: string; 
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [polling, readStatus, refreshCount]);
+  }, [polling, readStatus, refreshCount, companySlug, jobSlug]);
 
   const button = recheckButton({ count, status, starting });
 

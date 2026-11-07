@@ -35,6 +35,13 @@ import { toast } from '@/components/ui/toast';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 /**
+ * The ToggleGroup's selected fill is --muted, which is nearly the card's own background in the dark theme, so
+ * the chosen tier was indistinguishable (seen in the ticket 09 browser pass). Dim the unchosen item's text so
+ * the choice reads without relying on the fill.
+ */
+const TIER_ITEM_CLASS = 'gap-2 text-muted-foreground aria-pressed:text-foreground';
+
+/**
  * The Requirements editor on the Job's Settings tab (spec: .scratch/keyword-match/spec.md, "Web";
  * GLOSSARY.md "Requirement"). A manager adds, edits, reorders and removes Requirements (a description,
  * a tier and the keywords that count as evidence in a CV) and saves the whole list at once
@@ -318,11 +325,11 @@ function RequirementCard({
           }
         }}
       >
-        <ToggleGroupItem value="must_have" className="gap-2">
+        <ToggleGroupItem value="must_have" className={TIER_ITEM_CLASS}>
           <CircleAlertIcon />
           Must have
         </ToggleGroupItem>
-        <ToggleGroupItem value="nice_to_have" className="gap-2">
+        <ToggleGroupItem value="nice_to_have" className={TIER_ITEM_CLASS}>
           <SparklesIcon />
           Nice to have
         </ToggleGroupItem>

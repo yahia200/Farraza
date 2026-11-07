@@ -349,8 +349,8 @@ export async function getRecheckCount(companySlug: string, jobSlug: string): Pro
 /**
  * Starts a Re-check (POST .../jobs/:jobSlug/recheck, 202 with the status). The API makes this a no-op
  * while a run is waiting or active and queues nothing at a count of zero, so a repeat call is harmless.
- * Needs the permission that saves Requirements (interviewers get 403). No page revalidation: the results
- * change nothing the Settings page renders; the board and list read them on their next load.
+ * Needs the permission that saves Requirements (interviewers get 403). No page revalidation here: the run
+ * is not finished yet. The control calls `refreshCandidates` when polling sees it end.
  */
 export async function startRecheck(companySlug: string, jobSlug: string): Promise<StartRecheckResult> {
   const response = await apiFetch(recheckPath(companySlug, jobSlug), { method: 'POST' });
@@ -385,4 +385,14 @@ export async function getRecheckStatus(companySlug: string, jobSlug: string): Pr
   }
   const status = parseRecheckStatus(await response.json());
   return status ? { ok: true, status } : { ok: false, message: GENERIC_FAILURE_MESSAGE };
+}
+
+/**
+ * Called by the Re-check control when a run has finished: the board, table and sheet read the stored
+ * results through `use cache: private` DAL functions (lib/dal.ts), which nothing else invalidates, so
+ * without this they kept showing the pre-run markers (found in the ticket 09 browser pass). Revalidates
+ * the candidates path only; it reads nothing and changes nothing.
+ */
+export async function refreshCandidates(companySlug: string, jobSlug: string): Promise<void> {
+  revalidatePath(`/dashboard/${companySlug}/jobs/${jobSlug}/candidates`);
 }
