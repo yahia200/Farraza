@@ -9,12 +9,12 @@
 
 **Blocked by:** 05, 08.
 
-**Status:** open
+**Status:** resolved
 
-- [ ] The flow above works end to end and is described in the PR
-- [ ] No public route or Member payload exposes CV text, Requirements or results beyond the Member routes in the spec
-- [ ] Every doc listed above is updated
-- [ ] `pnpm lint`, `pnpm check-types` and both test suites pass
+- [x] The flow above works end to end and is described in the PR
+- [x] No public route or Member payload exposes CV text, Requirements or results beyond the Member routes in the spec
+- [x] Every doc listed above is updated
+- [x] `pnpm lint`, `pnpm check-types` and both test suites pass
 
 ## Result and the owner's open question (2026-11-07)
 

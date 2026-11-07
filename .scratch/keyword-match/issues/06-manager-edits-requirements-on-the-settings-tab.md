@@ -8,9 +8,9 @@
 
 **Blocked by:** 03.
 
-**Status:** open
+**Status:** resolved
 
-- [ ] Add, edit, reorder and remove Requirements; tier toggles; keywords as an editable list
-- [ ] The caps are enforced with clear messages from the shared validator
-- [ ] Saving an unchanged list does not create a version (no visible change)
-- [ ] `pnpm lint`, `pnpm check-types` and both test suites pass
+- [x] Add, edit, reorder and remove Requirements; tier toggles; keywords as an editable list
+- [x] The caps are enforced with clear messages from the shared validator
+- [x] Saving an unchanged list does not create a version (no visible change)
+- [x] `pnpm lint`, `pnpm check-types` and both test suites pass

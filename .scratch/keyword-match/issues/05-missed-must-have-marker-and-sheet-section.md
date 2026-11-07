@@ -9,10 +9,10 @@
 
 **Blocked by:** 04.
 
-**Status:** open
+**Status:** resolved
 
-- [ ] The marker appears only for a missed must-have, never for a missed nice-to-have
-- [ ] An unreadable or failed CV never shows a marker or a "not matched" verdict
-- [ ] No Member or public payload contains CV text (tested)
-- [ ] Web follows the existing marker and sheet patterns in `.claude/rules/web.md`
-- [ ] `pnpm lint`, `pnpm check-types` and both test suites pass
+- [x] The marker appears only for a missed must-have, never for a missed nice-to-have
+- [x] An unreadable or failed CV never shows a marker or a "not matched" verdict
+- [x] No Member or public payload contains CV text (tested)
+- [x] Web follows the existing marker and sheet patterns in `.claude/rules/web.md`
+- [x] `pnpm lint`, `pnpm check-types` and both test suites pass

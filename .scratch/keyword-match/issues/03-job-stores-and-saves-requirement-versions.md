@@ -9,13 +9,13 @@
 
 **Blocked by:** 02.
 
-**Status:** open
+**Status:** resolved
 
-- [ ] A changed save creates version N+1; an unchanged save creates none
-- [ ] An empty list creates a version with no Requirements
-- [ ] Older versions are never modified
-- [ ] Requirement ids stay stable when the manager edits an existing one
-- [ ] No public route returns Requirements (tested)
-- [ ] Service specs in the `jobs.service.spec.ts` style cover every case
-- [ ] `.claude/rules/api.md` updated
-- [ ] `pnpm lint`, `pnpm check-types` and both test suites pass
+- [x] A changed save creates version N+1; an unchanged save creates none
+- [x] An empty list creates a version with no Requirements
+- [x] Older versions are never modified
+- [x] Requirement ids stay stable when the manager edits an existing one
+- [x] No public route returns Requirements (tested)
+- [x] Service specs in the `jobs.service.spec.ts` style cover every case
+- [x] `.claude/rules/api.md` updated
+- [x] `pnpm lint`, `pnpm check-types` and both test suites pass

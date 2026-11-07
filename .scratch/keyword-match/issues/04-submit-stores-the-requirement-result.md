@@ -8,11 +8,11 @@
 
 **Blocked by:** 02, 03.
 
-**Status:** open
+**Status:** resolved
 
-- [ ] A readable CV with a current version stores a result with the right version reference
-- [ ] A Job with no version, or an unreadable, failed or missing CV, stores nothing
-- [ ] The submit still succeeds when the matcher has nothing to do
-- [ ] `docs/db-schema.md` updated for the table and its conventions
-- [ ] Service specs in the `applications.service.spec.ts` style cover every case
-- [ ] `pnpm lint`, `pnpm check-types` and both test suites pass
+- [x] A readable CV with a current version stores a result with the right version reference
+- [x] A Job with no version, or an unreadable, failed or missing CV, stores nothing
+- [x] The submit still succeeds when the matcher has nothing to do
+- [x] `docs/db-schema.md` updated for the table and its conventions
+- [x] Service specs in the `applications.service.spec.ts` style cover every case
+- [x] `pnpm lint`, `pnpm check-types` and both test suites pass
