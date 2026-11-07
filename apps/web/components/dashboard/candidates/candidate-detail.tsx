@@ -13,6 +13,7 @@ import { CandidateActivity } from './candidate-activity';
 import { CandidateFile } from './candidate-file';
 import { CandidateMove } from './candidate-move';
 import { CandidateRatings } from './candidate-ratings';
+import { CandidateRequirements } from './candidate-requirements';
 import { CandidateStageBadges } from './candidate-stage-badges';
 import { formatAnswer } from './format-answer';
 
@@ -157,6 +158,8 @@ export async function CandidateDetail({
             )}
           </section>
         )}
+
+        <CandidateRequirements cvState={application.cvState} check={application.requirementCheck} />
 
         <section aria-labelledby="candidate-answers" className="flex flex-col gap-3">
           <h3 id="candidate-answers" className="text-sm font-medium">
