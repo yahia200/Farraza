@@ -456,7 +456,7 @@ One immutable version of a Job's **Requirements** (`GLOSSARY.md`, `.scratch/keyw
 - Written only by `PUT /api/companies/:companySlug/jobs/:jobSlug/requirements` (`JobsService.saveRequirements`).
 
 ### 3.24 `application_requirement_results` (model `ApplicationRequirementResult`)
-What a Job's **Requirements** said about one Application's CV text (`GLOSSARY.md`, `.scratch/keyword-match/spec.md`). At most one row per Application, written in the submit transaction after the Application and its `cv_texts` row (`ApplicationsRepository.submit`). **Never read by a public route.**
+What a Job's **Requirements** said about one Application's CV text (`GLOSSARY.md`, `.scratch/keyword-match/spec.md`). At most one row per Application, written in the submit transaction after the Application and its `cv_texts` row (`ApplicationsRepository.submit`). **Never read by a public route** (checked ticket 09: the public job payload and the submit answer carry no Requirement, result or marker, and `applications.service.spec.ts` pins it). No row is written for an `unreadable`, `failed` or missing CV; a CV under `CV_TEXT_MIN_LENGTH` (100) characters after trimming is stored as `unreadable`. Checked end to end: no schema change was needed.
 
 | Column | Field | Type | Constraints |
 |---|---|---|---|
