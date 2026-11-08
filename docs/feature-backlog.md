@@ -52,9 +52,29 @@ v1 shipped deliberately narrow (`.scratch/repeating-groups/spec.md`, "Out of Sco
 
 Rank candidates by topical similarity between the CV and each Requirement ("Best match" sort, strong or weak per Requirement). Advisory only, never auto-rejects.
 
-- Needs a background embed step and vector storage (plain `jsonb`/`real[]` with cosine in app code is enough at this scale).
-- Hosted (about $0.00003 per candidate) or a local English-only model. Open decision.
+Design in the grilling session of 2026-11-08; notes and measurements in [`.scratch/candidate-matching/layer3-embeddings-notes.md`](../.scratch/candidate-matching/layer3-embeddings-notes.md). Not yet a spec.
+
+- Needs a background embed step and vector storage (a `real[]` column with cosine in app code; pgvector only if cross-Job search appears).
+- An `Embedder` interface over an HTTP API: Ollama (`qwen3-embedding:0.6b`) in development, production undecided (possibly OpenAI).
+- It shares Layer 2's Requirement list and versions, embeds each Requirement's `text` only, and stores a score per Application so "Best match" is a plain `ORDER BY`.
 - Build only if Layer 2 does not rank well enough.
+- **URGENT before shipping: test the strong/weak cutoffs on real CVs.** The values (strong at 0.65 and above, weak below 0.50) come from a few invented paragraphs, so they are placeholders. Wrong cutoffs would label candidates misleadingly. Do this with 10 to 20 real CVs (kept out of git) and a few real Requirements, and re-test the instruction prefix wording at the same time.
+
+### Candidate list pagination
+
+The candidate list returns every Application at once (nothing in `apps/api/src/applications` limits or pages it). With Jobs of up to 500 Applications that will get heavy. Split out of Layer 3 on 2026-11-08.
+
+- Check how the board (all cards per stage) and the table each fetch before choosing offset or cursor paging.
+- Once it lands, the list API must sort by Layer 3's stored score on the server.
+
+### Job tiers and the Application limit
+
+Split out of Layer 3 on 2026-11-08 (decided out of scope for that slice). The glossary already defines **Application limit** and **Edit limit**; Layer 3 ships with one fixed edit limit of 100 for every Job (`.scratch/candidate-matching/layer3-spec.md`).
+
+- **Application limit:** the most Applications a Job accepts; at the limit the public apply page closes. Owner's figures: 200 on the standard tier and 500 on a more expensive one.
+- **Edit limit per tier:** the number of Applications after which a Job's Requirements and other cost-driving settings lock. 100 for every tier for now; the owner expects more tier granularity later, so store the numbers on the Job and not as global constants once tiers exist.
+- **Feature gating:** Layer 2 stays on every tier. Whether Layer 3 is limited to the higher tier is a pricing choice, not a cost one (about $0.02 per 500 candidates hosted); Layer 4 is where cost bites (roughly $7 to $14 for 300 candidates on Sonnet or Opus, `layers.md`). Decide gating in one helper function so changing it is a one-line edit.
+- **Open:** how a Job gets its tier, whether it can be upgraded after the edit limit is hit, and where the tier lives (Job or company). Related: "Duplicate a locked Job as a new Job" in Low priority.
 
 ### Candidate matching, Layer 4: LLM scoring
 
@@ -106,3 +126,11 @@ Bound how many password hashes run at once, so a burst of sign-in attempts from 
 - **Check first whether this is needed at all for a small team's app.** The per-visitor limits on sign-in and sign-up already bound each address. Weigh the cost of a distributed burst (rare for a small private tool) against the extra code and the chance of turning away real sign-ins.
 - **Before lowering the hash cost:** `logN: 17` is the library's stated OWASP minimum (N=2^17, r=8, p=1). OWASP's Password Storage Cheat Sheet lists other scrypt settings that trade memory for CPU; read it before weakening anything (not yet verified). The security review's "logN 15 is fine" claim contradicts the library comment.
 - Also check the memory size of the API's Cloud Run service (not in the repo): four concurrent hashes are about 512 MiB before Node itself.
+
+### Duplicate a locked Job as a new Job
+
+Let a recruiter copy a Job whose cost-driving settings are locked, to get a fresh, editable Job. Decided in the Layer 3 grilling session of 2026-11-08, and deliberately left out of the Layer 3 slice: a locked Job stays locked, and the UI only explains why.
+
+- **Why it exists:** once a Job reaches its editing limit (the number of Applications after which the Requirements and the Layer 3 and 4 settings can no longer change), a recruiter who got them wrong has no way out. This is that way out. Note the two separate limits: the editing limit (settings lock) and the acceptance limit (200, or 500 on the premium tier; the apply page closes).
+- **What to copy:** title, description, the form's latest published version, stages, Screening rules, Rating criteria, Requirements and the Layer 3 and 4 settings. Do not copy Applications, results or vectors.
+- **Open:** what the copy's slug and status are, whether the original closes automatically, and whether duplicating is allowed on unlocked Jobs too (it probably is).
