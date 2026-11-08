@@ -1,9 +1,9 @@
 import { Suspense, type ReactNode } from 'react';
 import { FormSkeleton, SkeletonGroup } from '@/components/dashboard/skeletons';
-import { getCompany, getJob, type CompanyJob, type JobStage, type MyCompany } from '@/lib/dal';
+import { getCompany, getJob, type LoadedJob, type MyCompany } from '@/lib/dal';
 
 type JobParams = Promise<{ companySlug: string; jobSlug: string }>;
-export type LoadedJob = CompanyJob & { stages: JobStage[]; requirementsLocked: boolean };
+export type { LoadedJob };
 
 /**
  * Like CompanyPage, for /dashboard/[companySlug]/jobs/[jobSlug]/…: awaits the
