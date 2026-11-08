@@ -22,13 +22,11 @@ export interface DataTableColumnMeta {
   className?: string;
 }
 
-const metaOf = (column: { columnDef: { meta?: unknown } }) => column.columnDef.meta as DataTableColumnMeta | undefined;
+const metaOf = (column: { columnDef: { meta?: unknown } }) =>
+  column.columnDef.meta as DataTableColumnMeta | undefined;
 
 /** Only tables that register rowSortingFeature give columns these methods. */
-type SortableColumn = {
-  getIsSorted?: () => false | 'asc' | 'desc';
-  toggleSorting?: (desc?: boolean) => void;
-};
+type SortableColumn = { getIsSorted?: () => false | 'asc' | 'desc'; toggleSorting?: (desc?: boolean) => void };
 const sortStateOf = (column: unknown) => (column as SortableColumn).getIsSorted?.() ?? false;
 
 /**

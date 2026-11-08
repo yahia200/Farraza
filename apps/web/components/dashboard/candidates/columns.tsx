@@ -92,7 +92,7 @@ const contactColumn = columnHelper.display({
   meta: { className: 'w-px' },
 });
 
-const stageColumn = columnHelper.accessor((row) => row.stage.position, {
+const stageColumn =columnHelper.accessor((row) => row.stage.position, {
   id: 'stage',
   header: ({ column }) => <DataTableSortButton column={column}>Stage</DataTableSortButton>,
   // Sorted and filtered by pipeline position, shown by name.
@@ -149,7 +149,10 @@ function highlightColumn({ key, label, kind }: HighlightedQuestion) {
       </DataTableSortButton>
     ),
     cell: ({ row }) => (
-      <HighlightAnswer answer={row.original.highlights[key] ?? null} className={`block ${HIGHLIGHT_WIDTH} truncate`} />
+      <HighlightAnswer
+        answer={row.original.highlights[key] ?? null}
+        className={`block ${HIGHLIGHT_WIDTH} truncate`}
+      />
     ),
   });
 }
