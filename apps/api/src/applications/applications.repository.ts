@@ -220,7 +220,7 @@ export class ApplicationsRepository {
    */
   async submit(input: NewApplication): Promise<SubmitResult> {
     try {
-      await this.prisma.db.transaction(async (tx) => {
+      const applicationId = await this.prisma.db.transaction(async (tx) => {
         const candidate = await tx.orm.public.Candidate.upsert({
           create: { companyId: input.companyId, ...input.candidate },
           update: { name: input.candidate.name, phone: input.candidate.phone },
@@ -309,8 +309,23 @@ export class ApplicationsRepository {
             missedMustHave: input.requirementResult.missedMustHave,
           });
         }
+
+        // Layer 3 (docs/db-schema.md §3.27): the pending or not-scored row. Written here, not by the
+        // embedding-match repository, because it must share this transaction. Scoring later replaces it
+        // (`EmbeddingMatchRepository.saveScore` upserts on UNIQUE (application_id)).
+        if (input.matchScore) {
+          await tx.orm.public.ApplicationMatchScore.create({
+            companyId: input.companyId,
+            jobId: input.jobId,
+            applicationId: application.id,
+            requirementsVersion: input.matchScore.requirementsVersion,
+            status: input.matchScore.status,
+            reason: input.matchScore.status === 'not_scored' ? input.matchScore.reason : null,
+          });
+        }
+        return application.id;
       });
-      return 'created';
+      return { status: 'created', applicationId };
     } catch (error) {
       if (error instanceof FileConflict) {
         return { status: 'file_conflict', fileId: error.fileId };

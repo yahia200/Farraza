@@ -29,9 +29,18 @@ import {
   type FieldError,
   type ScreeningFlag,
 } from '@repo/shared';
+import { MatchScoringQueue } from '../embedding-match/match-scoring.queue.js';
+import type { ScoreTarget } from '../embedding-match/embedding-match.js';
 import { SNIFF_BYTES, sniffFileType } from '../storage/file-sniff.js';
 import { StorageService } from '../storage/storage.service.js';
-import type { FileToAttach, FileToVerify, NewCvText, NewRequirementResult, OpenJob } from './application.js';
+import type {
+  FileToAttach,
+  FileToVerify,
+  NewCvText,
+  NewMatchScore,
+  NewRequirementResult,
+  OpenJob,
+} from './application.js';
 import { ApplicationsRepository } from './applications.repository.js';
 import type { CreateUploadDto } from './dto/create-upload.dto.js';
 import type { SubmitApplicationDto } from './dto/submit-application.dto.js';
@@ -43,6 +52,7 @@ export class ApplicationsService {
   constructor(
     private readonly applications: ApplicationsRepository,
     private readonly storage: StorageService,
+    private readonly matchScoring: MatchScoringQueue,
   ) {}
 
   /**
@@ -211,6 +221,7 @@ export class ApplicationsService {
     const placedIn = rejected ? found.rejectedStageId : found.firstStageId;
 
     const cvText = this.buildCvText(found, files, dto);
+    const matchScore = this.initialMatchScore(found, cvText);
     const result = await this.applications.submit({
       companyId: found.company.id,
       jobId: found.job.id,
@@ -223,6 +234,7 @@ export class ApplicationsService {
       files,
       cvText,
       requirementResult: this.checkRequirements(found, cvText),
+      matchScore,
       source,
       events: [
         { type: 'applied', fromStageId: null, toStageId: found.firstStageId, data: { source } },
@@ -245,10 +257,50 @@ export class ApplicationsService {
     if (result === 'duplicate') {
       throw new ConflictException("You've already applied for this job.");
     }
-    if (typeof result === 'object') {
+    if (result.status === 'file_conflict') {
       throw fileConflict(wanted.find((file) => file.id === result.fileId));
     }
+
+    // After the commit, so a job never sees an Application that does not exist yet. A pending row
+    // means a job is owed; an unreadable CV was already written as not scored and needs none.
+    if (result.status === 'created' && matchScore?.status === 'pending') {
+      await this.enqueueScoring({
+        companyId: found.company.id,
+        jobId: found.job.id,
+        applicationId: result.applicationId,
+      });
+    }
     return { received: true };
+  }
+
+  /**
+   * Queues the Application's scoring job. A refusal is logged and swallowed: the Application is
+   * saved and the applicant must not see an error for a background step (ADR-0007). The row stays
+   * `pending`; the Re-check second stage (ticket 11) finds such rows.
+   */
+  private async enqueueScoring(target: ScoreTarget): Promise<void> {
+    try {
+      await this.matchScoring.enqueue(target);
+    } catch (error) {
+      this.logger.error(
+        `Could not queue scoring for application ${target.applicationId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * The Layer 3 score row to write with the Application (spec "Database"): none when Layer 3 is off,
+   * when the Job has no Requirements to score against (checked before the CV, like
+   * `EmbeddingMatchService.score`), or when there is no CV; `not_scored` at once for a CV that is not
+   * `readable`; otherwise `pending`, with the job queued after the commit.
+   */
+  private initialMatchScore(found: OpenJob, cvText: NewCvText | null): NewMatchScore | null {
+    if (!this.matchScoring.enabled) return null;
+    if (!found.requirements || found.requirements.list.length === 0 || !cvText) return null;
+    const requirementsVersion = found.requirements.version;
+    return cvText.status === 'readable'
+      ? { status: 'pending', requirementsVersion }
+      : { status: 'not_scored', reason: 'cv_unreadable', requirementsVersion };
   }
 
   /**

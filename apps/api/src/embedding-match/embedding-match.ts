@@ -68,4 +68,18 @@ export type ScoreOutcome =
   /** The Job has no Requirements (or an empty current list): nothing to score against. */
   | { outcome: 'no_requirements' }
   | { outcome: 'scored'; overall: number }
-  | { outcome: 'not_scored'; reason: NotScoredReason };
+  | { outcome: 'not_scored'; reason: NotScoredReason }
+  /**
+   * The embedder failed and the caller said the run will be retried (`retryable`): nothing was
+   * written, so a `pending` row stays `pending` instead of flickering to `not_scored` and back.
+   */
+  | { outcome: 'embedder_failed' };
+
+export interface ScoreOptions {
+  /**
+   * True when the caller will run the scoring again if the embedder fails (a queue attempt that is
+   * not the last). The failure is then returned as `embedder_failed` without writing a row. False
+   * (the default) writes `not_scored / embedder_failed` at once.
+   */
+  retryable?: boolean;
+}

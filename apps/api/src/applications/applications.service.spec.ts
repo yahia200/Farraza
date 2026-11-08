@@ -46,11 +46,14 @@ import type {
   FileToVerify,
   NewApplication,
   NewCvText,
+  NewMatchScore,
   NewPendingFile,
   NewRequirementResult,
   OpenJob,
   SubmitResult,
 } from './application.js';
+import type { ScoreTarget } from '../embedding-match/embedding-match.js';
+import type { MatchScoringQueue } from '../embedding-match/match-scoring.queue.js';
 import type { ApplicationsRepository } from './applications.repository.js';
 import { ApplicationsService } from './applications.service.js';
 import type { SubmitApplicationDto } from './dto/submit-application.dto.js';
@@ -79,6 +82,8 @@ class InMemoryApplicationsRepository implements PublicApi<ApplicationsRepository
   readonly cvTexts: NewCvText[] = [];
   /** The `application_requirement_results` table: at most one row per Application, written with it. */
   readonly requirementResults: NewRequirementResult[] = [];
+  /** The `application_match_scores` table: at most one row per Application, written with it. */
+  readonly matchScores: Array<NewMatchScore & { applicationId: string }> = [];
   /** Every company a job was seeded for, with its public branding — so the listing knows it exists. */
   private readonly companies = new Map<string, OpenJob['company']>();
   /** One row per seeded job (open or not), for the public listing: like the `jobs` table's rows. */
@@ -290,7 +295,23 @@ class InMemoryApplicationsRepository implements PublicApi<ApplicationsRepository
     // Same transaction as the Application: only reached when nothing above refused the submit.
     if (input.cvText) this.cvTexts.push(input.cvText);
     if (input.requirementResult) this.requirementResults.push(input.requirementResult);
-    return 'created';
+    if (input.matchScore) this.matchScores.push({ ...input.matchScore, applicationId });
+    return { status: 'created', applicationId };
+  }
+}
+
+/**
+ * Stands in for `MatchScoringQueue`: records what was queued, and can be told to be off (Layer 3
+ * not configured) or to refuse (the queue's database is down).
+ */
+class FakeMatchScoring implements PublicApi<MatchScoringQueue> {
+  enabled = true;
+  failEnqueue = false;
+  readonly enqueued: ScoreTarget[] = [];
+
+  async enqueue(target: ScoreTarget): Promise<void> {
+    if (this.failEnqueue) throw new Error('queue unavailable');
+    this.enqueued.push(target);
   }
 }
 
@@ -370,15 +391,18 @@ const MB = 1024 * 1024;
 describe('ApplicationsService', () => {
   let repository: InMemoryApplicationsRepository;
   let storage: FakeStorage;
+  let matchScoring: FakeMatchScoring;
   let service: ApplicationsService;
 
   beforeEach(() => {
     repository = new InMemoryApplicationsRepository();
     storage = new FakeStorage();
+    matchScoring = new FakeMatchScoring();
     // `new` rather than a Nest provider: Vitest doesn't emit decorator metadata (see jobs.service.spec.ts).
     service = new ApplicationsService(
       repository as unknown as ApplicationsRepository,
       storage as unknown as StorageService,
+      matchScoring as unknown as MatchScoringQueue,
     );
   });
 
@@ -2263,6 +2287,133 @@ describe('ApplicationsService', () => {
       await expect(service.submit('acme', 'backend', body)).rejects.toBeInstanceOf(ConflictException);
 
       expect(repository.requirementResults).toEqual([]);
+    });
+  });
+
+  // Embedding match (Layer 3, ticket 07): a pending or not-scored row is written in the submit
+  // transaction, and one scoring job is queued after the commit. The queue is a fake: the worker is
+  // covered by embedding-match/match-scoring.processor.spec.ts.
+  describe('Embedding match scoring', () => {
+    const postgresId = '6f1b7f0e-3c53-4d6e-9a53-0c7e2f6a1b01';
+    const postgres: Requirement = { id: postgresId, text: 'Experience with PostgreSQL', tier: 'must_have', keywords: [] };
+    const cv =
+      'Database engineer. Ran production Postgres clusters for several years, tuning queries and leading a small team of engineers.';
+
+    function seedWithRequirements(version = 2) {
+      return repository.seedJob({ slug: 'backend', cvMode: 'optional', requirements: { version, list: [postgres] } });
+    }
+
+    async function submitCv(cvText?: SubmitApplicationDto['cvText']) {
+      const fileId = await uploadCv(samplePdf());
+      return service.submit('acme', 'backend', applicant({ cvFileId: fileId, ...(cvText ? { cvText } : {}) }));
+    }
+
+    it('writes a pending row for a readable CV and queues one job for the new Application', async () => {
+      const job = seedWithRequirements(2);
+
+      await expect(submitCv({ text: cv, status: 'readable' })).resolves.toEqual({ received: true });
+
+      expect(repository.matchScores).toEqual([
+        { status: 'pending', requirementsVersion: 2, applicationId: 'application-1' },
+      ]);
+      expect(matchScoring.enqueued).toEqual([
+        { companyId: job.company.id, jobId: job.job.id, applicationId: 'application-1' },
+      ]);
+    });
+
+    it.each([
+      ['unreadable', { text: 'scan', status: 'unreadable' as const }],
+      ['failed', { text: '', status: 'failed' as const }],
+      ['missing text (the browser could not read it)', undefined],
+    ])('writes a not-scored row at once for a %s CV, and queues nothing', async (_name, cvText) => {
+      seedWithRequirements(2);
+
+      await expect(submitCv(cvText)).resolves.toEqual({ received: true });
+
+      expect(repository.matchScores).toEqual([
+        { status: 'not_scored', reason: 'cv_unreadable', requirementsVersion: 2, applicationId: 'application-1' },
+      ]);
+      expect(matchScoring.enqueued).toEqual([]);
+    });
+
+    it('writes no row and queues nothing when the Application has no CV', async () => {
+      repository.seedJob({ slug: 'backend', cvMode: 'off', requirements: { version: 1, list: [postgres] } });
+
+      await expect(service.submit('acme', 'backend', applicant())).resolves.toEqual({ received: true });
+
+      expect(repository.matchScores).toEqual([]);
+      expect(matchScoring.enqueued).toEqual([]);
+    });
+
+    it('writes no row and queues nothing for a Job with no Requirements to score against', async () => {
+      repository.seedJob({ slug: 'backend', cvMode: 'optional' });
+
+      await submitCv({ text: cv, status: 'readable' });
+
+      expect(repository.matchScores).toEqual([]);
+      expect(matchScoring.enqueued).toEqual([]);
+    });
+
+    it('writes no row for a Job whose current version has an empty list', async () => {
+      repository.seedJob({ slug: 'backend', cvMode: 'optional', requirements: { version: 3, list: [] } });
+
+      await submitCv({ text: cv, status: 'readable' });
+
+      expect(repository.matchScores).toEqual([]);
+      expect(matchScoring.enqueued).toEqual([]);
+    });
+
+    it('writes nothing and queues nothing while Layer 3 is off', async () => {
+      seedWithRequirements();
+      matchScoring.enabled = false;
+
+      await expect(submitCv({ text: cv, status: 'readable' })).resolves.toEqual({ received: true });
+
+      expect(repository.applications).toHaveLength(1);
+      expect(repository.matchScores).toEqual([]);
+      expect(matchScoring.enqueued).toEqual([]);
+    });
+
+    it('writes no not-scored row for an unreadable CV while Layer 3 is off', async () => {
+      seedWithRequirements();
+      matchScoring.enabled = false;
+
+      await expect(submitCv({ text: 'scan', status: 'unreadable' })).resolves.toEqual({ received: true });
+
+      expect(repository.matchScores).toEqual([]);
+      expect(matchScoring.enqueued).toEqual([]);
+    });
+
+    it('still succeeds, keeping the pending row, when the queue refuses the job', async () => {
+      seedWithRequirements();
+      matchScoring.failEnqueue = true;
+
+      await expect(submitCv({ text: cv, status: 'readable' })).resolves.toEqual({ received: true });
+
+      expect(repository.applications).toHaveLength(1);
+      expect(repository.matchScores).toMatchObject([{ status: 'pending', applicationId: 'application-1' }]);
+    });
+
+    it('queues nothing when the submit is refused', async () => {
+      seedWithRequirements();
+      const fileId = await uploadCv(samplePdf());
+      const body = applicant({ cvFileId: fileId, cvText: { text: cv, status: 'readable' } });
+      await service.submit('acme', 'backend', body);
+      matchScoring.enqueued.length = 0;
+      repository.matchScores.length = 0;
+
+      await expect(service.submit('acme', 'backend', body)).rejects.toBeInstanceOf(ConflictException);
+
+      expect(repository.matchScores).toEqual([]);
+      expect(matchScoring.enqueued).toEqual([]);
+    });
+
+    it('returns no score, status or queue detail from the submit', async () => {
+      seedWithRequirements();
+
+      const body = JSON.stringify(await submitCv({ text: cv, status: 'readable' }));
+
+      expect(body).not.toMatch(/score|pending|queue|application-1/i);
     });
   });
 
