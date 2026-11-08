@@ -14,6 +14,7 @@ import {
   parseFormFields,
   SCREENING_RULES_LIMIT,
   REQUIREMENTS_LIMIT,
+  REQUIREMENT_EDIT_LIMIT,
   type FormFields,
   type Requirement,
   type ScreeningRule,
@@ -50,7 +51,19 @@ class InMemoryJobsRepository implements PublicApi<JobsRepository> {
   private readonly jobs: { companyId: string; job: JobWithStages }[] = [];
   private readonly publishedFormJobIds = new Set<string>();
   private readonly requirementVersions: RequirementVersion[] = [];
+  private readonly applicationStatuses = new Map<string, string[]>();
   private nextId = 1;
+
+  /** Test setup: the job holds `count` more Applications, all in `status`. */
+  seedApplications(job: JobWithStages, count: number, status = 'active'): void {
+    const existing = this.applicationStatuses.get(job.id) ?? [];
+    this.applicationStatuses.set(job.id, [...existing, ...new Array<string>(count).fill(status)]);
+  }
+
+  /** Every Application counts, whatever its status (mirrors the real unfiltered count). */
+  async countApplications(_companyId: string, jobId: string): Promise<number> {
+    return this.applicationStatuses.get(jobId)?.length ?? 0;
+  }
 
   /** Test setup: a draft job with the default stages. */
   seedJob(companyId: string, title: string): JobWithStages {
@@ -1218,6 +1231,98 @@ describe('JobsService', () => {
       await expect(save(job.slug, [req(1)])).rejects.toBeInstanceOf(
         ConflictException,
       );
+    });
+  });
+
+  describe('the Edit limit', () => {
+    const req = (n: number): Requirement => ({
+      id: `50000000-0000-4000-8000-${String(n).padStart(12, '0')}`,
+      text: `Requirement ${n}`,
+      tier: 'must_have',
+      keywords: ['postgres'],
+    });
+    const save = (slug: string, requirements: Requirement[], role: MemberRole = 'recruiter') =>
+      service.saveRequirements(user, membershipWithRole(role), slug, { requirements });
+    const detail = (slug: string) => service.getDetail(membershipWithRole('owner'), slug);
+
+    it('allows a save one Application below the limit', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+      jobs.seedApplications(job, REQUIREMENT_EDIT_LIMIT - 1);
+
+      await expect(save(job.slug, [req(1)])).resolves.toMatchObject({ version: 1 });
+    });
+
+    it('refuses a save at the limit with a 409 that says why', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+      jobs.seedApplications(job, REQUIREMENT_EDIT_LIMIT);
+
+      const refused = save(job.slug, [req(1)]);
+
+      await expect(refused).rejects.toBeInstanceOf(ConflictException);
+      await expect(refused).rejects.toThrow(/can no longer be changed/);
+      await expect(refused).rejects.toThrow(String(REQUIREMENT_EDIT_LIMIT));
+    });
+
+    it('counts a rejected Application towards the limit', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+      jobs.seedApplications(job, REQUIREMENT_EDIT_LIMIT - 1);
+      jobs.seedApplications(job, 1, 'rejected');
+
+      await expect(save(job.slug, [req(1)])).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('refuses for every role that may save, and past the limit too', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+      jobs.seedApplications(job, REQUIREMENT_EDIT_LIMIT + 50);
+
+      for (const role of ['owner', 'admin', 'recruiter'] as const) {
+        await expect(save(job.slug, [req(1)], role)).rejects.toBeInstanceOf(ConflictException);
+      }
+    });
+
+    it('writes no version and leaves the stored list untouched when it refuses', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+      await save(job.slug, [req(1)]);
+      jobs.seedApplications(job, REQUIREMENT_EDIT_LIMIT);
+
+      await expect(save(job.slug, [req(1), req(2)])).rejects.toBeInstanceOf(ConflictException);
+      await expect(save(job.slug, [])).rejects.toBeInstanceOf(ConflictException);
+
+      expect(jobs.versionsOf(job.id)).toHaveLength(1);
+      const payload = await detail(job.slug);
+      expect(payload.requirements).toEqual([req(1)]);
+      expect(payload.requirementsVersion).toBe(1);
+    });
+
+    it('still refuses a save that would change nothing', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+      await save(job.slug, [req(1)]);
+      jobs.seedApplications(job, REQUIREMENT_EDIT_LIMIT);
+
+      await expect(save(job.slug, [req(1)])).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('checks the role before the limit', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+      jobs.seedApplications(job, REQUIREMENT_EDIT_LIMIT);
+
+      await expect(save(job.slug, [req(1)], 'interviewer')).rejects.toBeInstanceOf(AuthorizationError);
+    });
+
+    it('reports requirementsLocked false below the limit and true from it', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+      jobs.seedApplications(job, REQUIREMENT_EDIT_LIMIT - 1);
+      expect((await detail(job.slug)).requirementsLocked).toBe(false);
+
+      jobs.seedApplications(job, 1, 'rejected');
+      expect((await detail(job.slug)).requirementsLocked).toBe(true);
+    });
+
+    it('locks a Job that is already past the limit', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+      jobs.seedApplications(job, REQUIREMENT_EDIT_LIMIT * 3);
+
+      expect((await detail(job.slug)).requirementsLocked).toBe(true);
     });
   });
 

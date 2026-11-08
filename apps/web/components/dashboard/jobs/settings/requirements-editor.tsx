@@ -5,6 +5,7 @@ import {
   moveItem,
   newRequirement,
   REQUIREMENT_KEYWORD_MAX_LENGTH,
+  REQUIREMENT_EDIT_LIMIT,
   REQUIREMENT_KEYWORDS_LIMIT,
   REQUIREMENT_TEXT_MAX_LENGTH,
   REQUIREMENTS_LIMIT,
@@ -64,11 +65,14 @@ export function RequirementsEditor({
   jobSlug,
   savedRequirements,
   savedVersion,
+  locked,
 }: {
   companySlug: string;
   jobSlug: string;
   savedRequirements: Requirement[];
   savedVersion: number;
+  /** The Edit limit is reached: the list is read-only (the API refuses a save anyway). */
+  locked: boolean;
 }) {
   const [requirements, setRequirements] = useState(savedRequirements);
   const [saved, setSaved] = useState(savedRequirements);
@@ -79,6 +83,7 @@ export function RequirementsEditor({
   const reduceMotion = useReducedMotion();
   const dirty = JSON.stringify(requirements) !== JSON.stringify(saved);
   const atLimit = requirements.length >= REQUIREMENTS_LIMIT;
+  const frozen = pending || locked;
 
   function edit(index: number, next: Requirement) {
     setRequirements((current) => current.map((item, i) => (i === index ? next : item)));
@@ -140,6 +145,14 @@ export function RequirementsEditor({
 
   return (
     <div className="flex flex-col gap-3" data-requirements-version={version}>
+      {locked && (
+        <Alert role="status">
+          <AlertDescription>
+            This job has {REQUIREMENT_EDIT_LIMIT} or more applications, so its requirements can no longer be changed.
+            You can still re-check candidates below.
+          </AlertDescription>
+        </Alert>
+      )}
       {requirements.length === 0 ? (
         <p className="rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">
           No requirements yet. Candidates are not checked against anything.
@@ -154,7 +167,7 @@ export function RequirementsEditor({
                   index={index}
                   count={requirements.length}
                   errors={errors[index]}
-                  disabled={pending}
+                  disabled={frozen}
                   onChange={(next) => edit(index, next)}
                   onRemove={() => remove(index)}
                   onMove={(to) => move(index, to)}
@@ -174,13 +187,13 @@ export function RequirementsEditor({
       <div className="flex flex-wrap items-center gap-2">
         <Button
           variant="outline"
-          disabled={pending || atLimit}
+          disabled={frozen || atLimit}
           onClick={() => setRequirements((current) => [...current, newRequirement(crypto.randomUUID())])}
         >
           <PlusIcon data-icon="inline-start" />
           Add requirement
         </Button>
-        <Button onClick={save} disabled={!dirty || pending}>
+        <Button onClick={save} disabled={!dirty || frozen}>
           {pending ? <Spinner data-icon="inline-start" /> : <CheckIcon data-icon="inline-start" />}
           Save requirements
         </Button>

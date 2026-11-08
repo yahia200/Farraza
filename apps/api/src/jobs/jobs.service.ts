@@ -3,6 +3,7 @@ import { AuthorizationService } from '@nestjs/authorization';
 import {
   checkHighlightKeys,
   parseScreeningRules,
+  REQUIREMENT_EDIT_LIMIT,
   type Requirement,
   type ScreeningRule,
 } from '@repo/shared';
@@ -18,7 +19,7 @@ import type { SaveRatingCriteriaDto } from './dto/save-rating-criteria.dto.js';
 import type { SaveRequirementsDto } from './dto/save-requirements.dto.js';
 import type { SaveScreeningRulesDto } from './dto/save-screening-rules.dto.js';
 import type { UpdateJobDto } from './dto/update-job.dto.js';
-import type { Job, JobWithStages } from './job.js';
+import type { Job, JobDetail, JobWithStages } from './job.js';
 import { JobPolicy } from './job.policy.js';
 import { JobsRepository } from './jobs.repository.js';
 import { isUniqueViolation } from '../common/db-errors.js';
@@ -63,6 +64,21 @@ export class JobsService {
       throw new NotFoundException();
     }
     return job;
+  }
+
+  /**
+   * The manager-facing Job payload: `get` plus `requirementsLocked` (the Edit limit). A separate
+   * method because `get` is the lookup a dozen other services share, and they have no use for the
+   * extra count query.
+   */
+  async getDetail(membership: Membership, jobSlug: string): Promise<JobDetail> {
+    const job = await this.get(membership, jobSlug);
+    return { ...job, requirementsLocked: await this.requirementsLocked(membership, job) };
+  }
+
+  private async requirementsLocked(membership: Membership, job: JobWithStages): Promise<boolean> {
+    const held = await this.jobs.countApplications(membership.company.id, job.id);
+    return held >= REQUIREMENT_EDIT_LIMIT;
   }
 
   async update(
@@ -174,6 +190,11 @@ export class JobsService {
    * parse. A Job with no version reads as `[]`, so saving `[]` on it is a no-op (version `0`); once
    * there is a version, `[]` is a real change and makes an empty version. Two saves racing for the
    * same number lose with a 409 (UNIQUE (job_id, version)), not silently overwritten.
+   *
+   * The Edit limit comes first: a Job holding `REQUIREMENT_EDIT_LIMIT` or more Applications (any
+   * status) refuses every save, an unchanged list included, with a 409 and nothing written. The
+   * count and the insert are not one transaction, so a save racing the 100th submit can still land;
+   * the limit bounds cost, it is not a security boundary.
    */
   async saveRequirements(
     user: User,
@@ -184,6 +205,11 @@ export class JobsService {
     await this.authorization.authorize(JobPolicy, 'update', user, membership);
 
     const job = await this.get(membership, jobSlug);
+    if (await this.requirementsLocked(membership, job)) {
+      throw new ConflictException(
+        `This job has ${REQUIREMENT_EDIT_LIMIT} or more applications, so its requirements can no longer be changed.`,
+      );
+    }
     if (isDeepStrictEqual(job.requirements, dto.requirements)) {
       return { requirements: job.requirements, version: job.requirementsVersion };
     }

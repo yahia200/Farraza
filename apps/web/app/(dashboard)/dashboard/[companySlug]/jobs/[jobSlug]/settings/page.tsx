@@ -89,6 +89,7 @@ async function Settings({ company, job }: { company: MyCompany; job: LoadedJob }
           jobSlug={job.slug}
           savedRequirements={job.requirements}
           savedVersion={job.requirementsVersion}
+          locked={job.requirementsLocked}
         />
       </section>
       <RatingCriteriaSection companySlug={company.slug} jobSlug={job.slug} savedKeys={job.ratingCriteria} />
