@@ -91,6 +91,11 @@ class InMemoryStore implements PublicApi<EmbeddingMatchRepository>, PublicApi<Re
     this.scores.set(input.applicationId, structuredClone(input));
   }
 
+  /** This store only holds scored and not-scored rows, so there is never a pending one to delete. */
+  async deletePendingScore() {
+    return 0;
+  }
+
   // ReembedRepository ------------------------------------------------------------------------
 
   private isStale(row: MatchScoreInput, model: string) {

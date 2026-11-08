@@ -99,6 +99,19 @@ export class EmbeddingMatchRepository {
   }
 
   /**
+   * Deletes the Application's score row only while it is `pending` (the status is part of the
+   * filter, so a `scored` or `not_scored` row is never touched). Returns how many rows went (0 or 1).
+   */
+  async deletePendingScore(companyId: string, jobId: string, applicationId: string): Promise<number> {
+    return this.prisma.db.orm.public.ApplicationMatchScore.where({
+      companyId,
+      jobId,
+      applicationId,
+      status: 'pending',
+    }).deleteAndCount();
+  }
+
+  /**
    * Writes the Application's one score row, replacing any earlier one: an upsert on UNIQUE
    * (application_id), so a retried job or a racing submit leaves one row. `updatedAt` is refreshed
    * on the update branch because the column default only applies to inserts.

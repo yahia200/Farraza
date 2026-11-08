@@ -44,7 +44,13 @@ export class EmbeddingMatchService {
     if (!this.embedder) return { outcome: 'disabled' };
 
     const current = await this.repository.findCurrentRequirements(companyId, jobId);
-    if (!current || current.requirements.length === 0) return { outcome: 'no_requirements' };
+    if (!current || current.requirements.length === 0) {
+      // The Requirements were emptied after the submit wrote its `pending` row. There is nothing to
+      // score against, so drop the row ("no row = no state"), or the card reads "Scoring..." for
+      // ever. Only a `pending` row goes: a scored or not-scored row keeps its history.
+      await this.repository.deletePendingScore(companyId, jobId, applicationId);
+      return { outcome: 'no_requirements' };
+    }
 
     const cv = await this.repository.findCvText(companyId, jobId, applicationId);
     if (!cv) return { outcome: 'no_cv' };

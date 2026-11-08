@@ -43,6 +43,8 @@ class InMemoryEmbeddingMatchRepository implements PublicApi<EmbeddingMatchReposi
   readonly requirementVectors: (RequirementVector & { jobId: string; version: number })[] = [];
   readonly chunkVectors: (ChunkVector & { applicationId: string })[] = [];
   readonly scores = new Map<string, MatchScoreInput>();
+  /** Applications whose row is the `pending` one the submit transaction writes. */
+  readonly pending = new Set<string>();
   private readonly versions = new Map<string, CurrentRequirements[]>();
 
   seedVersion(jobId: string, requirements: Requirement[]): number {
@@ -99,7 +101,13 @@ class InMemoryEmbeddingMatchRepository implements PublicApi<EmbeddingMatchReposi
 
   /** One row per Application (UNIQUE application_id): a later save replaces the earlier one. */
   async saveScore(input: MatchScoreInput) {
+    this.pending.delete(input.applicationId);
     this.scores.set(input.applicationId, structuredClone(input));
+  }
+
+  /** Deletes the row only while it is `pending`: a scored or not-scored row is never touched. */
+  async deletePendingScore(_companyId: string, _jobId: string, applicationId: string) {
+    return this.pending.delete(applicationId) ? 1 : 0;
   }
 
   scoreOf(applicationId: string) {
@@ -294,6 +302,36 @@ describe('EmbeddingMatchService.score', () => {
     expect(repository.requirementVectors).toEqual([]);
     expect(repository.chunkCount('a1')).toBe(0);
     expect(embedder.calls).toEqual([]);
+  });
+
+  it('clears the pending row when the Job has no Requirements, or an empty current list', async () => {
+    repository.seedApplication('a1', JOB, { status: 'readable', text: POSTGRES_CV });
+    repository.pending.add('a1');
+    expect(await service.score(target('a1'))).toEqual({ outcome: 'no_requirements' });
+    expect(repository.pending.has('a1')).toBe(false);
+
+    // The Requirements were emptied after the submit: a version with an empty list.
+    repository.pending.add('a1');
+    repository.seedVersion(JOB, []);
+    expect(await service.score(target('a1'))).toEqual({ outcome: 'no_requirements' });
+    expect(repository.pending.has('a1')).toBe(false);
+    expect(repository.scores.size).toBe(0);
+  });
+
+  it('leaves a scored or not-scored row alone when the Requirements were emptied', async () => {
+    const version = repository.seedVersion(JOB, [postgres]);
+    repository.seedApplication('a1', JOB, { status: 'readable', text: POSTGRES_CV });
+    repository.seedApplication('a2', JOB, { status: 'unreadable', text: '' });
+    await service.score(target('a1'));
+    await service.score(target('a2'));
+    const before = JSON.stringify([...repository.scores.entries()]);
+    expect(repository.scoreOf('a1')).toMatchObject({ status: 'scored', requirementsVersion: version });
+
+    repository.seedVersion(JOB, []);
+    expect(await service.score(target('a1'))).toEqual({ outcome: 'no_requirements' });
+    expect(await service.score(target('a2'))).toEqual({ outcome: 'no_requirements' });
+
+    expect(JSON.stringify([...repository.scores.entries()])).toBe(before);
   });
 
   it('writes no row for an Application without a CV', async () => {

@@ -58,6 +58,11 @@ class InMemoryRepository implements PublicApi<EmbeddingMatchRepository> {
     this.saves.push(input);
     this.row = input.status === 'scored' ? { status: 'scored' } : { status: 'not_scored', reason: input.reason };
   }
+  async deletePendingScore() {
+    if (this.row?.status !== 'pending') return 0;
+    this.row = null;
+    return 1;
+  }
 }
 
 /** Embeds everything as the same vector, so a CV always scores 1; can be told to be down. */
