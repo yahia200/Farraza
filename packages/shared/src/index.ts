@@ -12,6 +12,7 @@ export * from './screening-rules.js';
 export * from './requirements.js';
 export * from './requirement-edit-limit.js';
 export * from './requirement-editor.js';
+export * from './embedding-match.js';
 export * from './screening-rule-editor.js';
 export { formatIsoDate } from './dates.js';
 export * from './auth.js';
