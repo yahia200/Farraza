@@ -33,6 +33,11 @@ export class EmbeddingMatchService {
     @Inject(EMBEDDER) private readonly embedder: Embedder | null,
   ) {}
 
+  /** False when Layer 3 is off: `score` then does nothing, and callers should not look for work. */
+  get enabled(): boolean {
+    return this.embedder !== null;
+  }
+
   async score(target: ScoreTarget): Promise<ScoreOutcome> {
     const { companyId, jobId, applicationId } = target;
     if (!this.embedder) return { outcome: 'disabled' };

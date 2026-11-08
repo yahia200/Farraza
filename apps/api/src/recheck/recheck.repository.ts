@@ -11,7 +11,13 @@ export interface CurrentRequirements {
 export interface RecheckCandidate {
   applicationId: string;
   text: string;
+  /** Set only by `findNeedingWithScores` (Layer 3 on): which steps this Application still needs. */
+  needsKeywords?: boolean;
+  needsScore?: boolean;
 }
+
+/** Sorts before every real id (`gen_random_uuid()` never returns it): "no cursor yet" without a NULL parameter. */
+const START_OF_IDS = '00000000-0000-0000-0000-000000000000';
 
 // The Applications a Re-check works on (docs/db-schema.md §3.24): not rejected, CV text
 // `readable`, and no stored result or one older than `version`. One statement, because the
@@ -84,6 +90,101 @@ export class RecheckRepository {
       .build();
     const rows = await this.prisma.db.runtime().query(plan);
     return rows.map((row) => ({ applicationId: row.id, text: row.text }));
+  }
+
+  /**
+   * Re-check with Layer 3 on: how many Applications still need the keyword step, the scoring step
+   * or both, after the Application `after` (null: from the start). The FROM/JOIN block is
+   * `countNeeding`'s plus a LEFT JOIN of `application_match_scores` (docs/db-schema.md §3.27); the
+   * WHERE block must stay identical to the one in findNeedingWithScores. An Application is
+   * counted once however many steps it needs.
+   *
+   * Needs the scoring step: no score row, one computed for an older Requirements version, one
+   * still `pending`, or one that ended `embedder_failed`. A `model_changed` row is left alone on
+   * purpose: only the re-embed command (ticket 11) clears it, and retrying it here would end the
+   * same way. An unreadable CV is not selected at all (the `cv_texts` join).
+   */
+  async countNeedingWithScores(
+    companyId: string,
+    jobId: string,
+    version: number,
+    after: string | null = null,
+  ): Promise<number> {
+    if (version <= 0) return 0;
+    const plan = this.prisma.db.raw.sql`
+      SELECT count(*)::int AS n
+      FROM applications a
+      JOIN files f ON f.application_id = a.id AND f.purpose = 'cv' AND f.status = 'uploaded'
+      JOIN cv_texts t ON t.file_id = f.id AND t.status = 'readable'
+      LEFT JOIN application_requirement_results r ON r.application_id = a.id
+      LEFT JOIN application_match_scores m ON m.application_id = a.id
+      WHERE a.company_id = ${bindUuid(companyId)}
+        AND a.job_id = ${bindUuid(jobId)}
+        AND a.status <> 'rejected'
+        AND a.id > ${bindUuid(after ?? START_OF_IDS)}
+        AND (
+          r.id IS NULL OR r.version < ${bindInt4(version)}
+          OR m.id IS NULL OR m.requirements_version < ${bindInt4(version)}
+          OR m.status = 'pending'
+          OR (m.status = 'not_scored' AND m.reason = 'embedder_failed')
+        )
+    `
+      .returnsRow({ n: 'pg/int4@1' })
+      .build();
+    const rows = await this.prisma.db.runtime().query(plan);
+    return rows[0]?.n ?? 0;
+  }
+
+  /** Up to `limit` Applications after `after`, in id order, with their CV text and what each needs. */
+  async findNeedingWithScores(
+    companyId: string,
+    jobId: string,
+    version: number,
+    limit: number,
+    after: string | null = null,
+  ): Promise<RecheckCandidate[]> {
+    // The FROM/JOIN/WHERE block must stay identical to the one in countNeedingWithScores.
+    if (version <= 0) return [];
+    const plan = this.prisma.db.raw.sql`
+      SELECT a.id AS id, t.text AS text,
+        (r.id IS NULL OR r.version < ${bindInt4(version)}) AS needs_keywords,
+        (
+          m.id IS NULL OR m.requirements_version < ${bindInt4(version)}
+          OR m.status = 'pending'
+          OR (m.status = 'not_scored' AND m.reason = 'embedder_failed')
+        ) AS needs_score
+      FROM applications a
+      JOIN files f ON f.application_id = a.id AND f.purpose = 'cv' AND f.status = 'uploaded'
+      JOIN cv_texts t ON t.file_id = f.id AND t.status = 'readable'
+      LEFT JOIN application_requirement_results r ON r.application_id = a.id
+      LEFT JOIN application_match_scores m ON m.application_id = a.id
+      WHERE a.company_id = ${bindUuid(companyId)}
+        AND a.job_id = ${bindUuid(jobId)}
+        AND a.status <> 'rejected'
+        AND a.id > ${bindUuid(after ?? START_OF_IDS)}
+        AND (
+          r.id IS NULL OR r.version < ${bindInt4(version)}
+          OR m.id IS NULL OR m.requirements_version < ${bindInt4(version)}
+          OR m.status = 'pending'
+          OR (m.status = 'not_scored' AND m.reason = 'embedder_failed')
+        )
+      ORDER BY a.id
+      LIMIT ${bindInt4(limit)}
+    `
+      .returnsRow({
+        id: 'pg/uuid@1',
+        text: 'pg/text@1',
+        needs_keywords: 'pg/bool@1',
+        needs_score: 'pg/bool@1',
+      })
+      .build();
+    const rows = await this.prisma.db.runtime().query(plan);
+    return rows.map((row) => ({
+      applicationId: row.id,
+      text: row.text,
+      needsKeywords: row.needs_keywords,
+      needsScore: row.needs_score,
+    }));
   }
 
   /**

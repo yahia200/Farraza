@@ -21,7 +21,8 @@
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
-    "contract:emit": "prisma contract emit"
+    "contract:emit": "prisma contract emit",
+    "reembed": "node dist/embedding-match/reembed.main.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1151.0",

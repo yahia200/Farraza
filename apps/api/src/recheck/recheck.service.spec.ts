@@ -9,6 +9,8 @@ import type { JobWithStages } from '../jobs/job.js';
 import { JobPolicy } from '../jobs/job.policy.js';
 import type { JobsService } from '../jobs/jobs.service.js';
 import type { User } from '../users/user.js';
+import type { EmbeddingMatchService } from '../embedding-match/embedding-match.service.js';
+import type { ScoreOutcome, ScoreTarget } from '../embedding-match/embedding-match.js';
 import type { RecheckRepository } from './recheck.repository.js';
 import { RecheckService } from './recheck.service.js';
 
@@ -29,6 +31,12 @@ interface FakeApplication {
   /** False when the CV `files` row is still `pending` (no finished upload). */
   cvUploaded: boolean;
   result: { version: number; missedMustHave: boolean; results: RequirementMatches } | null;
+  /** The Layer 3 row (`application_match_scores`), or null when the Application has none. */
+  score: {
+    version: number;
+    status: 'pending' | 'scored' | 'not_scored';
+    reason?: 'cv_unreadable' | 'embedder_failed' | 'model_changed';
+  } | null;
 }
 
 class InMemoryRecheckRepository implements PublicApi<RecheckRepository> {
@@ -46,7 +54,7 @@ class InMemoryRecheckRepository implements PublicApi<RecheckRepository> {
   }
 
   seedApplication(input: Partial<FakeApplication> & { id: string; jobId: string }): void {
-    this.applications.push({ status: 'active', cv: 'readable', text: '', cvUploaded: true, result: null, ...input });
+    this.applications.push({ status: 'active', cv: 'readable', text: '', cvUploaded: true, result: null, score: null, ...input });
   }
 
   /** Test setup: run `hook` after every save, as another request could between chunks. */
@@ -87,6 +95,51 @@ class InMemoryRecheckRepository implements PublicApi<RecheckRepository> {
       .map((a) => ({ applicationId: a.id, text: a.text }));
   }
 
+  /** What the Layer 3 stage works on: no score row, one behind, still pending, or the embedder failed. */
+  private needsScore(a: FakeApplication, version: number) {
+    return (
+      a.score === null ||
+      a.score.version < version ||
+      a.score.status === 'pending' ||
+      (a.score.status === 'not_scored' && a.score.reason === 'embedder_failed')
+    );
+  }
+
+  private needingEither(jobId: string, version: number, after: string | null) {
+    return this.applications
+      .filter(
+        (a) =>
+          a.jobId === jobId &&
+          a.status !== 'rejected' &&
+          a.cv === 'readable' &&
+          a.cvUploaded &&
+          (a.result === null || a.result.version < version || this.needsScore(a, version)) &&
+          (after === null || a.id > after),
+      )
+      .sort((a, b) => a.id.localeCompare(b.id));
+  }
+
+  async countNeedingWithScores(_companyId: string, jobId: string, version: number, after: string | null = null) {
+    return version > 0 ? this.needingEither(jobId, version, after).length : 0;
+  }
+
+  async findNeedingWithScores(
+    _companyId: string,
+    jobId: string,
+    version: number,
+    limit: number,
+    after: string | null = null,
+  ) {
+    return this.needingEither(jobId, version, after)
+      .slice(0, limit)
+      .map((a) => ({
+        applicationId: a.id,
+        text: a.text,
+        needsKeywords: a.result === null || a.result.version < version,
+        needsScore: this.needsScore(a, version),
+      }));
+  }
+
   async saveResult(input: {
     companyId: string;
     jobId: string;
@@ -103,6 +156,38 @@ class InMemoryRecheckRepository implements PublicApi<RecheckRepository> {
     };
     this.saves += 1;
     this.afterSave?.(this.saves);
+  }
+}
+
+/**
+ * Stands in for `EmbeddingMatchService`: `score` writes the score row the real service would
+ * (`scored` when the embedder is up, `not_scored / embedder_failed` when it is down) so the
+ * Application leaves, or stays in, the Re-check selection as it would in the database.
+ */
+class FakeEmbeddingMatch implements Pick<EmbeddingMatchService, 'enabled' | 'score'> {
+  /** Layer 3 is off unless a spec turns it on: the older specs describe Re-check as it was. */
+  enabled = false;
+  embedderUp = true;
+  readonly scored: string[] = [];
+  /** Test setup: throw on the n-th call (1-based), as a lost database connection would. */
+  throwOnCall: number | null = null;
+  private calls = 0;
+
+  constructor(private readonly repo: InMemoryRecheckRepository) {}
+
+  async score(target: ScoreTarget): Promise<ScoreOutcome> {
+    this.calls += 1;
+    if (this.throwOnCall === this.calls) throw new Error('killed');
+    const app = this.repo.applications.find((a) => a.id === target.applicationId)!;
+    const current = await this.repo.findCurrentRequirements(target.companyId, target.jobId);
+    const version = current!.version;
+    this.scored.push(target.applicationId);
+    if (!this.embedderUp) {
+      app.score = { version, status: 'not_scored', reason: 'embedder_failed' };
+      return { outcome: 'not_scored', reason: 'embedder_failed' };
+    }
+    app.score = { version, status: 'scored' };
+    return { outcome: 'scored', overall: 0.5 };
   }
 }
 
@@ -165,6 +250,7 @@ const req = (id: string, tier: Requirement['tier'], keywords: string[]): Require
 describe('RecheckService', () => {
   let repo: InMemoryRecheckRepository;
   let queue: FakeQueue;
+  let embeddingMatch: FakeEmbeddingMatch;
   let service: RecheckService;
   const job = { id: 'job-1', slug: 'backend' } as JobWithStages;
   const slug = job.slug;
@@ -172,6 +258,7 @@ describe('RecheckService', () => {
   beforeEach(async () => {
     repo = new InMemoryRecheckRepository();
     queue = new FakeQueue();
+    embeddingMatch = new FakeEmbeddingMatch(repo);
     const moduleRef = await Test.createTestingModule({
       imports: [AuthorizationModule.forRoot()],
       providers: [JobPolicy],
@@ -193,6 +280,7 @@ describe('RecheckService', () => {
       repo as unknown as RecheckRepository,
       moduleRef.get(AuthorizationService),
       queue as unknown as Queue,
+      embeddingMatch as unknown as EmbeddingMatchService,
     );
   });
 
@@ -321,6 +409,162 @@ describe('RecheckService', () => {
         state: 'idle',
         lastRun: { failed: true },
       });
+    });
+  });
+
+  describe('the Layer 3 stage (embedding match)', () => {
+    const owner = membershipWithRole('owner');
+    const data = { companyId: company.id, jobId: job.id };
+    const go = req('go', 'must_have', ['go']);
+    const sentence = req('postgres', 'must_have', []);
+
+    beforeEach(() => {
+      embeddingMatch.enabled = true;
+    });
+
+    it('counts Applications whose score is missing, behind, pending or failed, once each', async () => {
+      const v1 = repo.seedVersion(job.id, [go]);
+      const done = { version: v1, missedMustHave: false, results: {} };
+      repo.seedApplication({ id: 'missing', jobId: job.id, result: done });
+      repo.seedApplication({ id: 'pending', jobId: job.id, result: done, score: { version: v1, status: 'pending' } });
+      repo.seedApplication({
+        id: 'failed',
+        jobId: job.id,
+        result: done,
+        score: { version: v1, status: 'not_scored', reason: 'embedder_failed' },
+      });
+      // Needs both the keyword result and the score, and still counts as one Application.
+      repo.seedApplication({ id: 'both', jobId: job.id });
+      // Up to date, or not this stage's to retry: a model change is the re-embed command's.
+      repo.seedApplication({ id: 'scored', jobId: job.id, result: done, score: { version: v1, status: 'scored' } });
+      repo.seedApplication({
+        id: 'model',
+        jobId: job.id,
+        result: done,
+        score: { version: v1, status: 'not_scored', reason: 'model_changed' },
+      });
+      repo.seedApplication({
+        id: 'unreadable-cv',
+        jobId: job.id,
+        result: done,
+        score: { version: v1, status: 'not_scored', reason: 'cv_unreadable' },
+      });
+
+      expect(await service.count(owner, slug)).toEqual({ count: 4 });
+
+      // A new Requirements version puts every readable Application behind, scored or not.
+      repo.seedVersion(job.id, [go, sentence]);
+      expect(await service.count(owner, slug)).toEqual({ count: 7 });
+    });
+
+    it('skips rejected Applications, unreadable CVs and unfinished uploads', async () => {
+      const v1 = repo.seedVersion(job.id, [go]);
+      const done = { version: v1, missedMustHave: false, results: {} };
+      repo.seedApplication({ id: 'rejected', jobId: job.id, status: 'rejected', result: done });
+      repo.seedApplication({ id: 'unreadable', jobId: job.id, cv: 'unreadable', result: done });
+      repo.seedApplication({ id: 'failed', jobId: job.id, cv: 'failed', result: done });
+      repo.seedApplication({ id: 'nocv', jobId: job.id, cv: null, result: done });
+      repo.seedApplication({ id: 'pending-upload', jobId: job.id, cvUploaded: false, result: done });
+
+      expect(await service.count(owner, slug)).toEqual({ count: 0 });
+    });
+
+    it('is zero when Layer 3 is off, even for Applications with no score', async () => {
+      const v1 = repo.seedVersion(job.id, [go]);
+      repo.seedApplication({ id: 'a1', jobId: job.id, result: { version: v1, missedMustHave: false, results: {} } });
+      embeddingMatch.enabled = false;
+
+      expect(await service.count(owner, slug)).toEqual({ count: 0 });
+      await service.run(data, async () => {});
+      expect(embeddingMatch.scored).toEqual([]);
+      expect(repo.applications[0]!.score).toBeNull();
+    });
+
+    it('is zero for a Job whose current Requirements list is empty (nothing to score against)', async () => {
+      const v1 = repo.seedVersion(job.id, []);
+      repo.seedApplication({ id: 'a1', jobId: job.id, result: { version: v1, missedMustHave: false, results: {} } });
+
+      expect(await service.count(owner, slug)).toEqual({ count: 0 });
+      expect(await service.run(data, async () => {})).toEqual({ processed: 0 });
+    });
+
+    it('starts a run for an Application that only lacks a score', async () => {
+      const v1 = repo.seedVersion(job.id, [go]);
+      repo.seedApplication({ id: 'a1', jobId: job.id, result: { version: v1, missedMustHave: false, results: {} } });
+
+      expect(await service.start(user, owner, slug)).toEqual({ state: 'running', processed: 0, total: 1 });
+    });
+
+    it('does the keyword step and the scoring step for an Application, and counts it once in the progress', async () => {
+      repo.seedVersion(job.id, [go]);
+      repo.seedApplication({ id: 'a1', jobId: job.id, text: 'Go' });
+      repo.seedApplication({ id: 'a2', jobId: job.id, text: 'Go' });
+      const reports: { processed: number; total: number }[] = [];
+
+      const result = await service.run(data, async (p) => void reports.push(p), 1);
+
+      expect(result).toEqual({ processed: 2 });
+      expect(reports).toEqual([
+        { processed: 1, total: 2 },
+        { processed: 2, total: 2 },
+      ]);
+      expect(embeddingMatch.scored).toEqual(['a1', 'a2']);
+      expect(repo.resultOf('a1')).toMatchObject({ version: 1 });
+      expect(repo.applications[0]!.score).toMatchObject({ version: 1, status: 'scored' });
+      expect(await service.count(owner, slug)).toEqual({ count: 0 });
+    });
+
+    it('scores a not-scored Application once the embedder is back, and ends the run while it is down', async () => {
+      repo.seedVersion(job.id, [go]);
+      repo.seedApplication({ id: 'a1', jobId: job.id, text: 'Go' });
+      repo.seedApplication({ id: 'a2', jobId: job.id, text: 'Go' });
+      embeddingMatch.embedderUp = false;
+
+      // Down: both end "embedder failed" and the run still finishes (each Application is tried once).
+      expect(await service.run(data, async () => {}, 1)).toEqual({ processed: 2 });
+      expect(repo.applications.map((a) => a.score)).toEqual([
+        { version: 1, status: 'not_scored', reason: 'embedder_failed' },
+        { version: 1, status: 'not_scored', reason: 'embedder_failed' },
+      ]);
+      // The keyword results were written regardless.
+      expect(repo.resultOf('a1')).toMatchObject({ version: 1 });
+      expect(await service.count(owner, slug)).toEqual({ count: 2 });
+
+      embeddingMatch.embedderUp = true;
+      expect(await service.run(data, async () => {}, 1)).toEqual({ processed: 2 });
+      expect(repo.applications.map((a) => a.score?.status)).toEqual(['scored', 'scored']);
+      expect(await service.count(owner, slug)).toEqual({ count: 0 });
+    });
+
+    it('after a restart mid-run only scores what is still missing', async () => {
+      repo.seedVersion(job.id, [go]);
+      for (const id of ['a1', 'a2', 'a3']) repo.seedApplication({ id, jobId: job.id, text: 'Go' });
+      embeddingMatch.throwOnCall = 2;
+      await expect(service.run(data, async () => {}, 1)).rejects.toThrow('killed');
+      expect(embeddingMatch.scored).toEqual(['a1']);
+
+      embeddingMatch.throwOnCall = null;
+      const result = await service.run(data, async () => {}, 1);
+
+      expect(result).toEqual({ processed: 2 });
+      expect(embeddingMatch.scored).toEqual(['a1', 'a2', 'a3']);
+      expect(await service.count(owner, slug)).toEqual({ count: 0 });
+    });
+
+    it('re-scores everything against a Requirements version saved mid-run', async () => {
+      repo.seedVersion(job.id, [go]);
+      for (const id of ['a1', 'a2', 'a3', 'a4']) repo.seedApplication({ id, jobId: job.id, text: 'Go and Rust' });
+      repo.afterEachSave((saves) => {
+        if (saves === 1) repo.seedVersion(job.id, [req('rust', 'must_have', ['rust'])]);
+      });
+
+      await service.run(data, async () => {}, 2);
+
+      for (const app of repo.applications) {
+        expect(app.result).toMatchObject({ version: 2 });
+        expect(app.score).toMatchObject({ version: 2, status: 'scored' });
+      }
+      expect(await service.count(owner, slug)).toEqual({ count: 0 });
     });
   });
 
