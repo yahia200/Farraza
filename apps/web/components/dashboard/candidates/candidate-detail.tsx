@@ -159,7 +159,11 @@ export async function CandidateDetail({
           </section>
         )}
 
-        <CandidateRequirements cvState={application.cvState} check={application.requirementCheck} />
+        <CandidateRequirements
+          cvState={application.cvState}
+          check={application.requirementCheck}
+          embeddingMatch={application.embeddingMatch}
+        />
 
         <section aria-labelledby="candidate-answers" className="flex flex-col gap-3">
           <h3 id="candidate-answers" className="text-sm font-medium">
