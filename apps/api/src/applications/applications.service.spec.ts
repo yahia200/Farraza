@@ -2178,6 +2178,17 @@ describe('ApplicationsService', () => {
       expect(repository.requirementResults).toMatchObject([{ version: 1, missedMustHave: true }]);
     });
 
+    it('stores "not checked" for a keyword-less Requirement and never marks it missed', async () => {
+      const sentenceOnly: Requirement = { id: sqlId, text: 'Knows Postgres', tier: 'must_have', keywords: [] };
+      repository.seedJob({ slug: 'backend', cvMode: 'optional', requirements: { version: 1, list: [sentenceOnly] } });
+
+      await expect(submitCv({ text: cvWithGo, status: 'readable' })).resolves.toEqual({ received: true });
+
+      expect(repository.requirementResults).toEqual([
+        { version: 1, results: { [sqlId]: { matched: null, terms: [] } }, missedMustHave: false },
+      ]);
+    });
+
     it('stores a result for an empty current version, so the Application counts as checked', async () => {
       repository.seedJob({ slug: 'backend', cvMode: 'optional', requirements: { version: 2, list: [] } });
 

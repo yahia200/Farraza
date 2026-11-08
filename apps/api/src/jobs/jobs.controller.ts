@@ -45,7 +45,7 @@ export class JobsController {
 
   @Get(':jobSlug')
   get(@CurrentMembership() membership: Membership, @Param('jobSlug') jobSlug: string) {
-    return this.jobs.get(membership, jobSlug);
+    return this.jobs.getDetail(membership, jobSlug);
   }
 
   @Patch(':jobSlug')

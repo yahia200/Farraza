@@ -1,5 +1,7 @@
 Status: draft (for owner review, not yet ticketed beyond the slices below)
 
+> **Changed by Layer 3 (embedding match, ticket 04): keywords are now optional.** A Requirement may have an empty keyword list. `matchRequirements` then returns `matched: null` ("not checked", no terms) for it, `missedMustHave` ignores it (never a miss, never a marker), and the sheet shows "Not checked". Results stored earlier read as before. The editor says a keyword-less Requirement is only looked at by Layer 3, and where this spec says "1 to 15 keywords", read "0 to 15". Re-check handles it with no special case. See `.scratch/candidate-matching/layer3-spec.md` (stories 7 to 10).
+
 # Keyword match (candidate matching, Layer 2)
 
 Related: the design notes (`.scratch/candidate-matching/layers.md`, Layer 2), the backlog item (`docs/feature-backlog.md`), ADR-0006 (CV text, `docs/adr/0006-cv-text-extracted-in-the-browser.md`), ADR-0007 (background work, `docs/adr/0007-background-work-on-bullmq-over-postgres.md`), the glossary entries **Requirement**, **CV text**, **Screening rule** and **Application Event** (`GLOSSARY.md`), the Screening rules spec (`.scratch/screening-rules/spec.md`, the Job-level-list pattern), and the CV autofill spec (`.scratch/cv-autofill/spec.md`, which stores the CV text this layer reads).
@@ -21,7 +23,7 @@ A manager lists **Requirements** for a Job on the Settings tab: a sentence, a ti
 5. As a manager, I want symbols in keywords to work ("C#", "Node.js", "C++"), so that common skills are not unmatchable.
 6. As a manager, I want an empty list to be valid, so that I can switch Layer 2 off.
 7. As a manager, I want to save Requirements on a draft, open or closed Job, so that I can prepare before publishing.
-8. As a manager, I want editing Requirements to leave stored results alone until I ask, so that nothing changes behind my back.
+8. As a manager, I want editing Requirements to leave stored results alone until I ask, so that nothing changes behind my back. *Note (Layer 3, ticket 05): stories 7 and 8 ("any Job status", with Re-check) now apply only below the **Edit limit**. Once a Job holds 100 Applications its Requirements are read-only (`.scratch/candidate-matching/layer3-spec.md`, "The Edit limit"); Re-check still works.*
 9. As a manager, I want a Re-check button that shows how many Applications it will touch and is disabled at zero, so that I never pay for work that is not needed.
 10. As a manager, I want Re-check to skip rejected Applications and CVs that could not be read, so that it only does useful work.
 11. As a manager, I want Re-check to run in the background and show progress, so that I can keep working.

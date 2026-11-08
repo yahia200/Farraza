@@ -124,7 +124,8 @@ export interface RequirementResultView {
   id: string;
   text: string;
   tier: RequirementTier;
-  matched: boolean;
+  /** `null`: "not checked", the Requirement has no keywords (neither a hit nor a miss). */
+  matched: boolean | null;
   /** The listed keywords that matched, as the manager wrote them. */
   terms: string[];
 }

@@ -1,12 +1,13 @@
-import { CircleCheckIcon, CircleXIcon } from 'lucide-react';
+import { CircleCheckIcon, CircleMinusIcon, CircleXIcon } from 'lucide-react';
 import type { CvState, RequirementCheckView } from '@/lib/dal';
 import { Badge } from '@/components/ui/badge';
 import { MissedMustHaveMarker } from './missed-must-have-marker';
 
 /**
  * The sheet's "Requirements" section (keyword match): each Requirement of the version the CV was
- * checked against, matched or not matched, with the keywords found. The verdict is words and an icon,
- * never colour alone.
+ * checked against, matched or not matched, with the keywords found, or "Not checked" for a Requirement
+ * with no keywords (neither a hit nor a miss; only the embedding match looks at it). The verdict is words
+ * and an icon, never colour alone.
  *
  * - `unreadable` / `failed`: only "CV could not be read". Never a marker or a "not matched", because a
  *   failed read must not look like a missing skill (the API sends no check for these states either).
@@ -44,7 +45,9 @@ export function CandidateRequirements({
       <ul className="flex flex-col gap-3">
         {check.results.map((result) => (
           <li key={result.id} className="flex items-start gap-2">
-            {result.matched ? (
+            {result.matched === null ? (
+              <CircleMinusIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            ) : result.matched ? (
               <CircleCheckIcon className="mt-0.5 size-4 shrink-0 text-success" aria-hidden="true" />
             ) : (
               <CircleXIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -57,7 +60,11 @@ export function CandidateRequirements({
                 </Badge>
               </span>
               <span className="text-xs text-muted-foreground wrap-anywhere">
-                {result.matched ? `Matched: ${result.terms.join(', ')}` : 'Not matched'}
+                {result.matched === null
+                  ? 'Not checked'
+                  : result.matched
+                    ? `Matched: ${result.terms.join(', ')}`
+                    : 'Not matched'}
               </span>
             </div>
           </li>

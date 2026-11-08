@@ -44,8 +44,8 @@ function mergeCriteria(existing: Record<string, number>, requested: RatingCriter
 /**
  * The Requirement check the sheet shows: each Requirement of the version the result was checked
  * against, with that version's text and tier. An `unreadable` or `failed` CV never gets a verdict (a
- * failed read must not look like a missing skill), whatever row might exist; a Requirement without a
- * stored verdict reads as not matched.
+ * failed read must not look like a missing skill), whatever row might exist; a Requirement with keywords
+ * but no stored verdict reads as not matched, and one without keywords as not checked.
  */
 function requirementCheckOf(cvState: CvState, row: RequirementCheckRow | null): RequirementCheck | null {
   if (!row || cvState !== 'readable') return null;
@@ -58,7 +58,8 @@ function requirementCheckOf(cvState: CvState, row: RequirementCheckRow | null): 
         id: requirement.id,
         text: requirement.text,
         tier: requirement.tier,
-        matched: match?.matched ?? false,
+        // No keywords: "not checked" (null), whether or not a verdict was stored.
+        matched: requirement.keywords.length === 0 ? null : (match?.matched ?? false),
         terms: match?.terms ?? [],
       };
     }),

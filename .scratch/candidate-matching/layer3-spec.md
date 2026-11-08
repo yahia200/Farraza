@@ -54,7 +54,7 @@ Decided in the grilling session unless marked *(proposed)*. Table and route name
 - `requirement_embeddings`: Job, company, version, Requirement id, model, dimensions, `vector real[]`. UNIQUE (job, version, Requirement id); written with insert-or-ignore so two workers cannot clash.
 - `cv_chunk_embeddings`: Application, company, Job, chunk index, `CHUNKER_VERSION`, model, dimensions, `vector real[]`. Chunk text is not stored; it is recomputed from the CV text row. Deleted with the Application.
 - `application_match_scores`: one row per Application with company, Job, Requirements version, model, `status` (`pending`, `scored`, `not_scored`), `reason` (`cv_unreadable`, `embedder_failed`, `model_changed`), a per-Requirement score object, an overall `score` for `ORDER BY`, and a time. A readable CV gets a `pending` row in the submit transaction; an unreadable one gets `not_scored` at once; no CV writes no row (as in Layer 2, nothing is shown).
-- Gate: confirm Prisma 8 can emit a `Float[]` column (ADR-0008); otherwise `jsonb`.
+- Gate: the vector columns are declared `Real[]` (= `real[]`; `Float[]` would be `float8[]`), verified in ticket 01 (ADR-0008).
 - Follow the tenancy and no-FK conventions in `docs/db-schema.md` §7 and update that doc.
 
 **Scoring flow (API)**

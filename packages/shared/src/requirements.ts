@@ -35,9 +35,9 @@ export const requirementSchema = z.object({
       error: `Use ${REQUIREMENT_TEXT_MAX_LENGTH} characters or fewer.`,
     }),
   tier: z.enum(REQUIREMENT_TIERS, { error: RELOAD_MESSAGE }),
+  /** May be empty: a Requirement with only its sentence is "not checked" by keyword match (Layer 3 only). */
   keywords: z
     .array(keywordSchema, { error: RELOAD_MESSAGE })
-    .min(1, { error: 'Add at least one keyword.' })
     .max(REQUIREMENT_KEYWORDS_LIMIT, {
       error: `Add at most ${REQUIREMENT_KEYWORDS_LIMIT} keywords.`,
     }),
@@ -57,8 +57,12 @@ export const requirementsSchema = z
     });
   });
 
-/** The result for one Requirement: whether any keyword matched, and which keywords (as listed) did. */
-export type RequirementMatch = { matched: boolean; terms: string[] };
+/**
+ * The result for one Requirement: whether any keyword matched, and which keywords (as listed) did.
+ * `matched` is `null` ("not checked") for a Requirement with no keywords: neither a hit nor a miss.
+ * Results stored before keywords became optional only ever hold a boolean.
+ */
+export type RequirementMatch = { matched: boolean | null; terms: string[] };
 export type RequirementMatches = Record<string, RequirementMatch>;
 
 const isWordChar = (char: string | undefined): boolean =>
@@ -102,6 +106,10 @@ export function matchRequirements(
   const text = cvText.toLowerCase();
   const results: RequirementMatches = {};
   for (const requirement of requirements) {
+    if (requirement.keywords.length === 0) {
+      results[requirement.id] = { matched: null, terms: [] };
+      continue;
+    }
     const terms = requirement.keywords.filter((keyword) =>
       forms(keyword).some((form) => form !== '' && containsWhole(text, form)),
     );
@@ -110,12 +118,18 @@ export function matchRequirements(
   return results;
 }
 
-/** True when a must-have Requirement did not match. A Requirement with no result counts as not matched. */
+/**
+ * True when a must-have Requirement did not match. A Requirement with keywords but no result counts as
+ * not matched; one with no keywords is "not checked" and is never a miss.
+ */
 export function missedMustHave(
   requirements: readonly Requirement[],
   matches: RequirementMatches,
 ): boolean {
   return requirements.some(
-    (requirement) => requirement.tier === 'must_have' && !matches[requirement.id]?.matched,
+    (requirement) =>
+      requirement.tier === 'must_have' &&
+      requirement.keywords.length > 0 &&
+      !matches[requirement.id]?.matched,
   );
 }

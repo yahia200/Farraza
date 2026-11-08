@@ -371,6 +371,38 @@ describe('PipelineService.detail: Requirement results and the CV state', () => {
     ]);
   });
 
+  it('shows a keyword-less Requirement as not checked (matched: null), stored verdict or not', async () => {
+    const pgId = '33333333-3333-4333-8333-333333333333';
+    repository.seedApplication({
+      id: 'app-1',
+      cvState: 'readable',
+      requirementCheck: {
+        version: 3,
+        missedMustHave: false,
+        results: {},
+        requirements: [{ id: pgId, text: 'Knows Postgres', tier: 'must_have', keywords: [] }],
+      },
+    });
+    repository.seedApplication({
+      id: 'app-2',
+      cvState: 'readable',
+      requirementCheck: {
+        version: 3,
+        missedMustHave: false,
+        results: { [pgId]: { matched: null, terms: [] } },
+        requirements: [{ id: pgId, text: 'Knows Postgres', tier: 'must_have', keywords: [] }],
+      },
+    });
+
+    for (const id of ['app-1', 'app-2']) {
+      const result = await service.detail(member('company-1', 'recruiter'), 'engineer', id);
+      expect(result.requirementCheck?.results).toEqual([
+        { id: pgId, text: 'Knows Postgres', tier: 'must_have', matched: null, terms: [] },
+      ]);
+      expect(result.requirementCheck?.missedMustHave).toBe(false);
+    }
+  });
+
   it.each(['unreadable', 'failed'] as const)(
     'gives no verdict for a %s CV, even if a stale row exists',
     async (cvState) => {

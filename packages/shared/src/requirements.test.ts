@@ -72,6 +72,10 @@ describe('matchRequirements', () => {
     expect(matched(['Postgres'], 'I have no experience with Postgres').matched).toBe(true);
   });
 
+  it('reports "not checked" (matched: null) for a Requirement with no keywords', () => {
+    expect(matched([], 'Anything at all, even Postgres')).toEqual({ matched: null, terms: [] });
+  });
+
   it('returns one result per Requirement id', () => {
     const results = matchRequirements([req(1, ['Go']), req(2, ['Rust'])], 'Go developer');
     expect(results[id(1)]!.matched).toBe(true);
@@ -90,6 +94,22 @@ describe('missedMustHave', () => {
     expect(missedMustHave(reqs, matchRequirements(reqs, 'Go only'))).toBe(false);
   });
 
+  it('ignores a must-have with no keywords: not checked is not a miss', () => {
+    const noKeywords = [req(1, [], 'must_have')];
+    expect(missedMustHave(noKeywords, matchRequirements(noKeywords, 'Any CV text'))).toBe(false);
+  });
+
+  it('still flags another must-have that missed beside a keyword-less one', () => {
+    const mixed = [req(1, [], 'must_have'), req(2, ['Rust'], 'must_have')];
+    expect(missedMustHave(mixed, matchRequirements(mixed, 'Go only'))).toBe(true);
+  });
+
+  it('reads a result stored before this change (matched: boolean) as it did', () => {
+    const stored = { [id(1)]: { matched: false, terms: [] } };
+    expect(missedMustHave([req(1, ['Go'], 'must_have')], stored)).toBe(true);
+    expect(missedMustHave([req(1, ['Go'], 'must_have')], { [id(1)]: { matched: true, terms: ['Go'] } })).toBe(false);
+  });
+
   it('is false for an empty list', () => {
     expect(missedMustHave([], {})).toBe(false);
   });
@@ -105,10 +125,15 @@ describe('requirementsSchema', () => {
     expect(parsed[0]!.keywords).toEqual(['Go']);
   });
 
-  it('rejects a Requirement with no keywords, at <index>.keywords', () => {
-    const result = requirementsSchema.safeParse([req(1, [])]);
+  it('accepts a Requirement with no keywords (only the sentence)', () => {
+    const parsed = requirementsSchema.parse([req(1, [])]);
+    expect(parsed[0]!.keywords).toEqual([]);
+  });
+
+  it('still needs the sentence when there are no keywords', () => {
+    const result = requirementsSchema.safeParse([{ ...req(1, []), text: ' ' }]);
     expect(result.success).toBe(false);
-    expect(result.error!.issues[0]!.path).toEqual([0, 'keywords']);
+    expect(result.error!.issues[0]!.path).toEqual([0, 'text']);
   });
 
   it('rejects a blank or over-long keyword', () => {
