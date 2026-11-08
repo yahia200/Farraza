@@ -50,12 +50,12 @@ async function main() {
       [
         `Model: ${report.model}${report.dryRun ? ' (dry run: nothing was changed)' : ''}`,
         `Applications on another model: ${report.found}`,
-        `Re-embedded: ${report.touched} (scored ${report.scored}; not scored: embedder failed ${notScored.embedder_failed}, CV unreadable ${notScored.cv_unreadable}, model changed ${notScored.model_changed}; left as they were ${report.unchanged})`,
+        `Re-embedded: ${report.touched} (scored ${report.scored}; not scored: CV unreadable ${notScored.cv_unreadable}, model changed ${notScored.model_changed}; embedder failed ${report.failed}; left as they were ${report.unchanged})`,
         `Cleared: ${report.requirementVectorsCleared} Requirement vectors, ${report.chunkVectorsCleared} CV chunk vectors`,
       ].join('\n'),
     );
-    if (report.notScored.embedder_failed > 0) {
-      console.log('Some Applications failed because the embedder did. Run Re-check on their Job, or this command, again.');
+    if (report.failed > 0) {
+      console.log('Some Applications failed because the embedder did. Their earlier result was kept: run this command again.');
     }
   } finally {
     await app.close();

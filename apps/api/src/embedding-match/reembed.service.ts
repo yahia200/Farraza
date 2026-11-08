@@ -26,10 +26,16 @@ export type ReembedReport =
       dryRun: boolean;
       /** Applications on another model (or "model changed") when the run began. */
       found: number;
-      /** Applications scored again (0 in a dry run). `scored + sum(notScored) + unchanged`. */
+      /** Applications scored again (0 in a dry run). `scored + sum(notScored) + failed + unchanged`. */
       touched: number;
       scored: number;
-      notScored: Record<NotScoredReason, number>;
+      /** Never `embedder_failed`: see `failed`. */
+      notScored: Record<Exclude<NotScoredReason, 'embedder_failed'>, number>;
+      /**
+       * The embedder failed for these. Their previous score row was kept (it names the old model,
+       * so the next run finds them again), not overwritten by "not scored (embedder failed)".
+       */
+      failed: number;
       /** Scoring wrote nothing (no CV left, or the Job has no Requirements any more): still stale. */
       unchanged: number;
       requirementVectorsCleared: number;
@@ -75,10 +81,8 @@ export class ReembedService {
       found,
       touched: 0,
       scored: 0,
-      notScored: { cv_unreadable: 0, embedder_failed: 0, model_changed: 0 } satisfies Record<
-        NotScoredReason,
-        number
-      >,
+      notScored: { cv_unreadable: 0, model_changed: 0 },
+      failed: 0,
       unchanged: 0,
       requirementVectorsCleared: 0,
       chunkVectorsCleared: 0,
@@ -110,11 +114,20 @@ export class ReembedService {
           model,
         );
 
-        const outcome = await this.scoring.score(target);
+        // `retryable`: this command is the retry. If the embedder dies, `score` must leave the
+        // Application's previous result alone instead of overwriting it with "embedder failed", so
+        // a rerun still finds it stale (the same option the queue uses between attempts).
+        const outcome = await this.scoring.score(target, { retryable: true });
         report.touched += 1;
         if (outcome.outcome === 'scored') report.scored += 1;
-        else if (outcome.outcome === 'not_scored') report.notScored[outcome.reason] += 1;
-        else {
+        else if (outcome.outcome === 'embedder_failed') {
+          report.failed += 1;
+          this.logger.warn(`Application ${applicationId} was not re-scored (the embedder failed)`);
+        } else if (outcome.outcome === 'not_scored') {
+          // Cannot be `embedder_failed` while `retryable` is set; the guard keeps the type honest.
+          if (outcome.reason === 'embedder_failed') report.failed += 1;
+          else report.notScored[outcome.reason] += 1;
+        } else {
           report.unchanged += 1;
           this.logger.warn(`Application ${applicationId} was not re-scored (${outcome.outcome})`);
         }

@@ -176,12 +176,19 @@ class FakeEmbedder implements Embedder {
   failDocuments: Error | null = null;
   /** When set, every call throws it, the probe included. */
   down: Error | null = null;
+  /** When set, the CV (document) embeds from this one on (1-based, counted from when it was set) throw it. */
+  failFromDocument: { call: number; error: Error } | null = null;
+  private documentCalls = 0;
 
   async embed(texts: string[], kind: EmbedKind): Promise<EmbedResult> {
     this.calls.push({ texts: [...texts], kind });
     if (this.down) throw this.down;
     const isProbe = texts.length === 1 && texts[0] === REEMBED_PROBE_TEXT;
     if (this.failDocuments && !isProbe) throw this.failDocuments;
+    if (kind === 'document' && !isProbe && this.failFromDocument) {
+      this.documentCalls += 1;
+      if (this.documentCalls >= this.failFromDocument.call) throw this.failFromDocument.error;
+    }
     const vectors = texts.map((text) =>
       kind === 'query' ? (QUERY_VECTORS[text] ?? [0, 1, 0]) : text.includes('postgres') ? [0.8, 0.6, 0] : [0, 0, 1],
     );
@@ -233,7 +240,8 @@ describe('ReembedService.run', () => {
       found: 2,
       touched: 2,
       scored: 2,
-      notScored: { cv_unreadable: 0, embedder_failed: 0, model_changed: 0 },
+      notScored: { cv_unreadable: 0, model_changed: 0 },
+      failed: 0,
       unchanged: 0,
       requirementVectorsCleared: 2,
       chunkVectorsCleared: 2,
@@ -314,21 +322,46 @@ describe('ReembedService.run', () => {
     expect(embedder.work()).toHaveLength(callsBefore);
   });
 
-  it('ends an Application as "embedder failed" when the service dies mid-run, and a rerun leaves it to Re-check', async () => {
+  it('keeps the previous result and counts a failure when the embedder dies, so a rerun finds it again', async () => {
     store.seedVersion(JOB, [postgres]);
     store.seedApplication('a1', JOB, { status: 'readable', text: POSTGRES_CV });
     await scoreAll(['a1']);
+    const scoredBefore = store.scores.get('a1');
     embedder.model = 'new-model';
     embedder.failDocuments = new EmbedderError('connection refused');
 
     const report = await service.run();
 
-    expect(report).toMatchObject({ found: 1, touched: 1, scored: 0, notScored: { embedder_failed: 1 } });
-    expect(store.scores.get('a1')).toMatchObject({ status: 'not_scored', reason: 'embedder_failed', model: null });
-    // Nothing of the old model is left to be compared against.
-    expect(store.chunkModels('a1')).toEqual([]);
+    expect(report).toMatchObject({ found: 1, touched: 1, scored: 0, failed: 1, unchanged: 0 });
+    // Not overwritten by "embedder failed": still the old model's score, so still stale.
+    expect(store.scores.get('a1')).toEqual(scoredBefore);
     embedder.failDocuments = null;
+    expect(await service.run()).toMatchObject({ found: 1, touched: 1, scored: 1, failed: 0 });
+    expect(store.scores.get('a1')).toMatchObject({ status: 'scored', model: 'new-model' });
     expect(await service.run()).toMatchObject({ found: 0, touched: 0 });
+  });
+
+  it('scores what it can when the embedder dies part way, leaving the rest as they were', async () => {
+    store.seedVersion(JOB, [postgres]);
+    for (const id of ['a1', 'a2', 'a3']) {
+      store.seedApplication(id, JOB, { status: 'readable', text: POSTGRES_CV });
+    }
+    await scoreAll(['a1', 'a2', 'a3']);
+    const scoredBefore = { a2: store.scores.get('a2'), a3: store.scores.get('a3') };
+    embedder.model = 'new-model';
+    // The first CV re-embeds, then the service goes down.
+    embedder.failFromDocument = { call: 2, error: new EmbedderError('connection refused') };
+
+    const report = await service.run({ chunkSize: 1 });
+
+    expect(report).toMatchObject({ found: 3, touched: 3, scored: 1, failed: 2 });
+    expect(store.scores.get('a1')).toMatchObject({ status: 'scored', model: 'new-model' });
+    expect(store.scores.get('a2')).toEqual(scoredBefore.a2);
+    expect(store.scores.get('a3')).toEqual(scoredBefore.a3);
+
+    embedder.failFromDocument = null;
+    expect(await service.run()).toMatchObject({ found: 2, touched: 2, scored: 2, failed: 0 });
+    expect(await service.run()).toMatchObject({ found: 0 });
   });
 
   it('refuses to start, touching nothing, when the embedder cannot be reached', async () => {
