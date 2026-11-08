@@ -49,7 +49,19 @@ export const envSchema = z.object({
   // MAIL_FROM is the envelope sender.
   SMTP_URL: z.url().optional(),
   MAIL_FROM: z.string().min(1).default('Farraza <accounts@farraza.app>'),
+
+  // Embedding service for Layer 3 (candidate matching; ADR-0008). Both unset
+  // means Layer 3 is off: nothing is queued or shown, and the API still boots,
+  // production included. Setting only one is refused below, because a half
+  // configuration would silently turn the layer off.
+  EMBEDDING_BASE_URL: httpUrl().optional(),
+  EMBEDDING_MODEL: z.string().trim().min(1).optional(),
 })
+  // Docs: `refine` with `path`, as for SMTP_URL below.
+  .refine((env) => (env.EMBEDDING_BASE_URL === undefined) === (env.EMBEDDING_MODEL === undefined), {
+    path: ['EMBEDDING_BASE_URL'],
+    message: 'EMBEDDING_BASE_URL and EMBEDDING_MODEL must be set together (both unset turns Layer 3 off)',
+  })
   // In production a missing SMTP_URL would silently log verification and reset
   // links instead of sending them. `refine` with `path` reports the issue on
   // SMTP_URL. Docs: `refine` in node_modules/zod/v4/classic/schemas.d.ts,

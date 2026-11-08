@@ -60,6 +60,71 @@ describe('validateEnv', () => {
     expect(env.SMTP_URL).toBe('smtp://user:pass@smtp.example.com:587');
   });
 
+  describe('embedding service (Layer 3)', () => {
+    it('boots with both variables unset, in production too', () => {
+      const env = validateEnv({
+        ...valid(),
+        NODE_ENV: 'production',
+        SMTP_URL: 'smtp://user:pass@smtp.example.com:587',
+      });
+
+      expect(env.EMBEDDING_BASE_URL).toBeUndefined();
+      expect(env.EMBEDDING_MODEL).toBeUndefined();
+    });
+
+    it('accepts both together', () => {
+      const env = validateEnv({
+        ...valid(),
+        EMBEDDING_BASE_URL: 'http://localhost:11434',
+        EMBEDDING_MODEL: 'qwen3-embedding:0.6b',
+      });
+
+      expect(env.EMBEDDING_BASE_URL).toBe('http://localhost:11434');
+      expect(env.EMBEDDING_MODEL).toBe('qwen3-embedding:0.6b');
+    });
+
+    it('refuses one without the other, naming the missing one', () => {
+      expect(() =>
+        validateEnv({ ...valid(), EMBEDDING_BASE_URL: 'http://localhost:11434' }),
+      ).toThrow(/EMBEDDING_MODEL/);
+      expect(() =>
+        validateEnv({ ...valid(), EMBEDDING_MODEL: 'qwen3-embedding:0.6b' }),
+      ).toThrow(/EMBEDDING_BASE_URL/);
+    });
+
+    it('refuses empty or blank values (a "VAR=" line in .env) instead of treating them as unset', () => {
+      expect(() =>
+        validateEnv({ ...valid(), EMBEDDING_BASE_URL: '', EMBEDDING_MODEL: 'm' }),
+      ).toThrow(/EMBEDDING_BASE_URL/);
+      expect(() =>
+        validateEnv({ ...valid(), EMBEDDING_BASE_URL: 'http://localhost:11434', EMBEDDING_MODEL: '' }),
+      ).toThrow(/EMBEDDING_MODEL/);
+      expect(() =>
+        validateEnv({ ...valid(), EMBEDDING_BASE_URL: 'http://localhost:11434', EMBEDDING_MODEL: '   ' }),
+      ).toThrow(/EMBEDDING_MODEL/);
+    });
+
+    it('refuses a base URL with another scheme', () => {
+      expect(() =>
+        validateEnv({
+          ...valid(),
+          EMBEDDING_BASE_URL: 'ftp://localhost:11434',
+          EMBEDDING_MODEL: 'm',
+        }),
+      ).toThrow(/EMBEDDING_BASE_URL/);
+    });
+
+    it('refuses a base URL that is not http(s)', () => {
+      expect(() =>
+        validateEnv({
+          ...valid(),
+          EMBEDDING_BASE_URL: 'localhost:11434',
+          EMBEDDING_MODEL: 'm',
+        }),
+      ).toThrow(/EMBEDDING_BASE_URL/);
+    });
+  });
+
   it('refuses an S3_FORCE_PATH_STYLE other than "true" or "false"', () => {
     expect(() =>
       validateEnv({ ...valid(), S3_FORCE_PATH_STYLE: 'yes' }),
