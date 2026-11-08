@@ -11,6 +11,7 @@ import type {
   ChunkVector,
   NotScoredReason,
   RequirementVector,
+  ScoreOptions,
   ScoreOutcome,
   ScoreTarget,
 } from './embedding-match.js';
@@ -38,7 +39,7 @@ export class EmbeddingMatchService {
     return this.embedder !== null;
   }
 
-  async score(target: ScoreTarget): Promise<ScoreOutcome> {
+  async score(target: ScoreTarget, options: ScoreOptions = {}): Promise<ScoreOutcome> {
     const { companyId, jobId, applicationId } = target;
     if (!this.embedder) return { outcome: 'disabled' };
 
@@ -88,6 +89,7 @@ export class EmbeddingMatchService {
     } catch (error) {
       if (!(error instanceof EmbedderError)) throw error;
       this.logger.warn(`Embedding failed for application ${applicationId}: ${error.message}`);
+      if (options.retryable) return { outcome: 'embedder_failed' };
       return notScored('embedder_failed', null);
     }
 
