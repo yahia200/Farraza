@@ -8,6 +8,10 @@
       "model": "ApplicationEvent",
       "namespace": "public"
     },
+    "application_match_scores": {
+      "model": "ApplicationMatchScore",
+      "namespace": "public"
+    },
     "application_requirement_results": {
       "model": "ApplicationRequirementResult",
       "namespace": "public"
@@ -22,6 +26,10 @@
     },
     "companies": {
       "model": "Company",
+      "namespace": "public"
+    },
+    "cv_chunk_embeddings": {
+      "model": "CvChunkEmbedding",
       "namespace": "public"
     },
     "cv_texts": {
@@ -82,6 +90,10 @@
     },
     "refresh_tokens": {
       "model": "RefreshToken",
+      "namespace": "public"
+    },
+    "requirement_embeddings": {
+      "model": "RequirementEmbedding",
       "namespace": "public"
     },
     "revoked_refresh_families": {
@@ -254,6 +266,40 @@
               {
                 "name": "Closed",
                 "value": "closed"
+              }
+            ]
+          },
+          "MatchScoreReason": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "CvUnreadable",
+                "value": "cv_unreadable"
+              },
+              {
+                "name": "EmbedderFailed",
+                "value": "embedder_failed"
+              },
+              {
+                "name": "ModelChanged",
+                "value": "model_changed"
+              }
+            ]
+          },
+          "MatchScoreStatus": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "Pending",
+                "value": "pending"
+              },
+              {
+                "name": "Scored",
+                "value": "scored"
+              },
+              {
+                "name": "NotScored",
+                "value": "not_scored"
               }
             ]
           },
@@ -707,6 +753,188 @@
               "table": "application_events"
             }
           },
+          "ApplicationMatchScore": {
+            "fields": {
+              "applicationId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "companyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "jobId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "model": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "reason": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "MatchScoreReason",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "requirementsVersion": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "score": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/float8@1",
+                  "kind": "scalar"
+                }
+              },
+              "scores": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/jsonb@1",
+                  "kind": "scalar"
+                }
+              },
+              "status": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "MatchScoreStatus",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "application": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "applicationId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Application",
+                  "namespace": "public"
+                }
+              },
+              "company": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "companyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Company",
+                  "namespace": "public"
+                }
+              },
+              "job": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "jobId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Job",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "applicationId": {
+                  "column": "application_id"
+                },
+                "companyId": {
+                  "column": "company_id"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "jobId": {
+                  "column": "job_id"
+                },
+                "model": {
+                  "column": "model"
+                },
+                "reason": {
+                  "column": "reason"
+                },
+                "requirementsVersion": {
+                  "column": "requirements_version"
+                },
+                "score": {
+                  "column": "score"
+                },
+                "scores": {
+                  "column": "scores"
+                },
+                "status": {
+                  "column": "status"
+                },
+                "updatedAt": {
+                  "column": "updated_at"
+                }
+              },
+              "namespaceId": "public",
+              "table": "application_match_scores"
+            }
+          },
           "ApplicationRequirementResult": {
             "fields": {
               "applicationId": {
@@ -1040,6 +1268,167 @@
               },
               "namespaceId": "public",
               "table": "companies"
+            }
+          },
+          "CvChunkEmbedding": {
+            "fields": {
+              "applicationId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "chunkIndex": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "chunkerVersion": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "companyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              },
+              "dimensions": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "jobId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "model": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "vector": {
+                "many": true,
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/float4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "application": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "applicationId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Application",
+                  "namespace": "public"
+                }
+              },
+              "company": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "companyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Company",
+                  "namespace": "public"
+                }
+              },
+              "job": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "jobId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Job",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "applicationId": {
+                  "column": "application_id"
+                },
+                "chunkIndex": {
+                  "column": "chunk_index"
+                },
+                "chunkerVersion": {
+                  "column": "chunker_version"
+                },
+                "companyId": {
+                  "column": "company_id"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "dimensions": {
+                  "column": "dimensions"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "jobId": {
+                  "column": "job_id"
+                },
+                "model": {
+                  "column": "model"
+                },
+                "vector": {
+                  "column": "vector"
+                }
+              },
+              "namespaceId": "public",
+              "table": "cv_chunk_embeddings"
             }
           },
           "CvText": {
@@ -2799,6 +3188,141 @@
               "table": "refresh_tokens"
             }
           },
+          "RequirementEmbedding": {
+            "fields": {
+              "companyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar"
+                }
+              },
+              "dimensions": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "jobId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "model": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "requirementId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "vector": {
+                "many": true,
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/float4@1",
+                  "kind": "scalar"
+                }
+              },
+              "version": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "company": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "companyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Company",
+                  "namespace": "public"
+                }
+              },
+              "job": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "jobId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Job",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "companyId": {
+                  "column": "company_id"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "dimensions": {
+                  "column": "dimensions"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "jobId": {
+                  "column": "job_id"
+                },
+                "model": {
+                  "column": "model"
+                },
+                "requirementId": {
+                  "column": "requirement_id"
+                },
+                "vector": {
+                  "column": "vector"
+                },
+                "version": {
+                  "column": "version"
+                }
+              },
+              "namespaceId": "public",
+              "table": "requirement_embeddings"
+            }
+          },
           "RevokedRefreshFamily": {
             "fields": {
               "expiresAt": {
@@ -3303,6 +3827,212 @@
                 ]
               },
               "uniques": []
+            },
+            "application_match_scores": {
+              "checks": [
+                {
+                  "expression": "\"reason\" IN ('cv_unreadable', 'embedder_failed', 'model_changed')",
+                  "name": "application_match_scores_reason_check_d327c559",
+                  "prefix": "application_match_scores_reason_check"
+                },
+                {
+                  "expression": "(status = 'not_scored') = (reason IS NOT NULL)",
+                  "name": "application_match_scores_reason_iff_not_scored_6017d983",
+                  "prefix": "application_match_scores_reason_iff_not_scored"
+                },
+                {
+                  "expression": "status = 'scored' OR score IS NULL",
+                  "name": "application_match_scores_score_only_when_scored_249dfa24",
+                  "prefix": "application_match_scores_score_only_when_scored"
+                },
+                {
+                  "expression": "jsonb_typeof(scores) = 'object'",
+                  "name": "application_match_scores_scores_object_ea1e94aa",
+                  "prefix": "application_match_scores_scores_object"
+                },
+                {
+                  "expression": "\"status\" IN ('pending', 'scored', 'not_scored')",
+                  "name": "application_match_scores_status_check_d7a33e57",
+                  "prefix": "application_match_scores_status_check"
+                },
+                {
+                  "expression": "requirements_version > 0",
+                  "name": "application_match_scores_version_positive_f87d420a",
+                  "prefix": "application_match_scores_version_positive"
+                }
+              ],
+              "columns": {
+                "application_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "company_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "default": {
+                    "expression": "gen_random_uuid()",
+                    "kind": "function"
+                  },
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "job_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "model": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "reason": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "MatchScoreReason",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "requirements_version": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "score": {
+                  "codecId": "pg/float8@1",
+                  "nativeType": "float8",
+                  "nullable": true
+                },
+                "scores": {
+                  "codecId": "pg/jsonb@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": {}
+                  },
+                  "nativeType": "jsonb",
+                  "nullable": false
+                },
+                "status": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "MatchScoreStatus",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "updated_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "company_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "application_match_scores"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "companies"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "job_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "application_match_scores"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "jobs"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "application_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "application_match_scores"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "applications"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "company_id"
+                  ],
+                  "name": "application_match_scores_company_id_idx_1303a718",
+                  "prefix": "application_match_scores_company_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "job_id"
+                  ],
+                  "name": "application_match_scores_job_id_idx_58a5bbdd",
+                  "prefix": "application_match_scores_job_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "job_id",
+                    "requirements_version"
+                  ],
+                  "name": "application_match_scores_job_version_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "application_id"
+                  ]
+                }
+              ]
             },
             "application_requirement_results": {
               "checks": [
@@ -3917,6 +4647,178 @@
                 {
                   "columns": [
                     "slug"
+                  ]
+                }
+              ]
+            },
+            "cv_chunk_embeddings": {
+              "checks": [
+                {
+                  "expression": "chunk_index >= 0",
+                  "name": "cv_chunk_embeddings_chunk_index_nonnegative_b02c23d3",
+                  "prefix": "cv_chunk_embeddings_chunk_index_nonnegative"
+                },
+                {
+                  "expression": "dimensions > 0",
+                  "name": "cv_chunk_embeddings_dimensions_positive_bda0f95e",
+                  "prefix": "cv_chunk_embeddings_dimensions_positive"
+                },
+                {
+                  "expression": "array_position(\"vector\", NULL) IS NULL",
+                  "name": "cv_chunk_embeddings_vector_elem_not_null_20b4417b",
+                  "prefix": "cv_chunk_embeddings_vector_elem_not_null"
+                }
+              ],
+              "columns": {
+                "application_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "chunk_index": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "chunker_version": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "company_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "created_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "dimensions": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "default": {
+                    "expression": "gen_random_uuid()",
+                    "kind": "function"
+                  },
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "job_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "model": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "vector": {
+                  "codecId": "pg/float4@1",
+                  "many": true,
+                  "nativeType": "float4",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "company_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "cv_chunk_embeddings"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "companies"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "job_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "cv_chunk_embeddings"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "jobs"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "application_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "cv_chunk_embeddings"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "applications"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "application_id"
+                  ],
+                  "name": "cv_chunk_embeddings_application_id_idx_e32e1f6e",
+                  "prefix": "cv_chunk_embeddings_application_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "company_id"
+                  ],
+                  "name": "cv_chunk_embeddings_company_id_idx_1303a718",
+                  "prefix": "cv_chunk_embeddings_company_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "job_id"
+                  ],
+                  "name": "cv_chunk_embeddings_job_id_idx_58a5bbdd",
+                  "prefix": "cv_chunk_embeddings_job_id_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "application_id",
+                    "chunk_index"
                   ]
                 }
               ]
@@ -5733,6 +6635,149 @@
               },
               "uniques": []
             },
+            "requirement_embeddings": {
+              "checks": [
+                {
+                  "expression": "dimensions > 0",
+                  "name": "requirement_embeddings_dimensions_positive_bda0f95e",
+                  "prefix": "requirement_embeddings_dimensions_positive"
+                },
+                {
+                  "expression": "array_position(\"vector\", NULL) IS NULL",
+                  "name": "requirement_embeddings_vector_elem_not_null_20b4417b",
+                  "prefix": "requirement_embeddings_vector_elem_not_null"
+                },
+                {
+                  "expression": "version > 0",
+                  "name": "requirement_embeddings_version_positive_341aaa74",
+                  "prefix": "requirement_embeddings_version_positive"
+                }
+              ],
+              "columns": {
+                "company_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "created_at": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "dimensions": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "default": {
+                    "expression": "gen_random_uuid()",
+                    "kind": "function"
+                  },
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "job_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "model": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "requirement_id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "vector": {
+                  "codecId": "pg/float4@1",
+                  "many": true,
+                  "nativeType": "float4",
+                  "nullable": false
+                },
+                "version": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "company_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "requirement_embeddings"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "companies"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "job_id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "requirement_embeddings"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "jobs"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "company_id"
+                  ],
+                  "name": "requirement_embeddings_company_id_idx_1303a718",
+                  "prefix": "requirement_embeddings_company_id_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "job_id"
+                  ],
+                  "name": "requirement_embeddings_job_id_idx_58a5bbdd",
+                  "prefix": "requirement_embeddings_job_id_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "job_id",
+                    "version",
+                    "requirement_id"
+                  ]
+                }
+              ]
+            },
             "revoked_refresh_families": {
               "columns": {
                 "expires_at": {
@@ -6163,6 +7208,22 @@
                 "closed"
               ]
             },
+            "MatchScoreReason": {
+              "kind": "valueSet",
+              "values": [
+                "cv_unreadable",
+                "embedder_failed",
+                "model_changed"
+              ]
+            },
+            "MatchScoreStatus": {
+              "kind": "valueSet",
+              "values": [
+                "pending",
+                "scored",
+                "not_scored"
+              ]
+            },
             "MemberRole": {
               "kind": "valueSet",
               "values": [
@@ -6203,7 +7264,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "3bbe7e5ef39732c709874cb5e08d8ab3a0130dae5d2c1ad598654da2da224e22"
+    "storageHash": "5001fda1149032bee8dbdee9445704017c6aca03d1e2729231c0388f440536a9"
   },
   "execution": {
     "executionHash": "6c72d2e21cac19476b009440c451b74d3f8aaae32e374ce19a06cc2a66cb6742",

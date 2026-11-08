@@ -32,6 +32,8 @@ Sections 1–7 describe what is built. Section 8 lists designed tables and const
 | `FilePurpose` | `files.purpose` | `cv`, `answer` |
 | `FileStatus` | `files.status` | `pending`, `uploaded` |
 | `CvTextStatus` | `cv_texts.status` | `readable`, `unreadable`, `failed` |
+| `MatchScoreStatus` | `application_match_scores.status` | `pending`, `scored`, `not_scored` |
+| `MatchScoreReason` | `application_match_scores.reason` | `cv_unreadable`, `embedder_failed`, `model_changed` |
 | `SessionMfa` | `sessions.mfa` | `pending`, `verified` |
 | `EmailTokenPurpose` | `email_tokens.purpose` | `email-verification`, `password-reset` (hyphenated: these are the auth library's `EmailTokenPurpose` values) |
 
@@ -476,6 +478,67 @@ What a Job's **Requirements** said about one Application's CV text (`GLOSSARY.md
 - Applications that existed before a Job had a version, or before this table, have no row.
 - **Re-check** (`recheck/`, `RecheckRepository`): an Application needs one when it is not `rejected`, its CV (`files.purpose = 'cv'` and `files.status = 'uploaded'`, the same file `findCvState` reads, joined to `cv_texts`) is `readable`, and it has no row here or a row with `version` below the Job's current version. The count and the next chunk use that same predicate (raw SQL joining `applications`, `files`, `cv_texts` and this table), and a chunk's write is `upsert ... conflictOn: { applicationId }` that also refreshes `checked_at`, so a retried chunk or a racing submit leaves one row. Re-check never deletes a row: a rejected Application keeps its old result, and an Application whose CV later stops being `readable` cannot happen (CV text is written once).
 
+### 3.25 `requirement_embeddings` (model `RequirementEmbedding`)
+The vector of one **Requirement**'s sentence for one Job and Requirements version (embedding match, Layer 3; `.scratch/candidate-matching/layer3-spec.md` "Database", ADR-0008). Embedded as a *query* (with `REQUIREMENT_QUERY_INSTRUCTION` in front, inside the Ollama embedder). Written by `EmbeddingMatchService` the first time a version is scored, **insert-or-ignore**, and never updated. **Never read by a route.**
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK, DEFAULT `gen_random_uuid()` |
+| `company_id` | `companyId` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
+| `job_id` | `jobId` | `uuid` | NOT NULL, FK → `jobs.id` ON DELETE CASCADE |
+| `version` | `version` | `integer` | NOT NULL, **no FK** (the `job_requirement_versions.version` that was embedded; with `job_id` it names that row) |
+| `requirement_id` | `requirementId` | `uuid` | NOT NULL, **no FK** (a Requirement's `id` inside that version's JSONB list) |
+| `model` | `model` | `text` | NOT NULL (the embedding model id that made `vector`) |
+| `dimensions` | `dimensions` | `integer` | NOT NULL (the length the writer declared) |
+| `vector` | `vector` | `real[]` | NOT NULL (declared `Real[]` in the contract; `Float[]` would be `float8[]`: ADR-0008, gate result) |
+| `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+
+- UNIQUE (`job_id`, `version`, `requirement_id`): the key insert-or-ignore (`createAndCount(..., { onConflict: 'skip' })`) watches, so two workers embedding the same Requirement cannot clash and the first writer's vector is the one every run then reads back. INDEX (`company_id`), INDEX (`job_id`) (Prisma adds one for every FK).
+- CHECK `requirement_embeddings_version_positive`: `version > 0`. CHECK `requirement_embeddings_dimensions_positive`: `dimensions > 0`. Prisma also adds `CHECK (array_position(vector, NULL) IS NULL)` to every list column (no NULL elements).
+- **The database does not check that `array_length(vector, 1) = dimensions`**; `EmbeddingMatchService` does before it writes (a vector of another length is "embedder failed"). The `real[]` column stores single precision: the driver returns the shortest decimal that identifies each `real`, so compare stored vectors through `Math.fround`.
+- A Requirements version is immutable, so its vectors are too. A changed model leaves the old rows in place and the Application ends "not scored (model changed)" until a deliberate re-embed (ticket 11). Deleted with the Job or company.
+
+### 3.26 `cv_chunk_embeddings` (model `CvChunkEmbedding`)
+The vector of one chunk of an Application's CV text (`chunkCvText` in `@repo/shared`), embedded as a *document*. **The chunk text is not stored**: it is recomputed from `cv_texts` (§3.22) with the same `chunker_version`. Replaced as a whole set whenever the Application is scored again. **Never read by a route.**
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK, DEFAULT `gen_random_uuid()` |
+| `company_id` | `companyId` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
+| `job_id` | `jobId` | `uuid` | NOT NULL, FK → `jobs.id` ON DELETE CASCADE |
+| `application_id` | `applicationId` | `uuid` | NOT NULL, FK → `applications.id` ON DELETE CASCADE |
+| `chunk_index` | `chunkIndex` | `integer` | NOT NULL (position in `chunkCvText(text)`, from 0) |
+| `chunker_version` | `chunkerVersion` | `integer` | NOT NULL (`CHUNKER_VERSION` when the chunk was cut) |
+| `model` | `model` | `text` | NOT NULL |
+| `dimensions` | `dimensions` | `integer` | NOT NULL (declared length, as in §3.25) |
+| `vector` | `vector` | `real[]` | NOT NULL |
+| `created_at` | `createdAt` | `timestamptz` | NOT NULL, DEFAULT `now()` |
+
+- UNIQUE (`application_id`, `chunk_index`). INDEX (`company_id`), INDEX (`job_id`), INDEX (`application_id`) (Prisma adds one for every FK, the last beside the UNIQUE). CHECK `cv_chunk_embeddings_chunk_index_nonnegative`, CHECK `cv_chunk_embeddings_dimensions_positive`, and the no-NULL-element CHECK on `vector`.
+- `EmbeddingMatchRepository.replaceChunkVectors` deletes the Application's rows and inserts the new set in one transaction, so scoring the same Application twice never duplicates chunks. They are kept even when the score is "not scored (model changed)": they are valid for the model that made them. Deleted with the Application (and so with the Job or company).
+
+### 3.27 `application_match_scores` (model `ApplicationMatchScore`)
+What embedding match made of one Application: one row per Application, advisory, **never read by a public route**. Enums: `MatchScoreStatus`, `MatchScoreReason` (§2).
+
+| Column | Field | Type | Constraints |
+|---|---|---|---|
+| `id` | `id` | `uuid` | PK, DEFAULT `gen_random_uuid()` |
+| `company_id` | `companyId` | `uuid` | NOT NULL, FK → `companies.id` ON DELETE CASCADE |
+| `job_id` | `jobId` | `uuid` | NOT NULL, FK → `jobs.id` ON DELETE CASCADE |
+| `application_id` | `applicationId` | `uuid` | NOT NULL, UNIQUE, FK → `applications.id` ON DELETE CASCADE |
+| `status` | `status` | `text` (`MatchScoreStatus`) | NOT NULL |
+| `reason` | `reason` | `text` (`MatchScoreReason`) | NULL; set exactly when `status` is `not_scored` |
+| `requirements_version` | `requirementsVersion` | `integer` | NOT NULL, **no FK** (the `job_requirement_versions.version` this row was computed against) |
+| `model` | `model` | `text` | NULL (the model that made the vectors compared; null while `pending` and for `cv_unreadable`) |
+| `scores` | `scores` | `jsonb` | NOT NULL, DEFAULT `'{}'`, **no FK** (per Requirement id: its best dot product, shape in §4.7; `{}` unless `scored`) |
+| `score` | `score` | `double precision` | NULL (the weighted mean of `scores`, only for an `ORDER BY`; null unless `scored`; never displayed) |
+| `updated_at` | `updatedAt` | `timestamptz` | NOT NULL, DEFAULT `now()` (refreshed by `saveScore` on the update branch) |
+
+- UNIQUE (`application_id`): the key `saveScore` upserts on. INDEX (`company_id`), INDEX (`job_id`, `requirements_version`) named `application_match_scores_job_version_idx` (the default name is over Prisma's 54-byte limit; for "rows behind the current version"), plus Prisma's INDEX (`job_id`).
+- CHECK `application_match_scores_version_positive`, CHECK `application_match_scores_scores_object` (`jsonb_typeof(scores) = 'object'`), CHECK `application_match_scores_reason_iff_not_scored` (`(status = 'not_scored') = (reason IS NOT NULL)`), CHECK `application_match_scores_score_only_when_scored` (`status = 'scored' OR score IS NULL`).
+- Written by `EmbeddingMatchService.score` (`embedding-match/`; nothing calls it yet, ticket 07 does). Outcomes: `scored` (scores, overall, model); `not_scored` with `cv_unreadable` (CV text `unreadable` or `failed`), `embedder_failed` (the embedder threw, or returned a wrong count or a vector not `dimensions` long) or `model_changed` (the stored Requirement vectors and the CV's differ in model or length). **No row** for an Application with no CV file or no `cv_texts` row, and none for a Job with no Requirements or an empty current list; `EMBEDDER` null (Layer 3 off) writes nothing either. `pending` is written by the submit transaction (ticket 07); scoring replaces it.
+- A stale row (its `requirements_version` below the Job's current version) is the Re-check second stage's to find (ticket 11).
+
 ## 4. JSONB shapes
 
 The database does not validate these. The application does, using the Zod schemas and parsers in `packages/shared` (`@repo/shared`).
@@ -613,15 +676,18 @@ A JSON array of at most `REQUIREMENTS_LIMIT` (10) objects `{ id, text, tier: 'mu
 ### 4.6 `application_requirement_results.results`
 A JSON object keyed by Requirement `id` (a UUID from the checked version's list): `{ "<requirementId>": { "matched": true, "terms": ["Golang"] } }` (`RequirementMatches` in `packages/shared/src/requirements.ts`). `terms` are the keywords, as the manager listed them, that matched. `matched` is `null` ("not checked", `terms: []`) for a Requirement with no keywords; it is neither a hit nor a miss, and `missed_must_have` ignores it. Results stored before keywords became optional only hold `true` or `false`. Every Requirement of the checked version has a key; `{}` for an empty version. Keys may name Requirements a later version dropped.
 
+### 4.7 `application_match_scores.scores`
+A JSON object keyed by Requirement `id` (a UUID from the scored version's list) to that Requirement's best dot product over the CV's chunks, a plain number: `{ "<requirementId>": 0.6747 }` (`ApplicationScore.requirements` from `scoreApplication` in `packages/shared/src/embedding-match.ts`). Every Requirement of the version has a key when the row is `scored`; `{}` otherwise. No band is stored: `bandOf(score)` is applied on read.
+
 ## 5. Relationships
 
 These are the relations declared in `contract.prisma`. Columns marked "no FK" above are not relations.
 
-- A `company` has many `memberships`, `jobs`, `stages`, `form_versions`, `candidates`, `applications`, `files`, and `cv_texts`, and `application_requirement_results`.
+- A `company` has many `memberships`, `jobs`, `stages`, `form_versions`, `candidates`, `applications`, `files`, and `cv_texts`, and `application_requirement_results`, `requirement_embeddings`, `cv_chunk_embeddings` and `application_match_scores`.
 - A `user` has many `memberships`, `sessions`, `identities`, `email_tokens`, `refresh_tokens`, one `mfa_totp`, and many `mfa_recovery_codes` and `mfa_failures`, and is referenced by `jobs.created_by`, `notes.author_id`, `ratings.user_id` and `oidc_states.link_user_id`.
-- A `job` has many `form_versions`, `stages`, `applications`, `files`, `cv_texts`, `job_requirement_versions`, and `application_requirement_results`.
+- A `job` has many `form_versions`, `stages`, `applications`, `files`, `cv_texts`, `job_requirement_versions`, `application_requirement_results`, `requirement_embeddings`, `cv_chunk_embeddings` and `application_match_scores`.
 - A `candidate` has many `applications`.
-- An `application` belongs to one `job`, one `candidate`, one `form_version`, and one `stage`, and has many `application_events`, `notes`, `ratings`, and `files`, and at most one `application_requirement_results`.
+- An `application` belongs to one `job`, one `candidate`, one `form_version`, and one `stage`, and has many `application_events`, `notes`, `ratings`, and `files`, and at most one `application_requirement_results` and one `application_match_scores`, and many `cv_chunk_embeddings`.
 
 ### The external `bullmq` schema
 
@@ -666,6 +732,7 @@ The database cannot check these, so the services must:
 - The refresh-token and MFA stores (`@nestjs/authentication`'s `refresh-token-store.interface.d.ts` and `mfa-store.interface.d.ts`) rely on single atomic writes, never a read followed by a write: `markRefreshTokenUsed` is `UPDATE … WHERE used_at IS NULL` (one winner per token, the rest are a reuse), `claimTotpStep` is an update that only raises `last_used_step`, `consumeRecoveryCode` is one `DELETE`, and `saveTotp` is an upsert whose `last_used_step` is `GREATEST(stored, new)` so it is never lowered. `recordMfaFailure` is deliberately three separate statements without a transaction (insert, prune, count) so that every recorded attempt is visible to the next caller at once. A revocation row can exist before or after the family's tokens, which is why `revoked_refresh_families` has no FK.
 - A Google sign-in is matched to a user through `identities` (`provider`, `subject`) only. Linking a new identity to an existing user by email is allowed only when both Google and `users.email_verified` say the address is verified.
 - `job_requirement_versions.company_id` is copied from the Job on insert. `JobsService.saveRequirements` reads the Job's current version (highest `version`), compares the new list with it (deep equality, order counts) and, if it differs, inserts `version + 1` in a single `INSERT`; a unique violation on (`job_id`, `version`) means another save won, answered as a 409. Versions are never updated, so older ones stay exactly as saved. No public route and no Application payload carries Requirements (`applications.service.spec.ts`, "no Requirement reaches the public routes").
+- Embedding match (Layer 3, §3.25 to §3.27) copies `company_id` and `job_id` from the Application (or the Job) on insert and filters by them on every read (`EmbeddingMatchRepository`). `requirement_embeddings.version`/`requirement_id` and `application_match_scores.requirements_version` hold ids of a JSONB list or of an immutable version row, so they have no FK and are valid when written. The database does not check `array_length(vector, 1) = dimensions`: `EmbeddingMatchService` rejects a vector of another length before any write. Requirement vectors are written insert-or-ignore and read back, so a run always scores with the first writer's vectors; the chunk set and the score row are replaced, never appended.
 
 ## 8. Not built yet
 

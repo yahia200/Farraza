@@ -403,6 +403,104 @@ model ApplicationRequirementResult {
   @@map("application_requirement_results")
 }
 
+enum MatchScoreStatus {
+  Pending   = "pending"
+  Scored    = "scored"
+  NotScored = "not_scored"
+}
+
+enum MatchScoreReason {
+  CvUnreadable   = "cv_unreadable"
+  EmbedderFailed = "embedder_failed"
+  ModelChanged   = "model_changed"
+}
+
+/// The embedding of one Requirement's sentence, per Job and Requirements version (embedding match, Layer 3, ADR-0008). Written insert-or-ignore, never updated: versions are immutable, and a model change is a deliberate re-embed.
+model RequirementEmbedding {
+  id            Uuid              @id @default(sql`gen_random_uuid()`)
+  companyId     Uuid              @map("company_id")
+  jobId         Uuid              @map("job_id")
+  /// The `job_requirement_versions.version` of this Job. No FK: (job_id, version) names the row, and the Job's cascade removes both.
+  version       Int
+  /// A Requirement's `id` inside that version's JSONB list. No FK: it lives inside an array.
+  requirementId Uuid              @map("requirement_id")
+  model         String
+  /// The length the writer declared. The database does not check `vector` against it; the service does (ADR-0008, gate result).
+  dimensions    Int
+  /// `real[]`, not `Float[]` (which is `float8[]`): ADR-0008, gate result.
+  vector        Real[]
+  createdAt     TimestamptzJsDate @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  job     Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, version, requirementId])
+  @@index([companyId])
+  @@check(expression: "version > 0", name: "requirement_embeddings_version_positive")
+  @@check(expression: "dimensions > 0", name: "requirement_embeddings_dimensions_positive")
+  @@map("requirement_embeddings")
+}
+
+/// The embedding of one chunk of an Application's CV text (embedding match, Layer 3). The chunk text is not stored: it is recomputed from `cv_texts` with the same `chunkerVersion`. Replaced as a set when the Application is scored again; deleted with the Application.
+model CvChunkEmbedding {
+  id             Uuid              @id @default(sql`gen_random_uuid()`)
+  companyId      Uuid              @map("company_id")
+  jobId          Uuid              @map("job_id")
+  applicationId  Uuid              @map("application_id")
+  /// The chunk's position in `chunkCvText(text)`, from 0.
+  chunkIndex     Int               @map("chunk_index")
+  /// CHUNKER_VERSION when the chunk was cut.
+  chunkerVersion Int               @map("chunker_version")
+  model          String
+  /// The length the writer declared; see requirement_embeddings.dimensions.
+  dimensions     Int
+  vector         Real[]
+  createdAt      TimestamptzJsDate @default(now()) @map("created_at")
+
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  job         Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@unique([applicationId, chunkIndex])
+  @@index([companyId])
+  @@index([jobId])
+  @@check(expression: "chunk_index >= 0", name: "cv_chunk_embeddings_chunk_index_nonnegative")
+  @@check(expression: "dimensions > 0", name: "cv_chunk_embeddings_dimensions_positive")
+  @@map("cv_chunk_embeddings")
+}
+
+/// What embedding match (Layer 3) made of one Application: scored, not scored with a reason, or still pending. At most one row per Application. Advisory and never returned to the public.
+model ApplicationMatchScore {
+  id                  Uuid              @id @default(sql`gen_random_uuid()`)
+  companyId           Uuid              @map("company_id")
+  jobId               Uuid              @map("job_id")
+  applicationId       Uuid              @unique @map("application_id")
+  status              MatchScoreStatus
+  /// Set exactly when `status` is `not_scored`.
+  reason              MatchScoreReason?
+  /// The `job_requirement_versions.version` this row was computed against. No FK, as in application_requirement_results.
+  requirementsVersion Int               @map("requirements_version")
+  /// The embedding model that made the vectors compared; null while pending or for an unreadable CV.
+  model               String?
+  /// Per Requirement id: its best dot product over the CV's chunks. `{}` unless `scored`.
+  scores              Jsonb             @default(json`{}`)
+  /// The weighted mean of `scores` (shared `scoreApplication`), kept as a column so a sort is an ordinary ORDER BY. Null unless `scored`. Never displayed.
+  score               Float?
+  updatedAt           TimestamptzJsDate @default(now()) @map("updated_at")
+
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  job         Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([jobId, requirementsVersion], map: "application_match_scores_job_version_idx")
+  @@check(expression: "requirements_version > 0", name: "application_match_scores_version_positive")
+  @@check(expression: "jsonb_typeof(scores) = 'object'", name: "application_match_scores_scores_object")
+  @@check(expression: "(status = 'not_scored') = (reason IS NOT NULL)", name: "application_match_scores_reason_iff_not_scored")
+  @@check(expression: "status = 'scored' OR score IS NULL", name: "application_match_scores_score_only_when_scored")
+  @@map("application_match_scores")
+}
+
 enum SessionMfa {
   Pending  = "pending"
   Verified = "verified"
