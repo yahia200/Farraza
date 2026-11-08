@@ -83,6 +83,18 @@ export class JobsRepository {
     };
   }
 
+  /**
+   * How many Applications the job holds, whatever their status (a rejected one still counts, so the
+   * number never goes down). One `count(*)` filtered by company and job; the Edit limit reads it.
+   * `count` comes back as a bigint-capable value in the types, hence `Number` (as `PrismaMfaStore`).
+   */
+  async countApplications(companyId: string, jobId: string): Promise<number> {
+    const { count } = await this.prisma.db.orm.public.Application.where({ companyId, jobId }).aggregate(
+      (aggregate) => ({ count: aggregate.count() }),
+    );
+    return Number(count);
+  }
+
   /** The job's current Requirements: its highest `job_requirement_versions.version`, or null. */
   async findLatestRequirementVersion(jobId: string): Promise<RequirementVersion | null> {
     const row = await this.requirementVersions

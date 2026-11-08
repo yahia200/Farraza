@@ -21,7 +21,7 @@ A manager lists **Requirements** for a Job on the Settings tab: a sentence, a ti
 5. As a manager, I want symbols in keywords to work ("C#", "Node.js", "C++"), so that common skills are not unmatchable.
 6. As a manager, I want an empty list to be valid, so that I can switch Layer 2 off.
 7. As a manager, I want to save Requirements on a draft, open or closed Job, so that I can prepare before publishing.
-8. As a manager, I want editing Requirements to leave stored results alone until I ask, so that nothing changes behind my back.
+8. As a manager, I want editing Requirements to leave stored results alone until I ask, so that nothing changes behind my back. *Note (Layer 3, ticket 05): stories 7 and 8 ("any Job status", with Re-check) now apply only below the **Edit limit**. Once a Job holds 100 Applications its Requirements are read-only (`.scratch/candidate-matching/layer3-spec.md`, "The Edit limit"); Re-check still works.*
 9. As a manager, I want a Re-check button that shows how many Applications it will touch and is disabled at zero, so that I never pay for work that is not needed.
 10. As a manager, I want Re-check to skip rejected Applications and CVs that could not be read, so that it only does useful work.
 11. As a manager, I want Re-check to run in the background and show progress, so that I can keep working.
