@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { param } from '@prisma/orm-postgres/relational-core/expression';
 import type { Requirement, RequirementMatches } from '@repo/shared';
+import { bindInt4, bindUuid, START_OF_IDS } from '../common/sql-params.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PENDING_STALE_MINUTES } from './recheck.constants.js';
 
@@ -17,15 +17,10 @@ export interface RecheckCandidate {
   needsScore?: boolean;
 }
 
-/** Sorts before every real id (`gen_random_uuid()` never returns it): "no cursor yet" without a NULL parameter. */
-const START_OF_IDS = '00000000-0000-0000-0000-000000000000';
-
 // The Applications a Re-check works on (docs/db-schema.md §3.24): not rejected, CV text
 // `readable`, and no stored result or one older than `version`. One statement, because the
 // contract has no back-relations from Application to File or CvText for the ORM to filter on.
-// `$1..` are bound parameters (the tag turns each ${} into one); nothing is interpolated.
-const bindUuid = (value: string) => param(value, { codecId: 'pg/uuid@1' });
-const bindInt4 = (value: number) => param(value, { codecId: 'pg/int4@1' });
+// The bound-parameter helpers are in `common/sql-params.ts`.
 
 @Injectable()
 export class RecheckRepository {

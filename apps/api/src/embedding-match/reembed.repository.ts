@@ -1,17 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { param } from '@prisma/orm-postgres/relational-core/expression';
+import { bindInt4, bindText, bindUuid, START_OF_IDS } from '../common/sql-params.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { ScoreTarget } from './embedding-match.js';
 
 /** An Application whose score row was made by another embedding model. */
 export type StaleTarget = ScoreTarget;
-
-const bindText = (value: string) => param(value, { codecId: 'pg/text@1' });
-const bindUuid = (value: string) => param(value, { codecId: 'pg/uuid@1' });
-const bindInt4 = (value: number) => param(value, { codecId: 'pg/int4@1' });
-
-/** Sorts before every real id (`gen_random_uuid()` never returns it): "no cursor yet" without a NULL parameter. */
-const START_OF_IDS = '00000000-0000-0000-0000-000000000000';
 
 /**
  * What the re-embed command (ticket 11) reads and clears. Separate from `EmbeddingMatchRepository`
