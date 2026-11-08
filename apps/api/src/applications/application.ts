@@ -81,7 +81,7 @@ export interface NewPendingFile {
  * the applicant is sent to the right step.
  */
 export type SubmitResult =
-  | 'created'
+  | { status: 'created'; applicationId: string }
   | 'duplicate'
   | { status: 'file_conflict'; fileId: string };
 
@@ -110,6 +110,16 @@ export interface NewRequirementResult {
   missedMustHave: boolean;
 }
 
+/**
+ * The match-score row written with the Application (`docs/db-schema.md` §3.27, Layer 3). `pending`
+ * means a scoring job will be queued after the commit; `not_scored` is final at once because the CV
+ * could not be read, so no job is queued. The version is the Job's current Requirements version.
+ * Never returned by a public route.
+ */
+export type NewMatchScore =
+  | { status: 'pending'; requirementsVersion: number }
+  | { status: 'not_scored'; reason: 'cv_unreadable'; requirementsVersion: number };
+
 export interface NewApplication {
   companyId: string;
   jobId: string;
@@ -125,6 +135,8 @@ export interface NewApplication {
   cvText: NewCvText | null;
   /** Saved in the same transaction; null when there is nothing to check (no version, or no readable CV). */
   requirementResult: NewRequirementResult | null;
+  /** Saved in the same transaction; null when Layer 3 is off, there are no Requirements to score against, or no CV. */
+  matchScore: NewMatchScore | null;
   source: string | null;
   events: Array<{
     type: 'applied' | 'auto_rejected' | 'flagged';
