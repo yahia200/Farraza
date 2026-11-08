@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { param } from '@prisma/orm-postgres/relational-core/expression';
 import type { Requirement, RequirementMatches } from '@repo/shared';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PENDING_STALE_MINUTES } from './recheck.constants.js';
 
 export interface CurrentRequirements {
   version: number;
@@ -100,7 +101,9 @@ export class RecheckRepository {
    * counted once however many steps it needs.
    *
    * Needs the scoring step: no score row, one computed for an older Requirements version, one
-   * still `pending`, or one that ended `embedder_failed`. A `model_changed` row is left alone on
+   * still `pending` after `PENDING_STALE_MINUTES` (the submit-time job gave up without writing a
+   * result, e.g. its last attempt hit a database error; a younger one is still being worked on),
+   * or one that ended `embedder_failed`. A `model_changed` row is left alone on
    * purpose: only the re-embed command (ticket 11) clears it, and retrying it here would end the
    * same way. An unreadable CV is not selected at all (the `cv_texts` join).
    */
@@ -125,7 +128,7 @@ export class RecheckRepository {
         AND (
           r.id IS NULL OR r.version < ${bindInt4(version)}
           OR m.id IS NULL OR m.requirements_version < ${bindInt4(version)}
-          OR m.status = 'pending'
+          OR (m.status = 'pending' AND m.updated_at < now() - ${bindInt4(PENDING_STALE_MINUTES)}::int * interval '1 minute')
           OR (m.status = 'not_scored' AND m.reason = 'embedder_failed')
         )
     `
@@ -150,7 +153,7 @@ export class RecheckRepository {
         (r.id IS NULL OR r.version < ${bindInt4(version)}) AS needs_keywords,
         (
           m.id IS NULL OR m.requirements_version < ${bindInt4(version)}
-          OR m.status = 'pending'
+          OR (m.status = 'pending' AND m.updated_at < now() - ${bindInt4(PENDING_STALE_MINUTES)}::int * interval '1 minute')
           OR (m.status = 'not_scored' AND m.reason = 'embedder_failed')
         ) AS needs_score
       FROM applications a
@@ -165,7 +168,7 @@ export class RecheckRepository {
         AND (
           r.id IS NULL OR r.version < ${bindInt4(version)}
           OR m.id IS NULL OR m.requirements_version < ${bindInt4(version)}
-          OR m.status = 'pending'
+          OR (m.status = 'pending' AND m.updated_at < now() - ${bindInt4(PENDING_STALE_MINUTES)}::int * interval '1 minute')
           OR (m.status = 'not_scored' AND m.reason = 'embedder_failed')
         )
       ORDER BY a.id

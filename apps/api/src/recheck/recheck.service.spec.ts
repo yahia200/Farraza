@@ -12,6 +12,7 @@ import type { User } from '../users/user.js';
 import type { EmbeddingMatchService } from '../embedding-match/embedding-match.service.js';
 import type { ScoreOutcome, ScoreTarget } from '../embedding-match/embedding-match.js';
 import type { RecheckRepository } from './recheck.repository.js';
+import { PENDING_STALE_MINUTES } from './recheck.constants.js';
 import { RecheckService } from './recheck.service.js';
 
 // Same pattern as jobs.service.spec.ts: the real service and real JobPolicy, with
@@ -36,6 +37,8 @@ interface FakeApplication {
     version: number;
     status: 'pending' | 'scored' | 'not_scored';
     reason?: 'cv_unreadable' | 'embedder_failed' | 'model_changed';
+    /** How long a `pending` row has been waiting, in minutes; absent means just written. */
+    ageMinutes?: number;
   } | null;
 }
 
@@ -100,7 +103,7 @@ class InMemoryRecheckRepository implements PublicApi<RecheckRepository> {
     return (
       a.score === null ||
       a.score.version < version ||
-      a.score.status === 'pending' ||
+      (a.score.status === 'pending' && (a.score.ageMinutes ?? 0) >= PENDING_STALE_MINUTES) ||
       (a.score.status === 'not_scored' && a.score.reason === 'embedder_failed')
     );
   }
@@ -422,11 +425,25 @@ describe('RecheckService', () => {
       embeddingMatch.enabled = true;
     });
 
-    it('counts Applications whose score is missing, behind, pending or failed, once each', async () => {
+    it('counts Applications whose score is missing, behind, abandoned as pending or failed, once each', async () => {
       const v1 = repo.seedVersion(job.id, [go]);
       const done = { version: v1, missedMustHave: false, results: {} };
       repo.seedApplication({ id: 'missing', jobId: job.id, result: done });
-      repo.seedApplication({ id: 'pending', jobId: job.id, result: done, score: { version: v1, status: 'pending' } });
+      // Pending for longer than the submit-time job can still be working: its last attempt died
+      // without writing a result (a database error), so nothing else will ever score it.
+      repo.seedApplication({
+        id: 'abandoned',
+        jobId: job.id,
+        result: done,
+        score: { version: v1, status: 'pending', ageMinutes: PENDING_STALE_MINUTES },
+      });
+      // Pending for a minute: the submit-time job is still working on it, so Re-check leaves it.
+      repo.seedApplication({
+        id: 'in-flight',
+        jobId: job.id,
+        result: done,
+        score: { version: v1, status: 'pending', ageMinutes: 1 },
+      });
       repo.seedApplication({
         id: 'failed',
         jobId: job.id,
@@ -454,7 +471,31 @@ describe('RecheckService', () => {
 
       // A new Requirements version puts every readable Application behind, scored or not.
       repo.seedVersion(job.id, [go, sentence]);
-      expect(await service.count(owner, slug)).toEqual({ count: 7 });
+      expect(await service.count(owner, slug)).toEqual({ count: 8 });
+    });
+
+    it('scores an abandoned pending Application in a run and leaves an in-flight one alone', async () => {
+      const v1 = repo.seedVersion(job.id, [go]);
+      const done = { version: v1, missedMustHave: false, results: {} };
+      repo.seedApplication({
+        id: 'abandoned',
+        jobId: job.id,
+        result: done,
+        score: { version: v1, status: 'pending', ageMinutes: PENDING_STALE_MINUTES },
+      });
+      // One minute short of the threshold: still in flight.
+      repo.seedApplication({
+        id: 'in-flight',
+        jobId: job.id,
+        result: done,
+        score: { version: v1, status: 'pending', ageMinutes: PENDING_STALE_MINUTES - 1 },
+      });
+
+      expect(await service.run(data, async () => {})).toEqual({ processed: 1 });
+
+      expect(embeddingMatch.scored).toEqual(['abandoned']);
+      expect(repo.applications[0]!.score).toMatchObject({ status: 'scored' });
+      expect(repo.applications[1]!.score).toMatchObject({ status: 'pending' });
     });
 
     it('skips rejected Applications, unreadable CVs and unfinished uploads', async () => {

@@ -4,7 +4,9 @@ import { NestFactory } from '@nestjs/core';
 import { validateEnv } from '../config/env.schema.js';
 import { EmbeddingModule } from '../embedding/embedding.module.js';
 import { PrismaModule } from '../prisma/prisma.module.js';
-import { EmbeddingMatchModule } from './embedding-match.module.js';
+import { EmbeddingMatchRepository } from './embedding-match.repository.js';
+import { EmbeddingMatchService } from './embedding-match.service.js';
+import { ReembedRepository } from './reembed.repository.js';
 import { ReembedService } from './reembed.service.js';
 
 /**
@@ -24,8 +26,11 @@ import { ReembedService } from './reembed.service.js';
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     PrismaModule,
     EmbeddingModule,
-    EmbeddingMatchModule,
   ],
+  // Not `EmbeddingMatchModule`: that one registers the `match-scoring` queue and its worker, which
+  // need the BullMQ root configured by `RecheckModule`. The command only needs the scoring
+  // service and its repository.
+  providers: [EmbeddingMatchService, EmbeddingMatchRepository, ReembedService, ReembedRepository],
 })
 class ReembedCommandModule {}
 
