@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { createPostgresBackend, setDefaultBackendFactory } from 'bullmq';
 import { CompaniesModule } from '../companies/companies.module.js';
+import { EmbeddingMatchModule } from '../embedding-match/embedding-match.module.js';
 import { JobPolicy } from '../jobs/job.policy.js';
 import { JobsModule } from '../jobs/jobs.module.js';
 import { RECHECK_QUEUE } from './recheck.constants.js';
@@ -21,6 +22,8 @@ import { RecheckService } from './recheck.service.js';
   imports: [
     CompaniesModule,
     JobsModule,
+    // The Layer 3 step of a run (`EmbeddingMatchService.score`, ticket 11).
+    EmbeddingMatchModule,
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {

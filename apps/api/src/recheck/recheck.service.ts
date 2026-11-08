@@ -4,11 +4,12 @@ import { AuthorizationService } from '@nestjs/authorization';
 import { matchRequirements, missedMustHave } from '@repo/shared';
 import type { Queue } from 'bullmq';
 import type { Membership } from '../companies/company.js';
+import { EmbeddingMatchService } from '../embedding-match/embedding-match.service.js';
 import { JobPolicy } from '../jobs/job.policy.js';
 import { JobsService } from '../jobs/jobs.service.js';
 import type { User } from '../users/user.js';
 import { RECHECK_CHUNK_SIZE, RECHECK_QUEUE, recheckJobId } from './recheck.constants.js';
-import { RecheckRepository } from './recheck.repository.js';
+import { RecheckRepository, type RecheckCandidate } from './recheck.repository.js';
 
 /** What a queued run carries: ids only, so a retry always re-reads the current Requirements. */
 export interface RecheckJobData {
@@ -40,17 +41,17 @@ export class RecheckService {
     private readonly repository: RecheckRepository,
     private readonly authorization: AuthorizationService,
     @InjectQueue(RECHECK_QUEUE) private readonly queue: Queue,
+    /** The Layer 3 step (ticket 11); `enabled` is false when no embedder is configured. */
+    private readonly embeddingMatch: EmbeddingMatchService,
   ) {}
 
-  /** How many Applications a Re-check would touch now. Zero when the Job has no version. */
+  /**
+   * How many Applications a Re-check would touch now (each once, whichever steps it needs). Zero
+   * when the Job has no version.
+   */
   async count(membership: Membership, jobSlug: string): Promise<{ count: number }> {
     const job = await this.jobs.get(membership, jobSlug);
-    const count = await this.repository.countNeeding(
-      membership.company.id,
-      job.id,
-      job.requirementsVersion,
-    );
-    return { count };
+    return { count: await this.countNeeding(membership.company.id, job.id, job.requirementsVersion) };
   }
 
   /**
@@ -74,11 +75,7 @@ export class RecheckService {
       await existing.remove();
     }
 
-    const total = await this.repository.countNeeding(
-      membership.company.id,
-      job.id,
-      job.requirementsVersion,
-    );
+    const total = await this.countNeeding(membership.company.id, job.id, job.requirementsVersion);
     if (total === 0) return this.status(membership, jobSlug);
 
     const data: RecheckJobData = { companyId: membership.company.id, jobId: job.id, total };
@@ -115,31 +112,65 @@ export class RecheckService {
   ): Promise<{ processed: number }> {
     const { companyId, jobId } = data;
     let processed = 0;
+    // Layer 3 only: the last Application of the previous chunk, and the version it was read under.
+    let after: string | null = null;
+    let cursorVersion = 0;
 
     for (;;) {
       const current = await this.repository.findCurrentRequirements(companyId, jobId);
       if (!current) break;
-      const chunk = await this.repository.findNeeding(companyId, jobId, current.version, chunkSize);
+      // Layer 3 is on only when an embedder is configured and there is something to score against.
+      const layer3 = this.embeddingMatch.enabled && current.requirements.length > 0;
+      if (current.version !== cursorVersion) {
+        // An edit landed: Applications before the cursor are behind again, so start over.
+        after = null;
+        cursorVersion = current.version;
+      }
+      // The cursor is what ends the run while the embedder is down: an Application that ended
+      // "embedder failed" still needs scoring, so "finished ones leave the selection" is not
+      // enough on its own. With Layer 3 off the old selection and loop are used unchanged.
+      const chunk: RecheckCandidate[] = layer3
+        ? await this.repository.findNeedingWithScores(companyId, jobId, current.version, chunkSize, after)
+        : await this.repository.findNeeding(companyId, jobId, current.version, chunkSize);
       if (chunk.length === 0) break;
 
-      for (const { applicationId, text } of chunk) {
-        const results = matchRequirements(current.requirements, text);
-        await this.repository.saveResult({
-          companyId,
-          jobId,
-          applicationId,
-          version: current.version,
-          results,
-          missedMustHave: missedMustHave(current.requirements, results),
-        });
+      for (const { applicationId, text, needsKeywords = true, needsScore = false } of chunk) {
+        if (needsKeywords) {
+          const results = matchRequirements(current.requirements, text);
+          await this.repository.saveResult({
+            companyId,
+            jobId,
+            applicationId,
+            version: current.version,
+            results,
+            missedMustHave: missedMustHave(current.requirements, results),
+          });
+        }
+        // The Layer 3 step. Its outcome is already stored by the scoring service (a score, or a
+        // "not scored" reason); an error that is not the embedder's (the database) fails the run.
+        if (needsScore) await this.embeddingMatch.score({ companyId, jobId, applicationId });
       }
 
       processed += chunk.length;
-      const remaining = await this.repository.countNeeding(companyId, jobId, current.version);
+      after = chunk[chunk.length - 1]!.applicationId;
+      const remaining = layer3
+        ? await this.repository.countNeedingWithScores(companyId, jobId, current.version, after)
+        : await this.repository.countNeeding(companyId, jobId, current.version);
       await report({ processed, total: processed + remaining });
     }
 
     return { processed };
+  }
+
+  /** The count a run would work through: the keyword step alone, or with the Layer 3 step. */
+  private async countNeeding(companyId: string, jobId: string, version: number): Promise<number> {
+    if (this.embeddingMatch.enabled) {
+      const current = await this.repository.findCurrentRequirements(companyId, jobId);
+      if (current && current.requirements.length > 0) {
+        return this.repository.countNeedingWithScores(companyId, jobId, version);
+      }
+    }
+    return this.repository.countNeeding(companyId, jobId, version);
   }
 
   private async toStatus(queued: {
