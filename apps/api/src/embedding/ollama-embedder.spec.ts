@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { REQUIREMENT_QUERY_INSTRUCTION } from '@repo/shared';
 import { EmbedderError } from './embedder.js';
-import { OllamaEmbedder, REQUIREMENT_QUERY_INSTRUCTION } from './ollama-embedder.js';
+import { OllamaEmbedder } from './ollama-embedder.js';
 
 interface Call {
   url: string;
@@ -92,11 +93,6 @@ describe('OllamaEmbedder', () => {
       expect(calls[0]!.body.input).toEqual(['Built APIs in Node']);
     });
 
-    it('is the instruction wording agreed in the spec, ending in "Query:"', () => {
-      expect(REQUIREMENT_QUERY_INSTRUCTION).toBe(
-        'Instruct: Given a job requirement, retrieve resume passages that satisfy it\nQuery:',
-      );
-    });
   });
 
   describe('failures', () => {

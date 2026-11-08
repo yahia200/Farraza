@@ -1,3 +1,4 @@
+import { REQUIREMENT_QUERY_INSTRUCTION } from '@repo/shared';
 import {
   EmbedderError,
   type Embedder,
@@ -14,14 +15,11 @@ import {
  */
 
 /*
- * Prepended to Requirement sentences (kind 'query') only. This is the Qwen3
- * Embedding "Instruct: ...\nQuery:..." query format, so it belongs with the
- * Ollama/Qwen implementation and not in the interface. Wording is provisional:
+ * REQUIREMENT_QUERY_INSTRUCTION (from @repo/shared, spec "Shared") is prepended
+ * to Requirement sentences (kind 'query') only. Its wording is provisional:
  * re-test on real CVs (spec: .scratch/candidate-matching/layer3-spec.md,
  * "Open items" 1; measurements in the notes file, "Instruction prefix").
  */
-export const REQUIREMENT_QUERY_INSTRUCTION =
-  'Instruct: Given a job requirement, retrieve resume passages that satisfy it\nQuery:';
 
 export interface OllamaEmbedderOptions {
   /** Origin of the Ollama server, e.g. http://localhost:11434. */

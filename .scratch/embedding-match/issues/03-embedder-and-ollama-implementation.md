@@ -32,7 +32,7 @@ Commit `9dbc9c6` (`feat(api): add the Embedder interface and Ollama implementati
 1. The two variables must be set together (a refine on `EMBEDDING_BASE_URL`). Setting one stops the boot, because a half configuration would silently turn Layer 3 off. The ticket only said "unset means off".
 2. "Reports itself as not configured" is `EMBEDDER` resolving to `null`, not a null-object class. Callers must check it. Alternative: a `NotConfiguredEmbedder` with `isConfigured`.
 3. Blank texts are skipped before the call, so `vectors` lines up with the non-blank texts, not with every input. Ticket 06 must not pass blank chunks (the chunker already drops them) or must filter first. Nothing non-blank means no request and `{ vectors: [], dimensions: 0 }`.
-4. `REQUIREMENT_QUERY_INSTRUCTION` lives in `ollama-embedder.ts`, not `@repo/shared`, because the `Instruct:/Query:` form is Qwen-specific. The spec lists it among the shared constants; if ticket 02 also defined one in shared, remove one of them.
+4. `REQUIREMENT_QUERY_INSTRUCTION` is imported from `@repo/shared` (ticket 02 defined it there, as the spec says); the Ollama embedder applies it. A first draft kept a local copy; it was removed after the merge. A non-Qwen provider would not use it.
 5. A 60 s per-request timeout (`AbortSignal.timeout`, option `timeoutMs`) and shape validation of the response; both fail as `EmbedderError`.
 6. `model` in the result is the configured model, not the name Ollama echoes back.
 
