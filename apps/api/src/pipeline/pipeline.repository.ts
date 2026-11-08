@@ -270,7 +270,7 @@ export class PipelineRepository {
         .all(),
       this.findCvState(companyId, applicationId),
       this.findRequirementCheck(companyId, applicationId),
-      this.findEmbeddingMatch(companyId, applicationId),
+      this.findEmbeddingMatch(companyId, jobId, applicationId),
     ]);
 
     return {
@@ -358,16 +358,20 @@ export class PipelineRepository {
   }
 
   /**
-   * The Application's score row with the Requirements of the version it names, looked up by (Job,
-   * version) from the immutable `job_requirement_versions` row. Null with no row. The chunk and
-   * Requirement vectors, and the CV text, are never read here.
+   * The Application's score row (by company, Job and Application) with the Requirements of the
+   * version it names, looked up by (Job, version) from the immutable `job_requirement_versions` row.
+   * Null with no row. The chunk and Requirement vectors, and the CV text, are never read here.
    */
-  private async findEmbeddingMatch(companyId: string, applicationId: string): Promise<EmbeddingMatchRow | null> {
-    const row = await this.matchScores.where({ companyId, applicationId }).first();
+  private async findEmbeddingMatch(
+    companyId: string,
+    jobId: string,
+    applicationId: string,
+  ): Promise<EmbeddingMatchRow | null> {
+    const row = await this.matchScores.where({ companyId, jobId, applicationId }).first();
     if (!row) return null;
     const version = await this.requirementVersions
       .select('requirements')
-      .where({ companyId, jobId: row.jobId, version: row.requirementsVersion })
+      .where({ companyId, jobId, version: row.requirementsVersion })
       .first();
     return {
       version: row.requirementsVersion,
