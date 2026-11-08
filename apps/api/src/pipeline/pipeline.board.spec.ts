@@ -8,7 +8,7 @@ import type { FormsRepository } from '../forms/forms.repository.js';
 import type { JobWithStages } from '../jobs/job.js';
 import type { JobsService } from '../jobs/jobs.service.js';
 import type { StorageService } from '../storage/storage.service.js';
-import type { CardRow, CardRowWithAnswers } from './pipeline.js';
+import type { CardRow, CardRowWithAnswers, MatchScoreSummary } from './pipeline.js';
 import type { PipelineRepository } from './pipeline.repository.js';
 import { PipelineService } from './pipeline.service.js';
 
@@ -28,8 +28,39 @@ interface StoredApplication extends CardRowWithAnswers {
 
 class InMemoryPipelineRepository implements Pick<
   PublicApi<PipelineRepository>,
-  'findCards' | 'findCardsWithAnswers' | 'findFormFields' | 'findRatingSummaries' | 'findMissedMustHaveIds'
+  | 'findCards'
+  | 'findCardsWithAnswers'
+  | 'findFormFields'
+  | 'findRatingSummaries'
+  | 'findMissedMustHaveIds'
+  | 'findMatchScores'
 > {
+  private readonly matchScores: (MatchScoreSummary & {
+    companyId: string;
+    jobId: string;
+    applicationId: string;
+  })[] = [];
+  /** Per call of `findMatchScores`: its length is the query count for the embedding match. */
+  readonly matchScoreReads: { companyId: string; jobId: string }[] = [];
+
+  seedMatchScore(
+    applicationId: string,
+    row: MatchScoreSummary,
+    owner = { companyId: 'company-1', jobId: 'job-1' },
+  ): void {
+    this.matchScores.push({ ...owner, applicationId, ...row });
+  }
+
+  /** Mirrors the SQL: the Job's `application_match_scores` rows, by Application id. */
+  async findMatchScores(companyId: string, jobId: string): Promise<Map<string, MatchScoreSummary>> {
+    this.matchScoreReads.push({ companyId, jobId });
+    return new Map(
+      this.matchScores
+        .filter((r) => r.companyId === companyId && r.jobId === jobId)
+        .map(({ applicationId, status, reason, score }) => [applicationId, { status, reason, score }]),
+    );
+  }
+
   private readonly requirementResults: {
     companyId: string;
     jobId: string;
@@ -729,6 +760,78 @@ describe('the pipeline board', () => {
       await cardsOf();
 
       expect(repository.markerReads).toEqual([]);
+    });
+  });
+
+  describe('the embedding match on each card', () => {
+    it('carries the overall number and a state: scored, scoring, or not scored with its reason', async () => {
+      for (const id of ['scored', 'pending', 'unreadable', 'failed', 'changed']) repository.seedApplication({ id });
+      repository.seedMatchScore('scored', { status: 'scored', reason: null, score: 0.61 });
+      repository.seedMatchScore('pending', { status: 'pending', reason: null, score: null });
+      repository.seedMatchScore('unreadable', { status: 'not_scored', reason: 'cv_unreadable', score: null });
+      repository.seedMatchScore('failed', { status: 'not_scored', reason: 'embedder_failed', score: null });
+      repository.seedMatchScore('changed', { status: 'not_scored', reason: 'model_changed', score: null });
+
+      const cards = await cardsOf();
+
+      expect(Object.fromEntries(cards.map((c) => [c.id, [c.matchScore, c.matchState]]))).toEqual({
+        scored: [0.61, { status: 'scored' }],
+        pending: [null, { status: 'scoring' }],
+        unreadable: [null, { status: 'not_scored', reason: 'cv_unreadable' }],
+        failed: [null, { status: 'not_scored', reason: 'embedder_failed' }],
+        changed: [null, { status: 'not_scored', reason: 'model_changed' }],
+      });
+    });
+
+    it('reads as no score and no state for an Application with no row', async () => {
+      repository.seedApplication({ id: 'mona' });
+
+      const [card] = await cardsOf();
+
+      expect(card?.matchScore).toBeNull();
+      expect(card?.matchState).toBeNull();
+    });
+
+    it('carries nothing of the match but the overall number and the state', async () => {
+      repository.seedApplication({ id: 'mona' });
+      repository.seedMatchScore('mona', { status: 'scored', reason: null, score: 0.7 });
+
+      const [card] = await cardsOf();
+
+      expect(Object.keys(card ?? {}).filter((key) => /match|score|band|vector|chunk/i.test(key)).sort()).toEqual([
+        'matchScore',
+        'matchState',
+      ]);
+    });
+
+    it('costs one query for the whole board, with or without Highlighted questions', async () => {
+      publish('version-1', formOf([city]));
+      for (const id of ['a', 'b', 'c']) repository.seedApplication({ id });
+      await cardsOf();
+      highlight(Q.city);
+      await cardsOf();
+
+      expect(repository.matchScoreReads).toEqual([
+        { companyId: 'company-1', jobId: 'job-1' },
+        { companyId: 'company-1', jobId: 'job-1' },
+      ]);
+    });
+
+    it('reads nothing for a Job with no Applications', async () => {
+      await cardsOf();
+
+      expect(repository.matchScoreReads).toEqual([]);
+    });
+
+    it('ignores a row of another company or Job, and reaches an interviewer', async () => {
+      repository.seedApplication({ id: 'mona' });
+      const scored = { status: 'scored', reason: null, score: 0.9 } as const;
+      repository.seedMatchScore('mona', scored, { companyId: 'company-2', jobId: 'job-1' });
+      repository.seedMatchScore('mona', scored, { companyId: 'company-1', jobId: 'job-9' });
+      expect((await cardsOf('interviewer'))[0]?.matchState).toBeNull();
+
+      repository.seedMatchScore('mona', scored);
+      expect((await cardsOf('interviewer'))[0]?.matchScore).toBe(0.9);
     });
   });
 

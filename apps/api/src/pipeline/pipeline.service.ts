@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { AuthorizationService } from '@nestjs/authorization';
 import {
   FORMER_MEMBER_NAME,
+  bandOf,
   checkRatingCriteria,
   highlightableQuestions,
   highlightKindOf,
@@ -23,7 +24,22 @@ import type { SaveRatingDto } from './dto/save-rating.dto.js';
 import { StorageService } from '../storage/storage.service.js';
 import { DOWNLOAD_URL_TTL_SECONDS } from '../storage/storage.js';
 import { FormsRepository } from '../forms/forms.repository.js';
-import type { ApplicationCard, ApplicationDetail, BoardColumn, CvState, RequirementCheck, RequirementCheckRow, FileLink, HighlightedQuestion, SavedRating } from './pipeline.js';
+import type {
+  ApplicationCard,
+  ApplicationDetail,
+  BoardColumn,
+  CardAddOns,
+  CvState,
+  EmbeddingMatchRow,
+  EmbeddingMatchView,
+  MatchScoreSummary,
+  MatchState,
+  RequirementCheck,
+  RequirementCheckRow,
+  FileLink,
+  HighlightedQuestion,
+  SavedRating,
+} from './pipeline.js';
 import { PipelineRepository } from './pipeline.repository.js';
 
 /**
@@ -61,6 +77,38 @@ function requirementCheckOf(cvState: CvState, row: RequirementCheckRow | null): 
         // No keywords: "not checked" (null), whether or not a verdict was stored.
         matched: requirement.keywords.length === 0 ? null : (match?.matched ?? false),
         terms: match?.terms ?? [],
+      };
+    }),
+  };
+}
+
+/** A stored status as the web sees it: a `pending` row is "scoring". */
+function matchStateOf(row: Pick<MatchScoreSummary, 'status' | 'reason'>): MatchState {
+  if (row.status === 'pending') return { status: 'scoring' };
+  if (row.status === 'scored') return { status: 'scored' };
+  // CHECK `application_match_scores_reason_iff_not_scored`: a not-scored row always has a reason.
+  if (row.reason === null) throw new Error('A not-scored match row has no reason.');
+  return { status: 'not_scored', reason: row.reason };
+}
+
+/**
+ * The embedding match the sheet shows: each Requirement of the version the Application was scored
+ * against, with that version's text and tier and its band. The band is worked out here from the stored
+ * score (`bandOf`, no threshold is stored) and the score itself is dropped, so it never leaves the API.
+ * Only a `scored` row has bands; a Requirement with no stored score has none.
+ */
+function embeddingMatchOf(row: EmbeddingMatchRow | null): EmbeddingMatchView | null {
+  if (!row) return null;
+  return {
+    version: row.version,
+    state: matchStateOf(row),
+    requirements: row.requirements.map((requirement) => {
+      const score = row.status === 'scored' ? row.scores[requirement.id] : undefined;
+      return {
+        id: requirement.id,
+        text: requirement.text,
+        tier: requirement.tier,
+        band: score === undefined ? null : bandOf(score),
       };
     }),
   };
@@ -126,7 +174,7 @@ export class PipelineService {
     companyId: string,
     jobId: string,
     highlighted: HighlightedQuestion[],
-  ): Promise<Omit<ApplicationCard, 'rating' | 'missedMustHave'>[]> {
+  ): Promise<Omit<ApplicationCard, CardAddOns>[]> {
     if (highlighted.length === 0) {
       const rows = await this.pipeline.findCards(companyId, jobId);
       return rows.map((row) => ({ ...row, highlights: {} }));
@@ -156,37 +204,45 @@ export class PipelineService {
   }
 
   /**
-   * Adds each card's Average rating and missed must-have marker. Two queries for the whole board,
-   * run together, never one per card, and none at all when the Job has no Applications. The rating is
-   * a grouped query by the ids of the cards just read (a Rating has no job id); a card whose
-   * Application has no Rating gets `{ average: null, count: 0 }`. The marker is the Job's result rows
-   * with a missed must-have; a card with no stored result is not marked.
+   * Adds each card's Average rating, missed must-have marker and embedding match. Three queries for
+   * the whole board, run together, never one per card, and none at all when the Job has no
+   * Applications. The rating is a grouped query by the ids of the cards just read (a Rating has no job
+   * id); a card whose Application has no Rating gets `{ average: null, count: 0 }`. The marker is the
+   * Job's result rows with a missed must-have; a card with no stored result is not marked. The match is
+   * the Job's score rows: a card with none has `matchScore: null` and `matchState: null`, and only a
+   * `scored` row gives a number.
    */
   private async withMarkers(
     companyId: string,
     jobId: string,
-    cards: Omit<ApplicationCard, 'rating' | 'missedMustHave'>[],
+    cards: Omit<ApplicationCard, CardAddOns>[],
   ): Promise<ApplicationCard[]> {
     if (cards.length === 0) return [];
-    const [summaries, missed] = await Promise.all([
+    const [summaries, missed, matches] = await Promise.all([
       this.pipeline.findRatingSummaries(
         companyId,
         cards.map((card) => card.id),
       ),
       this.pipeline.findMissedMustHaveIds(companyId, jobId),
+      this.pipeline.findMatchScores(companyId, jobId),
     ]);
-    return cards.map((card) => ({
-      ...card,
-      rating: summaries.get(card.id) ?? { average: null, count: 0 },
-      missedMustHave: missed.has(card.id),
-    }));
+    return cards.map((card) => {
+      const match = matches.get(card.id);
+      return {
+        ...card,
+        rating: summaries.get(card.id) ?? { average: null, count: 0 },
+        missedMustHave: missed.has(card.id),
+        matchScore: match?.status === 'scored' ? match.score : null,
+        matchState: match ? matchStateOf(match) : null,
+      };
+    });
   }
 
   async detail(membership: Membership, jobSlug: string, applicationId: string): Promise<ApplicationDetail> {
     const job = await this.jobs.get(membership, jobSlug);
     const detail = await this.pipeline.findDetail(membership.company.id, job.id, applicationId);
     if (!detail) throw new NotFoundException();
-    const { ratings: ratingRows, requirementCheck: checkRow, ...rest } = detail;
+    const { ratings: ratingRows, requirementCheck: checkRow, embeddingMatch: matchRow, ...rest } = detail;
     const ratings = ratingRows.map((rating) => ({
       userId: rating.userId,
       name: rating.userName ?? FORMER_MEMBER_NAME,
@@ -197,6 +253,7 @@ export class PipelineService {
     return {
       ...rest,
       requirementCheck: requirementCheckOf(detail.cvState, checkRow),
+      embeddingMatch: embeddingMatchOf(matchRow),
       ratings,
       ratingSummary: summariseRatings(ratings),
     };

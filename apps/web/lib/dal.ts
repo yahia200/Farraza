@@ -344,7 +344,17 @@ export interface ApplicationSummary {
   flags: ScreeningFlag[];
   /** A must-have Requirement did not match the CV text, mirroring ApplicationCard.missedMustHave. False with no stored result (including an unreadable or failed CV). */
   missedMustHave: boolean;
+  /** The embedding match's overall number, for sorting only (never shown), mirroring ApplicationCard.matchScore. Null unless the state is `scored`. */
+  matchScore: number | null;
+  /** The embedding match's state, mirroring ApplicationCard.matchState. Null when there is no score row. */
+  matchState: MatchStateView | null;
 }
+
+/** Mirrors MatchState in apps/api/src/pipeline/pipeline.ts: a pending score row reads `scoring`. */
+export type MatchStateView =
+  | { status: 'scoring' }
+  | { status: 'scored' }
+  | { status: 'not_scored'; reason: 'cv_unreadable' | 'embedder_failed' | 'model_changed' };
 
 /** Mirrors HighlightedQuestion in apps/api/src/pipeline/pipeline.ts: in form order, with the latest text. */
 export interface HighlightedQuestion {
@@ -410,7 +420,7 @@ export async function getPipelineBoard(companySlug: string, jobSlug: string): Pr
       name,
       position,
       kind,
-      applications: applications.map(({ id: applicationId, status, submittedAt, candidate, highlights, rating, flags, missedMustHave }) => ({
+      applications: applications.map(({ id: applicationId, status, submittedAt, candidate, highlights, rating, flags, missedMustHave, matchScore, matchState }) => ({
         id: applicationId,
         status,
         submittedAt,
@@ -420,6 +430,8 @@ export async function getPipelineBoard(companySlug: string, jobSlug: string): Pr
         rating: { average: rating.average, count: rating.count },
         flags,
         missedMustHave: missedMustHave === true,
+        matchScore: matchScore ?? null,
+        matchState: matchState ?? null,
       })),
     }))
     .sort((a, b) => a.position - b.position);
@@ -483,6 +495,22 @@ export interface RequirementCheckView {
   results: { id: string; text: string; tier: 'must_have' | 'nice_to_have'; matched: boolean | null; terms: string[] }[];
 }
 
+/**
+ * Mirrors EmbeddingMatchView in apps/api/src/pipeline/pipeline.ts. A band only, never a raw score;
+ * `band` is null when the state is not `scored` (or that Requirement has no stored score).
+ */
+export interface EmbeddingMatchDetailView {
+  /** The Requirements version this Application was scored against. */
+  version: number;
+  state: MatchStateView;
+  requirements: {
+    id: string;
+    text: string;
+    tier: 'must_have' | 'nice_to_have';
+    band: 'strong' | 'related' | 'weak' | null;
+  }[];
+}
+
 /** Mirrors ApplicationDetail in apps/api/src/pipeline/pipeline.ts (dates as ISO strings). */
 export interface ApplicationDetailView {
   id: string;
@@ -504,6 +532,8 @@ export interface ApplicationDetailView {
   cvState: CvState;
   /** The stored Requirement check, or null (never checked, or the CV was not `readable`), mirroring ApplicationDetail.requirementCheck. */
   requirementCheck: RequirementCheckView | null;
+  /** The embedding match's state and a band per Requirement, or null with no score row, mirroring ApplicationDetail.embeddingMatch. */
+  embeddingMatch: EmbeddingMatchDetailView | null;
   /** The application's history and its notes, oldest first; `buildActivityTimeline` joins them. */
   events: ActivityEvent[];
   notes: ActivityNote[];
@@ -560,6 +590,18 @@ export async function getApplication(
             tier,
             matched,
             terms,
+          })),
+        }
+      : null,
+    embeddingMatch: detail.embeddingMatch
+      ? {
+          version: detail.embeddingMatch.version,
+          state: detail.embeddingMatch.state,
+          requirements: detail.embeddingMatch.requirements.map(({ id, text, tier, band }) => ({
+            id,
+            text,
+            tier,
+            band,
           })),
         }
       : null,
