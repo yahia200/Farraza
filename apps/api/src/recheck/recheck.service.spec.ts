@@ -347,6 +347,31 @@ describe('RecheckService', () => {
       expect(await service.count(membershipWithRole('owner'), slug)).toEqual({ count: 0 });
     });
 
+    it('reads a keyword-less Requirement as not checked: no marker, no failure', async () => {
+      const sentenceOnly = req('postgres', 'must_have', []);
+      const version = repo.seedVersion(job.id, [sentenceOnly, go]);
+      repo.seedApplication({ id: 'a1', jobId: job.id, text: 'I write Go' });
+      repo.seedApplication({ id: 'a2', jobId: job.id, text: 'I write Rust' });
+
+      const result = await service.run(data, async () => {});
+
+      expect(result).toEqual({ processed: 2 });
+      expect(repo.resultOf('a1')).toMatchObject({ version, missedMustHave: false });
+      expect(repo.resultOf('a1')!.results['postgres']).toEqual({ matched: null, terms: [] });
+      // Only the must-have that has keywords can be missed.
+      expect(repo.resultOf('a2')).toMatchObject({ version, missedMustHave: true });
+      expect(await service.count(membershipWithRole('owner'), slug)).toEqual({ count: 0 });
+    });
+
+    it('never raises the marker for a Job whose only must-have has no keywords', async () => {
+      repo.seedVersion(job.id, [req('postgres', 'must_have', [])]);
+      repo.seedApplication({ id: 'a1', jobId: job.id, text: 'Anything' });
+
+      await service.run(data, async () => {});
+
+      expect(repo.resultOf('a1')).toMatchObject({ missedMustHave: false });
+    });
+
     it('works in chunks and reports progress after each', async () => {
       repo.seedVersion(job.id, [go]);
       for (const id of ['a1', 'a2', 'a3', 'a4', 'a5']) {

@@ -78,7 +78,7 @@ async function Settings({ company, job }: { company: MyCompany; job: LoadedJob }
             Requirements
           </h2>
           <p className="text-sm text-muted-foreground">
-            What a candidate should have, each with the keywords that count as evidence in their CV. Candidates are
+            What a candidate should have, each with optional keywords that count as evidence in their CV. Candidates are
             checked against these and the result is shown to your team as advice: CV matching never rejects anyone.
             Editing requirements leaves the results already shown alone until you re-check candidates.
           </p>

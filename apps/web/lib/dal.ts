@@ -474,7 +474,8 @@ export interface RequirementCheckView {
   /** The Requirements version this Application was checked against. */
   version: number;
   missedMustHave: boolean;
-  results: { id: string; text: string; tier: 'must_have' | 'nice_to_have'; matched: boolean; terms: string[] }[];
+  /** `matched: null` is "not checked": the Requirement has no keywords. */
+  results: { id: string; text: string; tier: 'must_have' | 'nice_to_have'; matched: boolean | null; terms: string[] }[];
 }
 
 /** Mirrors ApplicationDetail in apps/api/src/pipeline/pipeline.ts (dates as ISO strings). */

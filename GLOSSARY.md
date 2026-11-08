@@ -109,7 +109,7 @@ A rule a manager sets on a Job, about one form question, that is checked once wh
 _Avoid_: Auto-reject rule (the old name, from when reject was the only outcome), Knockout (the internal code term), filter
 
 **Requirement**:
-Something a manager says a Candidate should have, written for a Job in plain words, such as "Has run Postgres in production", and marked must-have or nice-to-have. Each Requirement lists the keywords and synonyms that count as evidence of it in a CV. A Requirement is checked against the CV text only, never the form answers (that is a Screening rule's job), and it only advises: a must-have the CV does not mention is flagged for a reviewer, and nothing is ever rejected or moved because of a Requirement. A CV whose text cannot be read never counts as missing a Requirement.
+Something a manager says a Candidate should have, written for a Job in plain words, such as "Has run Postgres in production", and marked must-have or nice-to-have. Each Requirement may list the keywords and synonyms that count as evidence of it in a CV; one with no keywords is "not checked" by keyword match (neither found nor missing) and is only looked at by the embedding match. A Requirement is checked against the CV text only, never the form answers (that is a Screening rule's job), and it only advises: a must-have the CV does not mention is flagged for a reviewer, and nothing is ever rejected or moved because of a Requirement. A CV whose text cannot be read never counts as missing a Requirement.
 _Avoid_: Criterion (a Criterion is a Rating dimension), Skill, Screening rule (a Screening rule checks a form answer and can reject)
 
 **Application limit**:

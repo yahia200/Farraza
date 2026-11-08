@@ -298,12 +298,16 @@ function RequirementCard({
           id={`${id}-text`}
           value={requirement.text}
           maxLength={REQUIREMENT_TEXT_MAX_LENGTH}
-          placeholder="For example: 3+ years of TypeScript"
+          placeholder="For example: Experience with TypeScript"
           disabled={disabled}
           aria-invalid={textMessages.length > 0}
-          aria-describedby={textMessages.length > 0 ? `${id}-text-errors` : undefined}
+          aria-describedby={`${id}-text-help${textMessages.length > 0 ? ` ${id}-text-errors` : ''}`}
           onChange={(event) => onChange({ ...requirement, text: event.target.value })}
         />
+        <p id={`${id}-text-help`} className="text-sm text-muted-foreground">
+          Describe the skill, not the level: &quot;Experience with PostgreSQL&quot;, not &quot;intermediate
+          Postgres&quot;. For years of experience, use a Screening rule on the application form.
+        </p>
         {textMessages.length > 0 && (
           <p id={`${id}-text-errors`} role="alert" className="text-sm text-destructive">
             {textMessages.join(' ')}
@@ -340,7 +344,13 @@ function RequirementCard({
         className="flex min-w-0 flex-col gap-2"
         aria-invalid={keywordMessages.length > 0}
       >
-        <legend className="mb-1.5 text-sm font-medium text-muted-foreground">Keywords</legend>
+        <legend className="mb-1.5 text-sm font-medium text-muted-foreground">Keywords (optional)</legend>
+        {requirement.keywords.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            No keywords: keyword match skips this requirement, so it is never marked missing. Only the match
+            score (when it is available) looks at it.
+          </p>
+        )}
         {requirement.keywords.length > 0 && (
           <ul className="flex flex-col gap-1.5">
             {requirement.keywords.map((keyword, at) => (

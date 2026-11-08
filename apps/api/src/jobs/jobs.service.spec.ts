@@ -1098,6 +1098,17 @@ describe('JobsService', () => {
       expect(payload.requirementsVersion).toBe(0);
     });
 
+    it('saves a Requirement with no keywords as a new version', async () => {
+      const job = jobs.seedJob(company.id, 'Backend Engineer');
+      await save(job.slug, [req(1)]);
+      const sentenceOnly = req(2, { keywords: [] });
+
+      const saved = await save(job.slug, [req(1), sentenceOnly]);
+
+      expect(saved).toEqual({ requirements: [req(1), sentenceOnly], version: 2 });
+      expect(jobs.versionsOf(job.id)[1]?.requirements[1]?.keywords).toEqual([]);
+    });
+
     it('creates version N+1 when the list changes', async () => {
       const job = jobs.seedJob(company.id, 'Backend Engineer');
       await save(job.slug, [req(1)]);
@@ -1243,12 +1254,19 @@ describe('JobsService', () => {
       });
     });
 
-    it('refuses an unknown key, a requirement with no keywords and an over-cap list', async () => {
+    it('passes a requirement with no keywords through', async () => {
+      const sentenceOnly = { ...valid, keywords: [] };
+      await expect(
+        validate({ requirements: [sentenceOnly] }),
+      ).resolves.toEqual({ requirements: [sentenceOnly] });
+    });
+
+    it('refuses an unknown key, a requirement with no sentence and an over-cap list', async () => {
       await expect(
         validate({ requirements: [], extra: 1 }),
       ).rejects.toBeInstanceOf(BadRequestException);
       await expect(
-        validate({ requirements: [{ ...valid, keywords: [] }] }),
+        validate({ requirements: [{ ...valid, text: ' ' }] }),
       ).rejects.toBeInstanceOf(BadRequestException);
       const many = Array.from({ length: REQUIREMENTS_LIMIT + 1 }, (_, i) => ({
         ...valid,
