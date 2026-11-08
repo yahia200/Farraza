@@ -7,7 +7,13 @@ import type { JobWithStages } from '../jobs/job.js';
 import type { JobsService } from '../jobs/jobs.service.js';
 import type { StorageService } from '../storage/storage.service.js';
 import type { ScreeningFlag } from '@repo/shared';
-import type { ApplicationDetailRow, CvState, RatingRow, RequirementCheckRow } from './pipeline.js';
+import type {
+  ApplicationDetailRow,
+  CvState,
+  EmbeddingMatchRow,
+  RatingRow,
+  RequirementCheckRow,
+} from './pipeline.js';
 import type { PipelineRepository } from './pipeline.repository.js';
 import { PipelineService } from './pipeline.service.js';
 
@@ -33,6 +39,7 @@ class InMemoryPipelineRepository implements Pick<PublicApi<PipelineRepository>, 
     flags: ScreeningFlag[];
     cvState: CvState;
     requirementCheck: RequirementCheckRow | null;
+    embeddingMatch: EmbeddingMatchRow | null;
   }[] = [];
   private readonly ratings: StoredRating[] = [];
   /** How many times `findDetail` ran: the detail must not cost a query per Rating. */
@@ -45,6 +52,7 @@ class InMemoryPipelineRepository implements Pick<PublicApi<PipelineRepository>, 
     flags?: ScreeningFlag[];
     cvState?: CvState;
     requirementCheck?: RequirementCheckRow | null;
+    embeddingMatch?: EmbeddingMatchRow | null;
   }): void {
     this.applications.push({
       companyId: 'company-1',
@@ -52,6 +60,7 @@ class InMemoryPipelineRepository implements Pick<PublicApi<PipelineRepository>, 
       flags: [],
       cvState: 'none',
       requirementCheck: null,
+      embeddingMatch: null,
       ...row,
     });
   }
@@ -96,6 +105,7 @@ class InMemoryPipelineRepository implements Pick<PublicApi<PipelineRepository>, 
       flags: found.flags,
       cvState: found.cvState,
       requirementCheck: found.requirementCheck,
+      embeddingMatch: found.embeddingMatch,
       events: [],
       notes: [],
       ratings,
@@ -430,5 +440,136 @@ describe('PipelineService.detail: Requirement results and the CV state', () => {
     const result = await detail();
 
     expect(JSON.stringify(result)).not.toMatch(/cv_?text/i);
+  });
+});
+
+describe('PipelineService.detail: the embedding match', () => {
+  const pgId = '44444444-4444-4444-8444-444444444444';
+  const reactId = '55555555-5555-4555-8555-555555555555';
+  const goId = '66666666-6666-4666-8666-666666666666';
+  const requirements = [
+    { id: pgId, text: 'Knows Postgres', tier: 'must_have' as const, keywords: [] },
+    { id: reactId, text: 'Knows React', tier: 'nice_to_have' as const, keywords: ['React'] },
+    { id: goId, text: 'Writes Go', tier: 'nice_to_have' as const, keywords: [] },
+  ];
+  const scored: EmbeddingMatchRow = {
+    version: 4,
+    status: 'scored',
+    reason: null,
+    // 0.65 and above is strong, below 0.50 is weak, between is related (bandOf in @repo/shared).
+    scores: { [pgId]: 0.7, [reactId]: 0.55, [goId]: 0.3 },
+    requirements,
+  };
+  let repository: InMemoryPipelineRepository;
+  let service: PipelineService;
+
+  beforeEach(() => {
+    repository = new InMemoryPipelineRepository();
+    // `authorize` fails the test if called: the detail has no policy.
+    const noPolicy = {
+      authorize: async () => {
+        throw new Error('detail must not call a policy');
+      },
+    } as unknown as AuthorizationService;
+    service = new PipelineService(
+      repository as unknown as PipelineRepository,
+      new FakeJobs() as unknown as JobsService,
+      noPolicy,
+      {} as StorageService,
+      {} as FormsRepository,
+    );
+  });
+
+  const detail = (role: MemberRole = 'recruiter') => service.detail(member('company-1', role), 'engineer', 'app-1');
+
+  it("gives a band per Requirement of the version it was scored against, with that version's text and tier, and the state", async () => {
+    repository.seedApplication({ id: 'app-1', embeddingMatch: scored });
+
+    const result = await detail();
+
+    expect(result.embeddingMatch).toEqual({
+      version: 4,
+      state: { status: 'scored' },
+      requirements: [
+        { id: pgId, text: 'Knows Postgres', tier: 'must_have', band: 'strong' },
+        { id: reactId, text: 'Knows React', tier: 'nice_to_have', band: 'related' },
+        { id: goId, text: 'Writes Go', tier: 'nice_to_have', band: 'weak' },
+      ],
+    });
+  });
+
+  it('computes the band on read, at the boundaries', async () => {
+    repository.seedApplication({
+      id: 'app-1',
+      embeddingMatch: { ...scored, scores: { [pgId]: 0.65, [reactId]: 0.5, [goId]: 0.4999 } },
+    });
+
+    const result = await detail();
+
+    expect(result.embeddingMatch?.requirements.map((r) => r.band)).toEqual(['strong', 'related', 'weak']);
+  });
+
+  it('never carries a raw per-Requirement score, a vector, a chunk or CV text', async () => {
+    repository.seedApplication({ id: 'app-1', cvState: 'readable', embeddingMatch: scored });
+
+    const result = await detail();
+
+    expect(Object.keys(result.embeddingMatch ?? {}).sort()).toEqual(['requirements', 'state', 'version']);
+    for (const requirement of result.embeddingMatch?.requirements ?? []) {
+      expect(Object.keys(requirement).sort()).toEqual(['band', 'id', 'text', 'tier']);
+    }
+    // The stored numbers appear nowhere in what the match adds to the payload.
+    expect(JSON.stringify(result.embeddingMatch)).not.toMatch(/0\.7|0\.55|0\.3\b/);
+  });
+
+  it('is null for an Application with no score row', async () => {
+    repository.seedApplication({ id: 'app-1' });
+
+    expect((await detail()).embeddingMatch).toBeNull();
+  });
+
+  it('shows "scoring" for a pending row, with no band yet', async () => {
+    repository.seedApplication({
+      id: 'app-1',
+      embeddingMatch: { version: 4, status: 'pending', reason: null, scores: {}, requirements },
+    });
+
+    const result = await detail();
+
+    expect(result.embeddingMatch?.state).toEqual({ status: 'scoring' });
+    expect(result.embeddingMatch?.requirements.map((r) => r.band)).toEqual([null, null, null]);
+  });
+
+  it.each(['cv_unreadable', 'embedder_failed', 'model_changed'] as const)(
+    'shows not scored with the reason %s, and no band',
+    async (reason) => {
+      repository.seedApplication({
+        id: 'app-1',
+        embeddingMatch: { version: 4, status: 'not_scored', reason, scores: {}, requirements },
+      });
+
+      const result = await detail();
+
+      expect(result.embeddingMatch?.state).toEqual({ status: 'not_scored', reason });
+      expect(result.embeddingMatch?.requirements.map((r) => r.band)).toEqual([null, null, null]);
+    },
+  );
+
+  it('gives a Requirement with no stored score no band rather than dropping it', async () => {
+    repository.seedApplication({ id: 'app-1', embeddingMatch: { ...scored, scores: { [pgId]: 0.9 } } });
+
+    const result = await detail();
+
+    expect(result.embeddingMatch?.requirements.map((r) => [r.id, r.band])).toEqual([
+      [pgId, 'strong'],
+      [reactId, null],
+      [goId, null],
+    ]);
+  });
+
+  it('reaches an interviewer', async () => {
+    repository.seedApplication({ id: 'app-1', embeddingMatch: scored });
+
+    expect((await detail('interviewer')).embeddingMatch?.state).toEqual({ status: 'scored' });
   });
 });

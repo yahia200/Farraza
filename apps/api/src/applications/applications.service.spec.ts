@@ -2494,6 +2494,32 @@ describe('ApplicationsService', () => {
     });
   });
 
+  // The embedding match (Layer 3) is members-only too: no score, band or state, and nothing read from a
+  // CV, leaves by a public route (ticket 08, glossary: CV text).
+  describe('no embedding-match score reaches the public routes', () => {
+    const keysOf = (value: unknown): string[] =>
+      Array.isArray(value)
+        ? value.flatMap(keysOf)
+        : value !== null && typeof value === 'object'
+          ? Object.entries(value).flatMap(([key, inner]) => [key, ...keysOf(inner)])
+          : [];
+
+    it('carries no score, band, state or embedding field in the apply page, the listing, the branding or the submit answer', async () => {
+      repository.seedJob({ slug: 'backend', cvMode: 'optional' });
+
+      const payloads = [
+        await service.getPublicJob('acme', 'backend'),
+        await service.listCompanyJobs('acme'),
+        await service.getCompanyBranding('acme'),
+        await service.submit('acme', 'backend', applicant()),
+      ];
+
+      for (const payload of payloads) {
+        expect(keysOf(payload).filter((key) => /score|band|matchState|embedding|vector|chunk|cvText/i.test(key))).toEqual([]);
+      }
+    });
+  });
+
   // The public listing at /{companySlug}: a company's branding and only its open jobs, projected to
   // the fields applicants may see. The repository query is checked against the real database by hand.
   describe('listCompanyJobs', () => {

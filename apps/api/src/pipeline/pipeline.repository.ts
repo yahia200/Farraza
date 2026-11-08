@@ -15,6 +15,8 @@ import type {
   CardRow,
   CardRowWithAnswers,
   CvState,
+  EmbeddingMatchRow,
+  MatchScoreSummary,
   RequirementCheckRow,
   ApplicationFile,
   ApplicationStatus,
@@ -97,6 +99,10 @@ export class PipelineRepository {
 
   private get requirementResults() {
     return this.prisma.db.orm.public.ApplicationRequirementResult;
+  }
+
+  private get matchScores() {
+    return this.prisma.db.orm.public.ApplicationMatchScore;
   }
 
   private get requirementVersions() {
@@ -193,6 +199,22 @@ export class PipelineRepository {
   }
 
   /**
+   * The embedding match of every Application of this Job that has a score row, by Application id, in
+   * one query by the company and the Job (the row carries both). Only the status, reason and overall
+   * number are selected: the per-Requirement `scores` are for the detail alone. An Application with
+   * no row (never queued, or no CV) has no entry.
+   */
+  async findMatchScores(companyId: string, jobId: string): Promise<Map<string, MatchScoreSummary>> {
+    const rows = await this.matchScores
+      .select('applicationId', 'status', 'reason', 'score')
+      .where({ companyId, jobId })
+      .all();
+    return new Map(
+      rows.map((row) => [row.applicationId, { status: row.status, reason: row.reason, score: row.score }]),
+    );
+  }
+
+  /**
    * The `fields` of each of these form versions of this company's job, by version id. Unknown ids,
    * and ids of another job's or company's versions, are left out.
    */
@@ -229,7 +251,7 @@ export class PipelineRepository {
       .first();
     if (!row) return null;
 
-    const [eventRows, noteRows, ratingRows, cvState, requirementCheck] = await Promise.all([
+    const [eventRows, noteRows, ratingRows, cvState, requirementCheck, embeddingMatch] = await Promise.all([
       this.events
         .where({ applicationId })
         .orderBy((event) => event.createdAt.asc())
@@ -248,6 +270,7 @@ export class PipelineRepository {
         .all(),
       this.findCvState(companyId, applicationId),
       this.findRequirementCheck(companyId, applicationId),
+      this.findEmbeddingMatch(companyId, applicationId),
     ]);
 
     return {
@@ -269,6 +292,7 @@ export class PipelineRepository {
       flags: row.flags as ScreeningFlag[],
       cvState,
       requirementCheck,
+      embeddingMatch,
       events: eventRows.map((event) => ({
         id: event.id,
         type: event.type,
@@ -329,6 +353,28 @@ export class PipelineRepository {
       missedMustHave: result.missedMustHave,
       // CHECKed objects/arrays, written only by the submit from the matcher and a parsed list.
       results: result.results as RequirementMatches,
+      requirements: (version?.requirements ?? []) as Requirement[],
+    };
+  }
+
+  /**
+   * The Application's score row with the Requirements of the version it names, looked up by (Job,
+   * version) from the immutable `job_requirement_versions` row. Null with no row. The chunk and
+   * Requirement vectors, and the CV text, are never read here.
+   */
+  private async findEmbeddingMatch(companyId: string, applicationId: string): Promise<EmbeddingMatchRow | null> {
+    const row = await this.matchScores.where({ companyId, applicationId }).first();
+    if (!row) return null;
+    const version = await this.requirementVersions
+      .select('requirements')
+      .where({ companyId, jobId: row.jobId, version: row.requirementsVersion })
+      .first();
+    return {
+      version: row.requirementsVersion,
+      status: row.status,
+      reason: row.reason,
+      // CHECKed to be an object, and written only by `EmbeddingMatchRepository.saveScore`.
+      scores: row.scores as Record<string, number>,
       requirements: (version?.requirements ?? []) as Requirement[],
     };
   }

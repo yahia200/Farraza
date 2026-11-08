@@ -5,6 +5,7 @@ import type {
   FormFields,
   Highlight,
   HighlightKind,
+  MatchBand,
   RatingSummary,
   RatingValues,
   Requirement,
@@ -12,6 +13,7 @@ import type {
   RequirementTier,
   ScreeningFlag,
 } from '@repo/shared';
+import type { NotScoredReason } from '../embedding-match/embedding-match.js';
 import type { StageKind } from '../jobs/job.js';
 
 export type ApplicationStatus = 'active' | 'rejected' | 'hired' | 'withdrawn';
@@ -45,10 +47,38 @@ export interface ApplicationCard {
    * every unreadable, failed or missing CV, and a miss of only nice-to-haves.
    */
   missedMustHave: boolean;
+  /**
+   * The embedding match's overall number (Layer 3), for sorting only: the web app never shows it. Null
+   * unless the Application is `scored`: no row, scoring and not scored all read null. Per-Requirement
+   * scores, vectors and passages never leave the API on a card.
+   */
+  matchScore: number | null;
+  /** The embedding match's state, or null when the Application has no score row. */
+  matchState: MatchState | null;
 }
 
-/** A card as `PipelineRepository` reads it, before the service adds the Highlighted answers, the rating and the marker. */
-export type CardRow = Omit<ApplicationCard, 'highlights' | 'rating' | 'missedMustHave'>;
+/**
+ * Where an Application's embedding match stands: `scoring` (a pending row), `scored`, or `not_scored`
+ * with why. A missing row is not a state: it reads as null where this type is used.
+ */
+export type MatchState =
+  | { status: 'scoring' }
+  | { status: 'scored' }
+  | { status: 'not_scored'; reason: NotScoredReason };
+
+/** An `application_match_scores` row as the board reads it: status, reason and the overall number only. */
+export interface MatchScoreSummary {
+  status: 'pending' | 'scored' | 'not_scored';
+  reason: NotScoredReason | null;
+  /** The overall number; null unless `scored` (a CHECK on the table). */
+  score: number | null;
+}
+
+/** The part of a card the service adds from other reads: rating, marker and embedding match. */
+export type CardAddOns = 'rating' | 'missedMustHave' | 'matchScore' | 'matchState';
+
+/** A card as `PipelineRepository` reads it, before the service adds the Highlighted answers, the rating and the markers. */
+export type CardRow = Omit<ApplicationCard, 'highlights' | CardAddOns>;
 
 /** A card row plus what the service needs to resolve its Highlighted answers. Stays inside the API. */
 export interface CardRowWithAnswers extends CardRow {
@@ -110,6 +140,12 @@ export interface ApplicationDetail {
   cvState: CvState;
   /** The stored Requirement check, or null when there is none (never checked, or CV not `readable`). */
   requirementCheck: RequirementCheck | null;
+  /**
+   * The embedding match: its state and a band per Requirement of the version it was scored against, or
+   * null when the Application has no score row. Bands are worked out on read; no raw score, vector,
+   * passage or CV text is ever in it.
+   */
+  embeddingMatch: EmbeddingMatchView | null;
   /** Every Member's Rating of this Application, oldest first. */
   ratings: RatingView[];
   /** The count, the average and the per-Criterion averages of `ratings` (`summariseRatings`). */
@@ -147,6 +183,37 @@ export interface RequirementCheckRow {
   requirements: Requirement[];
 }
 
+/** One Requirement with its band for this Application. Text and tier come from the scored version. */
+export interface RequirementBandView {
+  id: string;
+  text: string;
+  tier: RequirementTier;
+  /** Null when there is no band to show: not `scored`, or no stored score for this Requirement. */
+  band: MatchBand | null;
+}
+
+export interface EmbeddingMatchView {
+  /** The `job_requirement_versions.version` the Application was scored against. */
+  version: number;
+  state: MatchState;
+  /** One entry per Requirement of that version, in its order. */
+  requirements: RequirementBandView[];
+}
+
+/**
+ * The Application's score row as `PipelineRepository` reads it, beside the Requirements of the version
+ * it names. `scores` (Requirement id to its best dot product) stays inside the API: the service turns
+ * it into bands.
+ */
+export interface EmbeddingMatchRow {
+  version: number;
+  status: 'pending' | 'scored' | 'not_scored';
+  reason: NotScoredReason | null;
+  scores: Record<string, number>;
+  /** The Requirements of `version` (looked up by Job and version); `[]` if the version row is gone. */
+  requirements: Requirement[];
+}
+
 /**
  * One Member's Rating as the detail shows it. `userId` and `name` describe the author: `userId` is null
  * and `name` is "Former member" when the author's user is gone (the Rating stays and still counts).
@@ -169,10 +236,11 @@ export interface RatingRow extends RatingValues {
 /** The detail as `PipelineRepository.findDetail` reads it, before the service resolves names and the summary. */
 export type ApplicationDetailRow = Omit<
   ApplicationDetail,
-  'ratings' | 'ratingSummary' | 'requirementCheck'
+  'ratings' | 'ratingSummary' | 'requirementCheck' | 'embeddingMatch'
 > & {
   ratings: RatingRow[];
   requirementCheck: RequirementCheckRow | null;
+  embeddingMatch: EmbeddingMatchRow | null;
 };
 
 /** A Rating as the API answers after a save: the Member's own scores and when they were saved. */
