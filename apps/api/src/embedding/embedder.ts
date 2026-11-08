@@ -12,7 +12,7 @@
 export type EmbedKind = 'query' | 'document';
 
 export interface EmbedResult {
-  /** One vector per input text, in the same order. */
+  /** One vector per non-blank input text, in the same order (blank texts have no vector). */
   vectors: number[][];
   /** The model that produced the vectors, stored beside them. */
   model: string;
@@ -22,8 +22,12 @@ export interface EmbedResult {
 
 export interface Embedder {
   /**
-   * Embeds every text. The result always has exactly one vector per input; an
-   * implementation that cannot guarantee that throws instead of returning fewer.
+   * Embeds the texts. Blank texts (empty or whitespace only) are skipped: they
+   * are never sent to the model and get no vector, so the result has exactly
+   * one vector per non-blank input, in input order. Callers that need one
+   * vector per text must pass non-blank texts only. An implementation that
+   * cannot return a vector for every non-blank text throws instead of
+   * returning fewer. With no non-blank text the result has no vectors.
    * Throws an `EmbedderError` when the service is unreachable or answers badly.
    */
   embed(texts: string[], kind: EmbedKind): Promise<EmbedResult>;
