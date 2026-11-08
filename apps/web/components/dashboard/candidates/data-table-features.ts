@@ -1,5 +1,6 @@
 import {
   columnFilteringFeature,
+  columnVisibilityFeature,
   createFilteredRowModel,
   createSortedRowModel,
   filterFn_equals,
@@ -24,11 +25,14 @@ export interface CandidatesTableMeta {
 /**
  * TanStack Table v9 setup for a job's candidates: sorting, plus column
  * filtering for the stage filter. Same pattern as the jobs list
- * (components/dashboard/jobs/data-table-features.ts).
+ * (components/dashboard/jobs/data-table-features.ts). Column visibility is
+ * here for one reason: the hidden `matchScore` column that "Sort by score"
+ * sorts by (see columns.tsx), whose number must never be displayed.
  */
 export const candidatesTableFeatures = tableFeatures({
   rowSortingFeature,
   columnFilteringFeature,
+  columnVisibilityFeature,
   sortedRowModel: createSortedRowModel(),
   filteredRowModel: createFilteredRowModel(),
   // `basic` compares numbers: stages sort by their pipeline position.

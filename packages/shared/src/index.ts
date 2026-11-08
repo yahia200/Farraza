@@ -5,6 +5,7 @@ export * from './preset-keys.js';
 export * from './answers.js';
 export * from './answer-text.js';
 export * from './highlight-display.js';
+export * from './match-sort.js';
 export * from './highlights.js';
 export * from './rating-criteria.js';
 export * from './ratings.js';

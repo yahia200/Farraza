@@ -22,12 +22,24 @@ export interface DataTableColumnMeta {
   className?: string;
 }
 
-const metaOf = (column: { columnDef: { meta?: unknown } }) =>
-  column.columnDef.meta as DataTableColumnMeta | undefined;
+const metaOf = (column: { columnDef: { meta?: unknown } }) => column.columnDef.meta as DataTableColumnMeta | undefined;
 
 /** Only tables that register rowSortingFeature give columns these methods. */
-type SortableColumn = { getIsSorted?: () => false | 'asc' | 'desc'; toggleSorting?: (desc?: boolean) => void };
+type SortableColumn = {
+  getIsSorted?: () => false | 'asc' | 'desc';
+  toggleSorting?: (desc?: boolean) => void;
+};
 const sortStateOf = (column: unknown) => (column as SortableColumn).getIsSorted?.() ?? false;
+
+/**
+ * Only tables that register columnVisibilityFeature give rows `getVisibleCells` and the table
+ * `getVisibleLeafColumns`; without it every column is shown. The candidates table hides its
+ * "Sort by score" column this way. The all-column APIs would render hidden columns anyway
+ * (table-core 9.2.8 `skills/table-features/references/column-visibility.md`, "Rendering hidden
+ * cells anyway").
+ */
+type VisibilityRow<TCell> = { getVisibleCells?: () => TCell[] };
+type VisibilityTable = { getVisibleLeafColumns?: () => unknown[] };
 
 export function DataTable<TFeatures extends TableFeatures, TData extends RowData>({
   table,
@@ -37,7 +49,7 @@ export function DataTable<TFeatures extends TableFeatures, TData extends RowData
   emptyMessage?: ReactNode;
 }) {
   const rows = table.getRowModel().rows;
-  const columnCount = table.getAllLeafColumns().length;
+  const columnCount = (table as VisibilityTable).getVisibleLeafColumns?.().length ?? table.getAllLeafColumns().length;
 
   return (
     <div className="overflow-hidden rounded-2xl border">
@@ -65,7 +77,10 @@ export function DataTable<TFeatures extends TableFeatures, TData extends RowData
           {rows.length ? (
             rows.map((row) => (
               <TableRow key={row.id}>
-                {row.getAllCells().map((cell) => (
+                {(
+                  (row as VisibilityRow<ReturnType<typeof row.getAllCells>[number]>).getVisibleCells?.() ??
+                  row.getAllCells()
+                ).map((cell) => (
                   <TableCell key={cell.id} className={metaOf(cell.column)?.className}>
                     <table.FlexRender cell={cell} />
                   </TableCell>

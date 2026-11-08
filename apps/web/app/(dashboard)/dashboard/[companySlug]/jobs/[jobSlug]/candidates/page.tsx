@@ -99,6 +99,7 @@ async function Candidates({
           columns={columns}
           highlightedQuestions={highlightedQuestions}
           stages={job.stages}
+          requirementCount={job.requirements.length}
           basePath={basePath}
         />
       )}
@@ -125,11 +126,13 @@ function TableView({
   columns,
   highlightedQuestions,
   stages,
+  requirementCount,
   basePath,
 }: {
   columns: PipelineColumn[];
   highlightedQuestions: HighlightedQuestion[];
   stages: LoadedJob['stages'];
+  requirementCount: number;
   basePath: string;
 }) {
   // `appliedLabel` was formatted on the server by the DAL (lib/format.ts), so it can't differ from the browser's.
@@ -139,6 +142,7 @@ function TableView({
       data={rows}
       stages={stages}
       highlightedQuestions={highlightedQuestions}
+      requirementCount={requirementCount}
       meta={{ basePath }}
     />
   );

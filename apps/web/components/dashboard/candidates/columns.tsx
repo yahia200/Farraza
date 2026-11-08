@@ -1,7 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { compareHighlightSort, highlightSortValue, type HighlightSortValue } from '@repo/shared';
+import {
+  compareHighlightSort,
+  compareMatchSort,
+  highlightSortValue,
+  matchSortValue,
+  type HighlightSortValue,
+} from '@repo/shared';
 import { createColumnHelper } from '@tanstack/react-table';
 import { DataTableSortButton } from '@/components/data-table/data-table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -51,6 +57,28 @@ const ratingColumn = columnHelper.accessor(
   },
 );
 
+/** The id of the hidden column "Sort by score" sorts by; shared with candidates-table.tsx. */
+export const MATCH_SCORE_COLUMN_ID = 'matchScore';
+
+/**
+ * The embedding match's overall number, as a sort key only: the table hides it
+ * (`initialState.columnVisibility`), so it has no header and shows no cell. It is
+ * not a user-clickable sort, so "Sort by score" (candidates-table.tsx) is the
+ * only thing that sets it, as `{ id: 'matchScore', desc: false }`. The column's
+ * own order is "best first" (`compareMatchSort`: highest score first, no score
+ * last, equal scores a tie), so no `sortUndefined` and no `desc`. A tie falls
+ * through to the next sort entry, the Applied date (table-core 9.2.8,
+ * createSortedRowModel.js: `compareRows` moves on at `sortInt === 0`, then
+ * falls back to the row's original index).
+ */
+const matchScoreColumn = columnHelper.accessor((row) => matchSortValue(row), {
+  id: MATCH_SCORE_COLUMN_ID,
+  enableColumnFilter: false,
+  enableHiding: false,
+  sortFn: (rowA, rowB, columnId) =>
+    compareMatchSort(rowA.getValue<number | undefined>(columnId), rowB.getValue<number | undefined>(columnId)),
+});
+
 const contactColumn = columnHelper.display({
   id: 'contact',
   header: 'Contact',
@@ -64,7 +92,7 @@ const contactColumn = columnHelper.display({
   meta: { className: 'w-px' },
 });
 
-const stageColumn =columnHelper.accessor((row) => row.stage.position, {
+const stageColumn = columnHelper.accessor((row) => row.stage.position, {
   id: 'stage',
   header: ({ column }) => <DataTableSortButton column={column}>Stage</DataTableSortButton>,
   // Sorted and filtered by pipeline position, shown by name.
@@ -121,10 +149,7 @@ function highlightColumn({ key, label, kind }: HighlightedQuestion) {
       </DataTableSortButton>
     ),
     cell: ({ row }) => (
-      <HighlightAnswer
-        answer={row.original.highlights[key] ?? null}
-        className={`block ${HIGHLIGHT_WIDTH} truncate`}
-      />
+      <HighlightAnswer answer={row.original.highlights[key] ?? null} className={`block ${HIGHLIGHT_WIDTH} truncate`} />
     ),
   });
 }
@@ -145,5 +170,6 @@ export function candidateColumns(highlightedQuestions: HighlightedQuestion[]) {
     stageColumn,
     appliedColumn,
     contactColumn,
+    matchScoreColumn,
   ]);
 }
