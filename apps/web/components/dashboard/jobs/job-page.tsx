@@ -3,7 +3,7 @@ import { FormSkeleton, SkeletonGroup } from '@/components/dashboard/skeletons';
 import { getCompany, getJob, type CompanyJob, type JobStage, type MyCompany } from '@/lib/dal';
 
 type JobParams = Promise<{ companySlug: string; jobSlug: string }>;
-export type LoadedJob = CompanyJob & { stages: JobStage[] };
+export type LoadedJob = CompanyJob & { stages: JobStage[]; requirementsLocked: boolean };
 
 /**
  * Like CompanyPage, for /dashboard/[companySlug]/jobs/[jobSlug]/…: awaits the

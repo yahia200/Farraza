@@ -10,11 +10,27 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] A service spec shows a save is allowed at 99 Applications and refused at 100, and that a rejected Application counts
-- [ ] A refused save writes no version and leaves the stored list untouched
-- [ ] The Job payload's locked flag is correct on both sides of the limit, and no public payload carries it
+- [x] A service spec shows a save is allowed at 99 Applications and refused at 100, and that a rejected Application counts
+- [x] A refused save writes no version and leaves the stored list untouched
+- [x] The Job payload's locked flag is correct on both sides of the limit, and no public payload carries it
 - [ ] The Settings tab shows the read-only list and the reason, checked in a browser on a Job at the limit
-- [ ] `docs/db-schema.md` or the API rules mention the limit where Requirements are described
-- [ ] `pnpm lint`, `pnpm check-types` and `pnpm --filter api test` pass
+- [x] `docs/db-schema.md` or the API rules mention the limit where Requirements are described
+- [x] `pnpm lint`, `pnpm check-types` and `pnpm --filter api test` pass
+
+## Answer
+
+Commit: see `git log` on branch `worktree-agent-aa3abc85afd2a687f` (subject `feat(jobs): lock Requirements at the Edit limit`).
+
+Decisions:
+- `REQUIREMENT_EDIT_LIMIT = 100` lives in its own file `packages/shared/src/requirement-edit-limit.ts` (one export line in `index.ts`) so it does not collide with the scoring constants or the optional-keywords edits to `requirements.ts`.
+- `JobsService.saveRequirements` counts Applications (`JobsRepository.countApplications`, an unfiltered `count(*)` by company and Job, so rejected ones count) before comparing lists, and throws a 409 `ConflictException`. An unchanged list is refused too (simplest rule; the locked editor cannot send one anyway). The role check runs first, so an interviewer still gets 403.
+- The flag is on the single-Job payload only: new `JobsService.getDetail` returns `JobDetail` (`JobWithStages` plus `requirementsLocked`) and the controller's `GET :jobSlug` uses it. `get` (shared by a dozen services) is unchanged, so it runs no extra count and no other payload carries the flag. `POST` create and the list do not carry it.
+- No public payload carries it: `getPublicJob` builds its answer field by field, and the existing spec "returns no Requirements, results or marker from the public job payload" (regex `/requirement/i` on the JSON) covers a `requirementsLocked` key.
+- Web: `getJob` returns `requirementsLocked` (`LoadedJob`, not `CompanyJob`); the editor takes `locked`, disables every control and shows a status Alert with the reason; Re-check stays usable.
+
+Open items:
+- The browser box is unticked: needs the owner (seed or submit 100 Applications on a Job, open its Settings tab, check the Alert, the read-only list, a working Re-check button, and that a PUT returns 409).
+- Count and insert are not one transaction, so a save racing the 100th submit can land; judged acceptable for a cost bound (noted in the service, the db schema doc and api.md).
+- The real `countApplications` query is not covered by a spec (fake repository); it is a plain `aggregate(count)` copied from `PrismaMfaStore.countRecoveryCodes`.

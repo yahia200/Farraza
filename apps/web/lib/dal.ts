@@ -205,7 +205,10 @@ export async function getJobs(companySlug: string): Promise<CompanyJob[]> {
 }
 
 /** One job with its pipeline stages, or the not-found page. */
-export async function getJob(companySlug: string, jobSlug: string): Promise<CompanyJob & { stages: JobStage[] }> {
+export async function getJob(
+  companySlug: string,
+  jobSlug: string,
+): Promise<CompanyJob & { stages: JobStage[]; requirementsLocked: boolean }> {
   'use cache: private';
 
   const response = await apiFetch(jobsPath(companySlug, jobSlug));
@@ -218,9 +221,11 @@ export async function getJob(companySlug: string, jobSlug: string): Promise<Comp
   if (!response.ok) {
     throw new Error(`Could not load the job (HTTP ${response.status}).`);
   }
-  const job = (await response.json()) as CompanyJob & { stages: JobStage[] };
+  const job = (await response.json()) as CompanyJob & { stages: JobStage[]; requirementsLocked: boolean };
   return {
     ...toCompanyJob(job),
+    // The Edit limit (API `JobDetail`): only the single-job payload carries it, so it is not on `CompanyJob`.
+    requirementsLocked: job.requirementsLocked,
     stages: job.stages.map(({ id, name, position, kind }) => ({ id, name, position, kind })),
   };
 }

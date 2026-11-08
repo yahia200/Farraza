@@ -59,6 +59,15 @@ export interface JobWithStages extends Job {
   requirementsVersion: number;
 }
 
+/**
+ * The Job as the manager-facing `GET .../jobs/:jobSlug` returns it: the Job with its stages and
+ * current Requirements, plus whether the Requirements are locked by the Edit limit (the Job holds
+ * `REQUIREMENT_EDIT_LIMIT` or more Applications, of any status). Never part of a public payload.
+ */
+export interface JobDetail extends JobWithStages {
+  requirementsLocked: boolean;
+}
+
 export const DEFAULT_STAGES: ReadonlyArray<Omit<Stage, 'id'>> = [
   { name: 'Applied', position: 0, kind: 'normal', publicLabel: 'received' },
   { name: 'Screening', position: 1, kind: 'normal', publicLabel: 'in_review' },
