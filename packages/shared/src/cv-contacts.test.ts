@@ -180,6 +180,31 @@ describe('extractContactSuggestions: links and location by Preset key', () => {
     const text = `https://example.com/${'a'.repeat(2100)}`;
     expect(answerFor(extractContactSuggestions(text, [portfolio]), portfolio)).toBeUndefined();
   });
+
+  // Patterns from the 38-CV test run (test/cvs/software-developer, local only), with invented values.
+  it('finds a location on a line that also holds an email, a phone and a link label', () => {
+    const lines = [
+      'Karen Santos\nSenior Front-End Developer\nk.santos@example.com (123) 456-7890 Brooklyn, NY LinkedIn\nWORK EXPERIENCE',
+      'Charlotte May\nFrontend Developer\njohn.smith@example.com London, UK\nSummary',
+    ];
+    expect(answerFor(extractContactSuggestions(lines[0]!, [location]), location)).toBe('Brooklyn, NY');
+    expect(answerFor(extractContactSuggestions(lines[1]!, [location]), location)).toBe('London, UK');
+  });
+
+  it('does not take a job title list, a sentence or letter-spaced fragments as a location', () => {
+    const titles = 'Lena Park\nInfrastructure Engineer, Network Administrator, System Administrator\nwork';
+    expect(answerFor(extractContactSuggestions(titles, [location]), location)).toBeUndefined();
+    const sentence = 'Lena Park\nSAP Enhancements, Forms,Idoc RFC and Workflows.\nwork';
+    expect(answerFor(extractContactSuggestions(sentence, [location]), location)).toBeUndefined();
+    const spaced = 'Lena Park\n134/55 District 12, Ho Chi Minh, Vie tnam\nwork';
+    expect(answerFor(extractContactSuggestions(spaced, [location]), location)).toBeUndefined();
+  });
+
+  it('does not offer a resume builder watermark as a portfolio', () => {
+    const text = 'Charlotte May\nLondon, UK\nCreated with www.enhancv.com/resume\nhttps://charlotte.dev';
+    expect(answerFor(extractContactSuggestions(text, [portfolio]), portfolio)).toBe('https://charlotte.dev');
+    expect(answerFor(extractContactSuggestions('Powered by enhancv.com', [portfolio]), portfolio)).toBeUndefined();
+  });
 });
 
 // The server runs the extractor on applicant-supplied text up to the cap (50,000 characters), so

@@ -34,9 +34,26 @@ const SEGMENT_SEPARATOR = /[|•·●▪\t]| {2,}/;
 
 /** Job titles and institutions: two capitalised words that are not a person. */
 const ROLE_WORD =
-  /\b(engineer|developer|programmer|manager|designer|analyst|intern|consultant|architect|lead|director|specialist|scientist|officer|assistant|coordinator|administrator|accountant|teacher|student|graduate|university|college|school|institute)\b/i;
+  /\b(engineer|developer|programmer|manager|designer|analyst|intern|consultant|architect|lead|director|specialist|scientist|officer|assistant|coordinator|administrator|accountant|teacher|student|graduate|university|college|school|institute|bachelor|bachelors|master|masters|degree|diploma|doctorate|phd)\b/i;
 
-const NAME_SCAN_LINES = 10;
+/**
+ * How far down the CV a name is looked for. Two-column templates put it after the sidebar (lines 60
+ * and 68 in the 38-CV test run), so this is deep; what keeps a deep scan safe is `NAME_TOP_LINES`.
+ */
+const NAME_SCAN_LINES = 150;
+
+/**
+ * A candidate on one of the first lines (counting non-blank lines) is taken on position alone. One
+ * further down needs evidence (`hasEvidence`), because below the header block a two-word line is
+ * more often a degree, a skill or a heading ("Bachelor of Science", "KEY ACHIEVEMENTS") than a name.
+ */
+const NAME_TOP_LINES = 5;
+
+/** A line with more pieces than this is a list ("JavaScript | HTML | PHP | ..."), not a contact line. */
+const MAX_NAME_LINE_SEGMENTS = 4;
+
+/** "Name : Sara Hassan", "Full name: ...", "Họ và tên : ..." (Vietnamese): the name is what follows the label. */
+const NAME_LABEL = /^(?:full\s+name|name|họ\s+và\s+tên|họ\s+tên|tên)\s*[:：]\s*(.+)$/iu;
 
 /**
  * What is measured about one candidate line. Raw facts only, no weights. `null` means "this
@@ -56,6 +73,8 @@ export interface NameFeatures {
   emailMatch: number | null;
   /** Holds a job-title or institution word ("Software Engineer", "Cairo University"). */
   roleWord: boolean;
+  /** The line said so: it follows a "Name :" label. */
+  labelled: boolean;
 }
 
 export interface NameCandidate {
@@ -121,37 +140,72 @@ export function nameCandidates(
     if (!drawn.has(key)) drawn.set(key, line);
   }
 
-  const gated: { text: string; words: string[]; position: number; line: CvLayoutLine | undefined }[] = [];
+  const gated: {
+    text: string;
+    words: string[];
+    position: number;
+    line: CvLayoutLine | undefined;
+    labelled: boolean;
+  }[] = [];
   let position = 0;
   const drawnLines = [...drawn.entries()];
   /** The layout line for a piece of text: the same text, else the line that holds it (a segment). */
   const drawnFor = (text: string) =>
     drawn.get(text) ?? drawnLines.find(([key]) => key.includes(text))?.[1];
+  /** The non-blank lines in order, for joining a name written over two lines. */
+  const seen: { whole: string; position: number }[] = [];
 
   for (const raw of lines.slice(0, NAME_SCAN_LINES)) {
     const whole = normalizeSpaces(raw);
     if (whole === '') continue;
     const here = position++;
-    // A name often shares its line with contact details ("Sara Hassan  +20 100 123 4567"). The whole
+    seen.push({ whole, position: here });
+
+    // A labelled name ("Name : Sara Hassan") is read from after the label. The label is evidence.
+    const label = NAME_LABEL.exec(whole)?.[1];
+    if (label !== undefined) {
+      const labelled = gate(normalizeSpaces(label.split(SEGMENT_SEPARATOR)[0] ?? ''));
+      if (labelled) {
+        gated.push({ ...labelled, position: here, line: drawnFor(labelled.text), labelled: true });
+        continue;
+      }
+    }
+
+    // A name often shares its line with contact details ("Sara Hassan  +20 100 ..."). The whole
     // line is tried first, so "Omar  Khaled" stays one name; only a line that fails the gate is
     // split into its pieces.
     const wholeGate = gate(whole);
+    const segments = raw.split(SEGMENT_SEPARATOR).map(normalizeSpaces).filter((piece) => piece !== '' && piece !== whole);
+    // A long list is not a header line: its pieces count only if the email vouches for one.
+    const isList = segments.length > MAX_NAME_LINE_SEGMENTS;
     const pieces = wholeGate
       ? [wholeGate]
-      : raw
-          .split(SEGMENT_SEPARATOR)
-          .map(normalizeSpaces)
-          .filter((piece) => piece !== '' && piece !== whole)
-          .flatMap((piece) => gate(piece) ?? []);
+      : segments
+          .flatMap((piece) => gate(piece) ?? [])
+          .filter((piece) => !isList || (emailMatchRatio(piece.words, email) ?? 0) > 0);
     for (const piece of pieces) {
-      gated.push({ ...piece, position: here, line: drawnFor(piece.text) });
+      gated.push({ ...piece, position: here, line: drawnFor(piece.text), labelled: false });
     }
   }
+
+  // A name over two lines ("ENRIQUE" above "VERAGOZA"): two one-word lines that sit together at the
+  // top. Only the top, so a stray pair of words further down is never glued into a name.
+  for (let i = 0; i + 1 < seen.length; i++) {
+    const first = seen[i]!;
+    const second = seen[i + 1]!;
+    if (second.position >= NAME_TOP_LINES) break;
+    if (first.whole.includes(' ') || second.whole.includes(' ')) continue;
+    // Each half must be a possible name word on its own: "Resume" above "one" is no name.
+    if ([first.whole, second.whole].some((word) => NOT_A_NAME.test(word) || NOT_NAME_WORD.test(word))) continue;
+    const joined = gate(`${first.whole} ${second.whole}`);
+    if (joined) gated.push({ ...joined, position: first.position, line: undefined, labelled: false });
+  }
+  gated.sort((a, b) => a.position - b.position);
 
   const sizes = gated.flatMap((candidate) => (candidate.line ? [candidate.line.fontSize] : []));
   const biggest = sizes.length > 0 ? Math.max(...sizes) : null;
 
-  return gated.map(({ text, words, position: at, line }) => ({
+  return gated.map(({ text, words, position: at, line, labelled }) => ({
     text,
     features: {
       position: at,
@@ -160,6 +214,7 @@ export function nameCandidates(
       allCaps: text === text.toUpperCase() && text !== text.toLowerCase(),
       emailMatch: emailMatchRatio(words, email),
       roleWord: ROLE_WORD.test(text),
+      labelled,
     },
   }));
 }
@@ -177,6 +232,7 @@ export function nameCandidates(
  *   name in another script, scores 0: absence is not a mismatch.
  * - Bold (+1.5) and all capitals (+1) only add. Bold is never penalised when false, because
  *   `fontFamily` often cannot say bold at all (see `cv-layout.ts`).
+ * - A "Name :" label is as strong as an email match (+4): the CV says it is the name.
  * - Position is a mild tiebreaker (-0.3 per line above), so with no other signal the first
  *   candidate still wins, as it did before scoring existed.
  */
@@ -186,6 +242,7 @@ const NAME_WEIGHTS = {
   emailMatch: 4,
   bold: 1.5,
   allCaps: 1,
+  labelled: 4,
   position: -0.3,
 } as const;
 
@@ -197,17 +254,36 @@ export function scoreNameFeatures(features: NameFeatures): number {
   if (features.emailMatch !== null) score += NAME_WEIGHTS.emailMatch * features.emailMatch;
   if (features.bold === true) score += NAME_WEIGHTS.bold;
   if (features.allCaps) score += NAME_WEIGHTS.allCaps;
+  if (features.labelled) score += NAME_WEIGHTS.labelled;
   return score;
 }
 
-/** The best-scoring candidate's text; on a tie the earlier line wins. Undefined without a candidate. */
+/**
+ * A candidate far from the top is only believable with a reason: a "Name :" label, an email whose
+ * words match it, or being the biggest text on the page when at least one other candidate was drawn.
+ */
+function hasEvidence(features: NameFeatures, sizedCandidates: number): boolean {
+  return (
+    features.labelled ||
+    (features.emailMatch ?? 0) > 0 ||
+    (features.relativeSize !== null && features.relativeSize >= 0.999 && sizedCandidates >= 2)
+  );
+}
+
+/**
+ * The best-scoring candidate's text; on a tie the earlier line wins. A candidate beyond the first
+ * `NAME_TOP_LINES` lines must have evidence (`hasEvidence`). Undefined without a candidate.
+ */
 export function findName(
   lines: readonly string[],
   email: string | undefined,
   layout?: CvLayout,
 ): string | undefined {
+  const candidates = nameCandidates(lines, email, layout);
+  const sized = candidates.filter((candidate) => candidate.features.relativeSize !== null).length;
   let best: { text: string; score: number } | undefined;
-  for (const candidate of nameCandidates(lines, email, layout)) {
+  for (const candidate of candidates) {
+    if (candidate.features.position >= NAME_TOP_LINES && !hasEvidence(candidate.features, sized)) continue;
     const score = scoreNameFeatures(candidate.features);
     if (best === undefined || score > best.score) best = { text: candidate.text, score };
   }

@@ -97,6 +97,17 @@ const NOT_PORTFOLIO_HOSTS = new Set([
   'wa.me',
   't.me',
   'youtube.com',
+  // Resume builders put their own address in a footer or watermark ("Created with enhancv.com").
+  'enhancv.com',
+  'canva.com',
+  'novoresume.com',
+  'zety.com',
+  'resume.io',
+  'resumegenius.com',
+  'kickresume.com',
+  'flowcv.com',
+  'livecareer.com',
+  'myperfectresume.com',
 ]);
 
 const PROFILE_SLUG = '[\\p{L}\\p{N}_%-]+';
@@ -141,7 +152,21 @@ const PLACE = /^\p{Lu}[\p{L}\p{M}.'’ -]*(?:,\s*\p{Lu}[\p{L}\p{M}.'’ -]*){1,2
 
 /** Words that make a "Word, Word" line a job title or an institution, not a place. */
 const NOT_PLACE_WORDS =
-  /\b(engineer|developer|manager|designer|analyst|intern|consultant|architect|lead|director|specialist|university|college|school|institute|inc|ltd|llc|company|corp)\b/i;
+  /\b(engineer|developer|manager|designer|analyst|intern|consultant|architect|lead|director|specialist|administrator|officer|assistant|coordinator|technician|accountant|programmer|university|college|school|institute|inc|ltd|llc|company|corp)\b/i;
+
+/** Lower-case joining words: a place never has one ("... Forms, Idoc RFC and Workflows."). */
+const SENTENCE_WORDS = /\b(?:and|or|with|for|using|the|to)\b/;
+
+/** The labels of contact details ("LinkedIn", "Email:"), which sit beside a city on one line. */
+const CONTACT_LABEL = /\b(?:linkedin|github|portfolio|website|e-?mail|phone|mobile|tel)\b\s*:?/giu;
+
+/**
+ * A line with its email, phone, links and their labels blanked out, so a city on the same line
+ * ("k@example.com (123) 456-7890 Brooklyn, NY LinkedIn") is left as its own piece.
+ */
+function withoutContactDetails(line: string): string {
+  return line.replace(EMAIL, '  ').replace(PHONE, '  ').replace(URL_LIKE, '  ').replace(CONTACT_LABEL, '  ');
+}
 
 function findLocation(lines: string[], name: string | undefined): string | undefined {
   let seenFirstLine = false;
@@ -156,9 +181,9 @@ function findLocation(lines: string[], name: string | undefined): string | undef
     if (labelled && !/[@\d]/.test(labelled)) return labelled;
 
     if (isFirstLine) continue;
-    for (const segment of trimmed.split(/[|•·●▪\t]| {2,}/)) {
+    for (const segment of withoutContactDetails(trimmed).split(/[|•·●▪\t]| {2,}/)) {
       const part = segment.trim();
-      if (PLACE.test(part) && !NOT_PLACE_WORDS.test(part)) return part;
+      if (PLACE.test(part) && !NOT_PLACE_WORDS.test(part) && !SENTENCE_WORDS.test(part)) return part;
     }
   }
   return undefined;

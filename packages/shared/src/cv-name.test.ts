@@ -72,8 +72,8 @@ describe('nameCandidates', () => {
     expect(candidates[0]?.features).toMatchObject({ relativeSize: null, bold: null });
   });
 
-  it('only scans the first ten lines', () => {
-    const lines = [...Array.from({ length: 10 }, () => ''), 'Sara Hassan'];
+  it('only scans the first 150 lines, blank ones included', () => {
+    const lines = [...Array.from({ length: 150 }, () => ''), 'Sara Hassan'];
     expect(nameCandidates(lines, undefined)).toEqual([]);
   });
 });
@@ -169,14 +169,76 @@ describe('findName ranking', () => {
     expect(findName(['Omar Khaled', 'Sara Hassan'], undefined, layout)).toBe('Omar Khaled');
   });
 
-  it('counts the tenth line but not the eleventh', () => {
+  it('counts the 150th line but not the 151st', () => {
+    // Blank lines do not move a name down (its position counts non-blank lines), so it still needs no evidence.
     const blanksThen = (n: number) => [...Array.from({ length: n }, () => ''), 'Sara Hassan'];
-    expect(findName(blanksThen(9), undefined)).toBe('Sara Hassan'); // 10th line
-    expect(findName(blanksThen(10), undefined)).toBeUndefined(); // 11th line
+    expect(findName(blanksThen(149), undefined)).toBe('Sara Hassan'); // 150th line
+    expect(findName(blanksThen(150), undefined)).toBeUndefined(); // 151st line
   });
 
   it('lets a wrong or missing layout fall back to the text alone', () => {
     const layout: CvLayout = { lines: [{ text: 'Unrelated Text', fontSize: 40, bold: true }] };
     expect(findName(['Omar Khaled', 'Cairo Egypt'], undefined, layout)).toBe('Omar Khaled');
+  });
+});
+
+// The fixes from the 38-CV test run (test/cvs/software-developer, local only). Each case is a pattern
+// seen there, rebuilt with invented names.
+describe('findName: a name that is not at the very top needs evidence', () => {
+  const FILLER = ['CONTACT', 'a.vaughn@example.com', '(123) 456-7890', 'Austin, TX', 'LinkedIn', 'EDUCATION'];
+
+  it('does not guess a degree, a skill or a heading from further down', () => {
+    // "Bachelor of Science", "Web API Entity Framework" and "KEY ACHIEVEMENTS" all pass the gate.
+    expect(findName([...FILLER, 'Bachelor of Science', 'Computer Science'], undefined)).toBeUndefined();
+    expect(findName([...FILLER, 'Web API Entity Framework'], 'other@example.com')).toBeUndefined();
+    expect(findName([...FILLER, 'KEY ACHIEVEMENTS'], undefined)).toBeUndefined();
+  });
+
+  it('still takes a name near the top without any evidence', () => {
+    expect(findName(['Omar Khaled', 'Cairo Egypt'], undefined)).toBe('Omar Khaled');
+    expect(findName(['Curriculum Vitae', 'Software Engineer', 'Omar Khaled'], undefined)).toBe('Omar Khaled');
+  });
+
+  it('takes a name further down when the email agrees with it', () => {
+    expect(findName([...FILLER, 'Bachelor of Science', 'ALARIC VAUGHN'], 'a.vaughn@example.com')).toBe('ALARIC VAUGHN');
+  });
+
+  it('takes a name further down when it is the biggest text on the page', () => {
+    const layout: CvLayout = {
+      lines: [
+        { text: 'Bachelor of Science', fontSize: 11, bold: false },
+        { text: 'PHAM DO TU ANH', fontSize: 28, bold: false },
+      ],
+    };
+    expect(findName([...FILLER, 'Bachelor of Science', 'PHAM DO TU ANH'], undefined, layout)).toBe('PHAM DO TU ANH');
+  });
+
+  it('looks past the tenth line for such a name, but not for one with no evidence', () => {
+    const lines = [...Array.from({ length: 40 }, (_, i) => `line ${i} of some sentence here`), 'Sara Hassan'];
+    expect(findName(lines, 'sara.hassan@example.com')).toBe('Sara Hassan');
+    expect(findName(lines, undefined)).toBeUndefined();
+  });
+});
+
+describe('nameCandidates: a name over two lines, a labelled name, a list', () => {
+  it('joins two single-word lines that sit together at the top', () => {
+    const lines = ['ENRIQUE', 'VERAGOZA', 'Front-End Developer', 'e.veragoza@example.com'];
+    expect(findName(lines, 'e.veragoza@example.com')).toBe('ENRIQUE VERAGOZA');
+  });
+
+  it('does not join a one-word line with a heading below it', () => {
+    expect(findName(['Sara', 'Experience'], undefined)).toBeUndefined();
+  });
+
+  it('reads the name after a label, in English and Vietnamese', () => {
+    expect(findName(['Name : Sara Hassan', 'Cairo'], undefined)).toBe('Sara Hassan');
+    const lines = [...Array.from({ length: 15 }, () => 'a line of text that is not a name'), 'Họ và tên : Nguyễn Lương Bình'];
+    expect(findName(lines, undefined)).toBe('Nguyễn Lương Bình');
+  });
+
+  it('does not take an item of a long skills list as a name', () => {
+    const lines = ['Objective', 'Skills', 'JavaScript | HTML | PHP | Python | Problem Solving | Teamwork', 'jessica hue'];
+    expect(findName(lines, 'jessicahue@example.com')).toBe('jessica hue');
+    expect(nameCandidates(lines, undefined).map((c) => c.text)).not.toContain('Problem Solving');
   });
 });
