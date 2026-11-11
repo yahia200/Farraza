@@ -22,6 +22,11 @@ const httpUrl = () => z.url({ protocol: /^https?$/ });
 export const envSchema = z.object({
   PORT: z.coerce.number().int().positive(),
   DATABASE_URL: z.string().min(1),
+  // Postgres for the background queue (BullMQ, ADR-0007). Optional: unset means
+  // DATABASE_URL. BullMQ sends `-c search_path=...` as a startup option, which a
+  // pooled endpoint (Neon's `-pooler` host, PgBouncer) refuses, so behind a pooler
+  // this must be the direct (unpooled) connection string.
+  QUEUE_DATABASE_URL: z.string().min(1).optional(),
   // The web app's origin: CORS origin and the session's trusted origin.
   APP_URL: httpUrl(),
   // Shared with the web app so the API trusts its forwarded client address.

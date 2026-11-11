@@ -28,9 +28,12 @@ import { RecheckService } from './recheck.service.js';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         setDefaultBackendFactory(createPostgresBackend);
-        return {
-          connection: { connectionString: config.getOrThrow<string>('DATABASE_URL'), migrate: true },
-        } as never;
+        // BullMQ pins `search_path` with a startup option, which a pooled connection
+        // string (Neon `-pooler`) refuses, so a pooled setup sets QUEUE_DATABASE_URL
+        // to the direct one. Unset, it uses the same database URL as the app.
+        const connectionString =
+          config.get<string>('QUEUE_DATABASE_URL') ?? config.getOrThrow<string>('DATABASE_URL');
+        return { connection: { connectionString, migrate: true } } as never;
       },
     }),
     BullModule.registerQueue({ name: RECHECK_QUEUE }),

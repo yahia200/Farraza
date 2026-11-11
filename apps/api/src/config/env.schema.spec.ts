@@ -60,6 +60,21 @@ describe('validateEnv', () => {
     expect(env.SMTP_URL).toBe('smtp://user:pass@smtp.example.com:587');
   });
 
+  describe('queue database', () => {
+    it('is optional: unset means the queue uses DATABASE_URL', () => {
+      expect(validateEnv(valid()).QUEUE_DATABASE_URL).toBeUndefined();
+    });
+
+    it('accepts a direct connection string', () => {
+      const url = 'postgresql://user:pass@ep-example.eu-central-1.aws.neon.tech/db';
+      expect(validateEnv({ ...valid(), QUEUE_DATABASE_URL: url }).QUEUE_DATABASE_URL).toBe(url);
+    });
+
+    it('refuses an empty value', () => {
+      expect(() => validateEnv({ ...valid(), QUEUE_DATABASE_URL: '' })).toThrow(/QUEUE_DATABASE_URL/);
+    });
+  });
+
   describe('embedding service (Layer 3)', () => {
     it('boots with both variables unset, in production too', () => {
       const env = validateEnv({
