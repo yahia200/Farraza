@@ -21,6 +21,7 @@
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
     "docx-preview": "0.4.1",
+    "jszip": "3.10.2",
     "lucide-react": "^1.52.0",
     "mammoth": "^1.13.0",
     "motion": "^14.5.0",

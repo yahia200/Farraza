@@ -31,6 +31,7 @@ export * from './file-preview.js';
 export * from './image-upload.js';
 export * from './screening-display.js';
 export * from './cv-text.js';
+export * from './docx-text.js';
 export * from './cv-contacts.js';
 export * from './cv-layout.js';
 export * from './cv-autofill.js';

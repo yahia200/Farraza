@@ -3,6 +3,8 @@ import {
   CV_PDF_TYPE,
   buildLayoutLines,
   contentTypeOf,
+  docxPartText,
+  isDocxHeaderOrFooter,
   normalizeCvText,
   resolveCvTextStatus,
   type CvLayout,
@@ -16,7 +18,8 @@ import {
  * - PDF: `unpdf` (`node_modules/unpdf/README.md`: `getDocumentProxy`, `extractText`, and
  *   `extractTextItems` for the first page's layout: font size and bold, used to score the name).
  * - DOCX: `mammoth` (`node_modules/mammoth/README.md`, `mammoth.extractRawText`, input
- *   `{ arrayBuffer }` in the browser; types in `lib/index.d.ts`).
+ *   `{ arrayBuffer }` in the browser; types in `lib/index.d.ts`), plus `jszip` for the header and
+ *   footer parts mammoth skips (`@repo/shared` `docx-text.ts`).
  * Both are loaded with `import()` only when a CV is picked
  * (`node_modules/next/dist/docs/01-app/02-guides/lazy-loading.md`, "Loading External Libraries"),
  * so the apply page's first load does not grow.
@@ -88,7 +91,42 @@ async function readDocx(data: ArrayBuffer): Promise<{ text: string; layout?: CvL
   // extractors read a blank line as the gap between entries. Halve each run of line breaks so a
   // Word paragraph is one line and an empty paragraph is one blank line (checked with mammoth 1.x
   // on a hand-made DOCX).
-  return { text: value.replace(/\n\n/g, "\n") };
+  const body = value.replace(/\n\n/g, "\n");
+  // mammoth skips headers and footers, where many CVs keep their email and website.
+  const { headers, footers } = await readDocxHeadersAndFooters(data);
+  return { text: [headers, body, footers].filter((part) => part !== "").join("\n") };
+}
+
+/** More header and footer parts than this is not a CV (Word makes up to three per section). */
+const MAX_DOCX_HEADER_FOOTER_PARTS = 9;
+
+/**
+ * The text of the DOCX's header and footer parts (`word/header*.xml`, `word/footer*.xml`), which
+ * `mammoth.extractRawText` leaves out. A DOCX is a zip, opened with `jszip`
+ * (`node_modules/jszip/README.markdown`, `JSZip.loadAsync`; types in `index.d.ts`); only the
+ * matching entries are decompressed. A bonus like the PDF layout: any failure gives no extra text,
+ * and the body is still returned.
+ */
+async function readDocxHeadersAndFooters(data: ArrayBuffer): Promise<{ headers: string; footers: string }> {
+  try {
+    const { default: JSZip } = await import("jszip");
+    const zip = await JSZip.loadAsync(data);
+    const names = Object.keys(zip.files)
+      .filter(isDocxHeaderOrFooter)
+      .sort()
+      .slice(0, MAX_DOCX_HEADER_FOOTER_PARTS);
+    const textOfParts = async (prefix: string) => {
+      const parts: string[] = [];
+      for (const name of names.filter((n) => n.startsWith(`word/${prefix}`))) {
+        const part = docxPartText((await zip.file(name)?.async("string")) ?? "");
+        if (part !== "") parts.push(part);
+      }
+      return parts.join("\n");
+    };
+    return { headers: await textOfParts("header"), footers: await textOfParts("footer") };
+  } catch {
+    return { headers: "", footers: "" };
+  }
 }
 
 /**
