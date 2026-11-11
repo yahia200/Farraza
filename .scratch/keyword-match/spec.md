@@ -1,4 +1,4 @@
-Status: draft (for owner review, not yet ticketed beyond the slices below)
+Status: resolved (all 9 tickets in `.scratch/keyword-match/issues/` resolved; Layer 2 built and verified)
 
 > **Changed by Layer 3 (embedding match, ticket 04): keywords are now optional.** A Requirement may have an empty keyword list. `matchRequirements` then returns `matched: null` ("not checked", no terms) for it, `missedMustHave` ignores it (never a miss, never a marker), and the sheet shows "Not checked". Results stored earlier read as before. The editor says a keyword-less Requirement is only looked at by Layer 3, and where this spec says "1 to 15 keywords", read "0 to 15". Re-check handles it with no special case. See `.scratch/candidate-matching/layer3-spec.md` (stories 7 to 10).
 
