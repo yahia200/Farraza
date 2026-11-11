@@ -456,8 +456,8 @@ describe('PipelineService.detail: the embedding match', () => {
     version: 4,
     status: 'scored',
     reason: null,
-    // 0.65 and above is strong, below 0.50 is weak, between is related (bandOf in @repo/shared).
-    scores: { [pgId]: 0.7, [reactId]: 0.55, [goId]: 0.3 },
+    // 0.47 and above is strong, below 0.415 is weak, between is related (bandOf in @repo/shared).
+    scores: { [pgId]: 0.7, [reactId]: 0.44, [goId]: 0.3 },
     requirements,
   };
   let repository: InMemoryPipelineRepository;
@@ -501,7 +501,7 @@ describe('PipelineService.detail: the embedding match', () => {
   it('computes the band on read, at the boundaries', async () => {
     repository.seedApplication({
       id: 'app-1',
-      embeddingMatch: { ...scored, scores: { [pgId]: 0.65, [reactId]: 0.5, [goId]: 0.4999 } },
+      embeddingMatch: { ...scored, scores: { [pgId]: 0.47, [reactId]: 0.415, [goId]: 0.4149 } },
     });
 
     const result = await detail();
@@ -519,7 +519,7 @@ describe('PipelineService.detail: the embedding match', () => {
       expect(Object.keys(requirement).sort()).toEqual(['band', 'id', 'text', 'tier']);
     }
     // The stored numbers appear nowhere in what the match adds to the payload.
-    expect(JSON.stringify(result.embeddingMatch)).not.toMatch(/0\.7|0\.55|0\.3\b/);
+    expect(JSON.stringify(result.embeddingMatch)).not.toMatch(/0\.7|0\.44|0\.3\b/);
   });
 
   it('is null for an Application with no score row', async () => {

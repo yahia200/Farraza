@@ -9,10 +9,20 @@
 
 **Blocked by:** 06 (an Application can be scored).
 
-**Status:** ready-for-human
+**Status:** resolved (constants applied; one rater and one Job, see the Answer)
 
 - [ ] The owner has marked the CVs for each Requirement
 - [ ] Scores per group and the overlap are written into the notes file
 - [ ] The strong and weak constants, and the prefix wording, are updated with the reasoning recorded
 - [ ] The placeholders in the spec and the backlog item are replaced by the tested values, or marked as failed
 - [ ] Any real CV stays out of git (check `git status` before committing)
+
+## Answer
+
+Run on 2026-11-09 with 38 software-developer CVs x 8 keyworded Requirements (304 cells), qwen3-embedding:0.6b, leave-one-CV-out. Ground truth is one rater (Claude, from the text layer), not the owner's marks, so treat it as a first calibration. The CVs and scripts are git-ignored and exist only on the owner's machine (`test/cvs/`).
+
+- Old placeholders (strong 0.65, weak 0.50): balanced accuracy 0.37; 1 of 101 strong cells came out strong.
+- Applied: `SCORE_STRONG_MIN = 0.47`, `SCORE_WEAK_MAX = 0.415` in `packages/shared/src/embedding-match.ts`. Leave-one-CV-out balanced accuracy 0.62 (accuracy 0.67); strong minimum 0.47 in all 38 folds, weak maximum 0.40 to 0.42.
+- Instruction prefix: kept. Removing it costs about 0.13 balanced accuracy; four other wordings are within noise (AUC 0.854 to 0.864). Chunk size left alone (not a proven win).
+- Ranking: Spearman 0.81 against the rater's rank, top 10 overlap 8 of 10.
+- Limits: embeddings rank topic, not level (two students rated 2 came out 6th and 7th; QA CVs score strong on an automated-tests Requirement). Not tested: a bigger Qwen3 model, experience-only chunks, more labelled Jobs, the owner's own marks.

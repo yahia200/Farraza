@@ -160,8 +160,8 @@ describe("scoreApplication", () => {
 describe("placeholder constants", () => {
   it("are the values the spec names", () => {
     expect(NICE_TO_HAVE_WEIGHT).toBe(0.1);
-    expect(SCORE_STRONG_MIN).toBe(0.65);
-    expect(SCORE_WEAK_MAX).toBe(0.5);
+    expect(SCORE_STRONG_MIN).toBe(0.47);
+    expect(SCORE_WEAK_MAX).toBe(0.415);
     expect(REQUIREMENT_QUERY_INSTRUCTION).toBe(
       "Instruct: Given a job requirement, retrieve resume passages that satisfy it\nQuery:",
     );
@@ -170,14 +170,14 @@ describe("placeholder constants", () => {
 
 describe("bandOf", () => {
   it.each([
-    [0.65, "strong"],
-    [0.6500001, "strong"],
+    [0.47, "strong"],
+    [0.4700001, "strong"],
     [0.9, "strong"],
     [1, "strong"],
-    [0.6499999, "related"],
-    [0.6, "related"],
-    [0.5, "related"],
-    [0.4999999, "weak"],
+    [0.4699999, "related"],
+    [0.45, "related"],
+    [0.415, "related"],
+    [0.4149999, "weak"],
     [0.3, "weak"],
     [0, "weak"],
     [-0.2, "weak"],

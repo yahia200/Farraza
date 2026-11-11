@@ -49,10 +49,17 @@ export const MUST_HAVE_WEIGHT = 1;
 /** Weight of a nice-to-have Requirement in the overall number. Placeholder. */
 export const NICE_TO_HAVE_WEIGHT = 0.1;
 
-/** A score at or above this is `strong`. Placeholder, to be tested on real CVs (ticket 12). */
-export const SCORE_STRONG_MIN = 0.65;
-/** A score below this is `weak`. Placeholder, to be tested on real CVs (ticket 12). */
-export const SCORE_WEAK_MAX = 0.5;
+/**
+ * A score at or above this is `strong`. Tested on 38 software-developer CVs x 8 Requirements with
+ * qwen3-embedding:0.6b (2026-11-09): 0.47 is the strong minimum in all 38 leave-one-CV-out folds.
+ * The old placeholder 0.65 called 1 of 101 strong cells strong. Retest if the model changes.
+ */
+export const SCORE_STRONG_MIN = 0.47;
+/**
+ * A score below this is `weak`. Same test: the best weak maximum was 0.40 to 0.42 per fold; 0.415
+ * is the pair's value (balanced accuracy 0.62 leave-one-CV-out, against 0.37 for 0.65/0.50).
+ */
+export const SCORE_WEAK_MAX = 0.415;
 
 /**
  * Put before a Requirement's text when it is embedded as a query (documents get none). Provisional
